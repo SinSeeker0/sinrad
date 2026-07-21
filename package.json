@@ -1,0 +1,59 @@
+{
+  "name": "sinrad",
+  "productName": "Sinrad",
+  "version": "1.23.0",
+  "description": "S.I.R — Personal Command Center (Vault, Links, Quick Folders, device folder search, Spotify, Console).",
+  "main": "main.js",
+  "author": "You",
+  "license": "MIT",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "pack": "electron-builder --dir",
+    "dist": "electron-builder",
+    "build:linux": "electron-builder --linux",
+    "build:win": "electron-builder --win",
+    "build:mac": "electron-builder --mac"
+  },
+  "devDependencies": {
+    "electron": "^32.2.0",
+    "electron-builder": "^25.1.8"
+  },
+  "build": {
+    "appId": "com.sinrad.commandcenter",
+    "productName": "Sinrad",
+    "files": [
+      "main.js",
+      "preload.js",
+      "scan.js",
+      "index.html",
+      "pet.html",
+      "package.json",
+      "*.png",
+      "*.gif",
+      "*.webp",
+      "*.svg"
+    ],
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
+    },
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": [
+        { "target": "portable", "artifactName": "Sinrad-${version}-portable.${ext}" },
+        { "target": "nsis", "artifactName": "Sinrad-Setup-${version}.${ext}" }
+      ]
+    },
+    "linux": {
+      "category": "Utility",
+      "target": [
+        { "target": "AppImage", "artifactName": "Sinrad-${version}.${ext}" },
+        { "target": "deb", "artifactName": "Sinrad-${version}.${ext}" }
+      ]
+    }
+  }
+}

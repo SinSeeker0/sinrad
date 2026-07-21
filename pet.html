@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Norma</title>
+<style>
+  html,body{margin:0;height:100%;background:transparent;overflow:hidden;
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none;}
+  #stage{position:relative;width:100%;height:100%}
+  #menu{position:absolute;top:6px;left:6px;right:6px;background:#15151d;border:1px solid #27b4ff;border-radius:10px;
+    padding:6px;box-shadow:0 12px 34px rgba(0,0,0,.65);display:none;z-index:10}
+  #menu.show{display:block}
+  #menu .mi{padding:8px 10px;border-radius:7px;font-size:12.5px;font-weight:600;color:#cfd3dc;display:flex;gap:9px;align-items:center;cursor:pointer}
+  #menu .mi:hover{background:#1e1e27;color:#fff}
+  #menu .dv{height:1px;background:#1a1a23;margin:5px 4px}
+  /* NO box / outline — just the gif; size is set to the image aspect at runtime */
+  #pet{position:absolute;bottom:6px;left:50%;transform:translateX(-50%);width:120px;height:120px;
+    background:transparent;display:grid;place-items:center;cursor:grab;z-index:1}
+  #pet:active{cursor:grabbing}
+  #pet img{width:100%;height:100%;object-fit:fill;display:block;pointer-events:none;-webkit-user-drag:none}
+  #pet .emo{font-size:62px;line-height:1}
+</style>
+</head>
+<body>
+  <div id="stage">
+    <div id="menu" data-hit>
+      <div class="mi" data-nav="vault">🔐 Vault</div>
+      <div class="mi" data-nav="links">🔗 Links</div>
+      <div class="mi" data-nav="folders">📁 Folders</div>
+      <div class="mi" data-nav="console">🖥️ Console</div>
+      <div class="dv"></div>
+      <div class="mi" data-pin>📌 Pin to panel</div>
+    </div>
+    <div id="pet" data-hit><span class="emo">🤖</span></div>
+  </div>
+<script>
+const E = window.electronAPI || {};
+const pet = document.getElementById("pet");
+const menu = document.getElementById("menu");
+let ignored = true;       // current setIgnoreMouseEvents state
+let menuOpen = false;
+let MASK = null;          // {GW,GH,solid:Uint8Array} when the image has transparency
+let petW = 120, petH = 120;
+
+function setIgnoreFalse(){ if(ignored){ E.setMouseIgnore && E.setMouseIgnore(false); ignored=false; } }
+function setIgnoreTrue(){ if(!ignored){ E.setMouseIgnore && E.setMouseIgnore(true,{forward:true}); ignored=true; } }
+
+/* downsample the image alpha into a occupancy grid for per-pixel click-through */
+function buildMask(img){
+  try{
+    const ar = img.naturalWidth/img.naturalHeight;
+    const GW = 48, GH = Math.max(1, Math.round(48/ar));
+    const cv = document.createElement("canvas"); cv.width=GW; cv.height=GH;
+    const ctx = cv.getContext("2d"); ctx.drawImage(img,0,0,GW,GH);
+    const d = ctx.getImageData(0,0,GW,GH).data;
+    const solid = new Uint8Array(GW*GH); let translucent=false;
+    for(let i=0;i<GW*GH;i++){ const a=d[i*4+3]; solid[i]= a>30?1:0; if(a<250) translucent=true; }
+    // size the pet box to the image aspect so the grid maps 1:1 (no letterbox)
+    const BASE=120; if(ar>=1){ petW=BASE; petH=Math.round(BASE/ar); } else { petH=BASE; petW=Math.round(BASE*ar); }
+    pet.style.width=petW+"px"; pet.style.height=petH+"px";
+    MASK = translucent ? {GW,GH,solid} : null;   // fully opaque image -> no passthrough possible
+  }catch(e){ MASK=null; petW=120; petH=120; }     // canvas read blocked -> whole-box fallback
+}
+
+(function loadFace(){
+  const names = ["norma.gif","norma.png","norma.webp"]; let i=0;
+  (function next(){
+    if(i>=names.length) return;
+    const im=new Image();
+    im.onload=()=>{ pet.innerHTML=""; const img=document.createElement("img"); img.src=names[i]; img.alt="Norma"; img.draggable=false; pet.appendChild(img); buildMask(img); };
+    im.onerror=()=>{ i++; next(); };
+    im.src=names[i];
+  })();
+})();
+
+E.setMouseIgnore && E.setMouseIgnore(true, { forward:true });
+document.addEventListener("mousemove",(e)=>{
+  if(menuOpen){ setIgnoreFalse(); return; }              // whole window interactive while the menu is open
+  const el=document.elementFromPoint(e.clientX,e.clientY);
+  const inPet = el && el.closest("#pet");
+  if(inPet){
+    if(MASK){
+      const cx=e.clientX-pet.offsetLeft, cy=e.clientY-pet.offsetTop;
+      if(cx<0||cy<0||cx>=petW||cy>=petH){ setIgnoreTrue(); return; }
+      const gx=Math.min(MASK.GW-1,Math.max(0,Math.floor(cx/petW*MASK.GW)));
+      const gy=Math.min(MASK.GH-1,Math.max(0,Math.floor(cy/petH*MASK.GH)));
+      if(MASK.solid[gy*MASK.GW+gx]) setIgnoreFalse(); else setIgnoreTrue();   // only the character is "solid"
+    } else setIgnoreFalse();
+  } else {
+    setIgnoreTrue();
+  }
+});
+
+pet.addEventListener("pointerdown",(e)=>{ if(e.button!==0) return; E.petDragStart && E.petDragStart({x:e.clientX,y:e.clientY}); });
+window.addEventListener("pointerup",()=>{ E.petDragEnd && E.petDragEnd(); });
+
+function openMenu(){ menu.classList.add("show"); menuOpen=true; }
+function closeMenu(){ menu.classList.remove("show"); menuOpen=false; }
+pet.addEventListener("contextmenu",(e)=>{ e.preventDefault(); menuOpen?closeMenu():openMenu(); });
+menu.addEventListener("contextmenu",(e)=>e.preventDefault());
+menu.addEventListener("click",(e)=>{
+  const nav=e.target.closest("[data-nav]"); const pin=e.target.closest("[data-pin]");
+  if(nav){ E.petNav && E.petNav(nav.dataset.nav); closeMenu(); }
+  else if(pin){ E.petPin && E.petPin(); closeMenu(); }
+});
+</script>
+</body>
+</html>

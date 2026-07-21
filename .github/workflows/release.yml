@@ -1,0 +1,45 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:   # lets you press "Run workflow" in the Actions tab too
+
+permissions:
+  contents: write      # needed to create the GitHub Release + upload files
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]   # Linux .AppImage/.deb, Windows .exe, macOS .dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      # If you triggered this manually (no tag), make a tag from package.json version
+      - name: Tag from package.json version (manual runs only)
+        if: github.ref_type != 'tag'
+        shell: bash
+        run: |
+          VER="v$(node -p "require('./package.json').version")"
+          git config user.email "ci@users.noreply.github.com"
+          git config user.name "github-actions"
+          git tag "$VER" || true
+
+      - name: Install dependencies
+        run: npm install
+
+      # electron-builder builds this OS's installers and uploads them to a GitHub Release
+      - name: Build + publish release
+        run: npm run dist
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
