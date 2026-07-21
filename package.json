@@ -1,10 +1,13 @@
 {
   "name": "sinrad",
   "productName": "Sinrad",
-  "version": "1.24.0",
+  "version": "1.26.0",
   "description": "S.I.R — Personal Command Center (Vault, Links, Quick Folders, device folder search, Spotify, Console).",
   "main": "main.js",
-  "author": "You",
+  "author": {
+    "name": "SinSeeker0",
+    "email": "SinSeeker0@users.noreply.github.com"
+  },
   "license": "MIT",
   "scripts": {
     "start": "electron .",
@@ -47,6 +50,7 @@
     },
     "linux": {
       "category": "Utility",
+      "maintainer": "SinSeeker0 <SinSeeker0@users.noreply.github.com>",
       "target": ["AppImage", "deb"]
     }
   }
