@@ -345,6 +345,11 @@
   .nm-trackrow{display:flex;align-items:center;gap:6px;margin-bottom:8px}
   .nm-track{flex:1;min-width:0;margin-bottom:0}
   .nm-folder{width:24px;height:24px;flex:0 0 auto}
+
+  .nm-disc{width:24px;height:24px;border-radius:50%;flex:0 0 auto;background:radial-gradient(circle at 50% 50%, #2a2a35 0 16%, #14141b 17% 21%, #2a2a35 22% 42%, #14141b 43% 47%, #2a2a35 48% 72%, #14141b 73% 77%, #2a2a35 78% 100%);border:1px solid rgba(51,209,122,.55);box-shadow:0 0 6px rgba(51,209,122,.35);position:relative}
+  .nm-disc::after{content:"";position:absolute;left:50%;top:50%;width:5px;height:5px;border-radius:50%;background:var(--green);transform:translate(-50%,-50%)}
+  .nm-disc.spin{animation:nmspin 3s linear infinite}
+  @keyframes nmspin{to{transform:rotate(360deg)}}
 </style>
 </head>
 <body>
@@ -372,7 +377,7 @@
             <button class="norma-min" data-action="norma-min" title="Send floating">–</button>
           </div>
           <div class="norma-hint">Minimize (–) to send her floating on your desktop.<br>Right-click her (or the floating pet) for quick access · Pin to dock.</div>
-          <div class="norma-music"><div class="nm-trackrow"><div class="nm-track" id="nm-track">No tracks</div><button class="nm-btn nm-folder" data-action="music-open-folder" title="Open music folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></div><div class="nm-controls"><button class="nm-btn" data-action="music-prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 6h2v12H6zM20 6v12l-9-6z"/></svg></button><button class="nm-btn nm-play" data-action="music-toggle" title="Play / Pause" id="nm-play"></button><button class="nm-btn" data-action="music-next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button></div></div>
+          <div class="norma-music"><div class="nm-trackrow"><div class="nm-disc" id="nm-disc"></div><div class="nm-track" id="nm-track">No tracks</div><button class="nm-btn nm-folder" data-action="music-open-folder" title="Open music folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></div><div class="nm-controls"><button class="nm-btn" data-action="music-prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 6h2v12H6zM20 6v12l-9-6z"/></svg></button><button class="nm-btn nm-play" data-action="music-toggle" title="Play / Pause" id="nm-play"></button><button class="nm-btn" data-action="music-next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button></div></div>
         </div>
       </aside>
       <main class="content" id="content"></main>
@@ -482,7 +487,7 @@ const NM_PLAY=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="1
 const NM_PAUSE=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
 const bgmAudio=new Audio(); bgmAudio.volume=0.5; let bgmTracks=[]; let bgmIdx=0; let bgmDir="";
 try{ if(state.music&&state.music.volume!=null) bgmAudio.volume=state.music.volume; if(state.music&&state.music.idx) bgmIdx=state.music.idx; }catch(_){}
-function updateMusicUI(){ const t=$("#nm-track"); const p=$("#nm-play"); if(t) t.textContent = bgmTracks.length? bgmTracks[bgmIdx].name : ("No tracks — drop audio files in: "+(bgmDir||"the bgm folder")); if(p) p.innerHTML = (bgmTracks.length && !bgmAudio.paused)? NM_PAUSE : NM_PLAY; const tb=$("#thinkbar"); if(tb){ if(bgmTracks.length && !bgmAudio.paused) tb.classList.add("playing"); else tb.classList.remove("playing"); } }
+function updateMusicUI(){ const t=$("#nm-track"); const p=$("#nm-play"); if(t) t.textContent = bgmTracks.length? bgmTracks[bgmIdx].name : ("No tracks — drop audio files in: "+(bgmDir||"the bgm folder")); if(p) p.innerHTML = (bgmTracks.length && !bgmAudio.paused)? NM_PAUSE : NM_PLAY; const tb=$("#thinkbar"); if(tb){ if(bgmTracks.length && !bgmAudio.paused) tb.classList.add("playing"); else tb.classList.remove("playing"); } const d=$("#nm-disc"); if(d){ if(bgmTracks.length && !bgmAudio.paused) d.classList.add("spin"); else d.classList.remove("spin"); } }
 bgmAudio.addEventListener("play",function(){ const tb=$("#thinkbar"); if(tb) tb.classList.add("playing"); });
 bgmAudio.addEventListener("pause",function(){ const tb=$("#thinkbar"); if(tb) tb.classList.remove("playing"); });
 bgmAudio.addEventListener("ended",function(){ const tb=$("#thinkbar"); if(tb) tb.classList.remove("playing"); });
@@ -511,7 +516,7 @@ function renderSettings(){ const b=$("#settings-body"); if(!b)return; const cur=
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 56;
+const EDIT_COUNT = 57;
 const APP_VERSION="1."+EDIT_COUNT+".0";
 
 const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef" };
@@ -754,7 +759,7 @@ function isFloating(){ return $("#norma").classList.contains("hidden"); }
 function setFloating(f){ if(f){ $("#norma").classList.add("hidden"); if(E&&E.petShow){E.petShow();} else { $("#norma-bubble").classList.add("show"); } log("info","Norma sent floating"); } else { $("#norma").classList.remove("hidden"); try{ $("#norma").scrollIntoView({block:"nearest"}); }catch(_){} $("#norma-bubble").classList.remove("show"); if(E&&E.petHide)E.petHide(); log("info","Norma pinned to panel"); } }
 (function(){ const card=$("#norma"),bubble=$("#norma-bubble"); let moved=false;
   function menu(x,y){ showMenu(x,y,`<div class="ci" data-action="nav" data-nav="vault">${ICO_LOCK} Vault</div><div class="ci" data-action="nav" data-nav="links">${ICO_LINK} Links</div><div class="ci" data-action="nav" data-nav="folders">${ICO_FOLDER} Folders</div>`); }
-  card.addEventListener("contextmenu",e=>{e.preventDefault();const m=$("#ctxmenu");if(m.classList.contains("show")){hideMenu();}else{menu(e.clientX,e.clientY);}});
+
   bubble.addEventListener("contextmenu",e=>{e.preventDefault();const m=$("#ctxmenu");if(m.classList.contains("show")){hideMenu();}else{moved=false;menu(e.clientX,e.clientY);const br=bubble.getBoundingClientRect();alignMenuToBubble(bubble);}});
   let drag=false,ox=0,oy=0;
   bubble.addEventListener("pointerdown",e=>{if(e.button!==0)return;drag=true;moved=false;ox=e.clientX-bubble.offsetLeft;oy=e.clientY-bubble.offsetTop;try{bubble.setPointerCapture(e.pointerId);}catch(_){}bubble.style.cursor="grabbing";});
