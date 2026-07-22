@@ -149,7 +149,8 @@
   .thinkbar::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--acc,#27b4ff),transparent);opacity:.22;transform:translateX(-100%);animation:shimmer 2.4s linear infinite}
   @keyframes shimmer{to{transform:translateX(100%)}}
   .tb-wave{position:absolute;inset:0;display:flex;align-items:flex-end;gap:2px;padding:0 5px}
-  .tb-wave i{flex:1;min-width:1px;height:30%;background:var(--acc,#27b4ff);border-radius:2px 2px 0 0;opacity:.5;animation:eq 1s ease-in-out infinite}
+  .tb-wave i{flex:1;min-width:1px;height:7%;background:var(--acc,#27b4ff);border-radius:2px 2px 0 0;opacity:.3;animation:none}
+  .thinkbar.playing .tb-wave i{animation:eq 1s ease-in-out infinite}
   @keyframes eq{0%,100%{height:18%;opacity:.3}50%{height:100%;opacity:.9}}
   @keyframes dotbounce{0%,80%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-4px);opacity:1}}
   .store-badge{display:inline-flex;align-items:center;gap:6px;background:#13131b;border:1px solid var(--border-soft);padding:3px 9px;border-radius:20px}
@@ -481,7 +482,10 @@ const NM_PLAY=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="1
 const NM_PAUSE=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
 const bgmAudio=new Audio(); bgmAudio.volume=0.5; let bgmTracks=[]; let bgmIdx=0; let bgmDir="";
 try{ if(state.music&&state.music.volume!=null) bgmAudio.volume=state.music.volume; if(state.music&&state.music.idx) bgmIdx=state.music.idx; }catch(_){}
-function updateMusicUI(){ const t=$("#nm-track"); const p=$("#nm-play"); if(t) t.textContent = bgmTracks.length? bgmTracks[bgmIdx].name : ("No tracks — drop audio files in: "+(bgmDir||"the bgm folder")); if(p) p.innerHTML = (bgmTracks.length && !bgmAudio.paused)? NM_PAUSE : NM_PLAY; }
+function updateMusicUI(){ const t=$("#nm-track"); const p=$("#nm-play"); if(t) t.textContent = bgmTracks.length? bgmTracks[bgmIdx].name : ("No tracks — drop audio files in: "+(bgmDir||"the bgm folder")); if(p) p.innerHTML = (bgmTracks.length && !bgmAudio.paused)? NM_PAUSE : NM_PLAY; const tb=$("#thinkbar"); if(tb){ if(bgmTracks.length && !bgmAudio.paused) tb.classList.add("playing"); else tb.classList.remove("playing"); } }
+bgmAudio.addEventListener("play",function(){ const tb=$("#thinkbar"); if(tb) tb.classList.add("playing"); });
+bgmAudio.addEventListener("pause",function(){ const tb=$("#thinkbar"); if(tb) tb.classList.remove("playing"); });
+bgmAudio.addEventListener("ended",function(){ const tb=$("#thinkbar"); if(tb) tb.classList.remove("playing"); });
 function musicSetTrack(i){ if(!bgmTracks.length) return; bgmIdx=((i%bgmTracks.length)+bgmTracks.length)%bgmTracks.length; bgmAudio.src=bgmTracks[bgmIdx].url; const pr=bgmAudio.play(); if(pr&&pr.catch) pr.catch(function(){}); updateMusicUI(); try{ if(!state.music) state.music={}; state.music.idx=bgmIdx; saveState(); }catch(_){} }
 function musicToggle(){ if(!bgmTracks.length) return; if(bgmAudio.paused){ const pr=bgmAudio.play(); if(pr&&pr.catch) pr.catch(function(){}); } else { bgmAudio.pause(); } updateMusicUI(); }
 function musicNext(){ musicSetTrack(bgmIdx+1); }
@@ -507,7 +511,7 @@ function renderSettings(){ const b=$("#settings-body"); if(!b)return; const cur=
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 55;
+const EDIT_COUNT = 56;
 const APP_VERSION="1."+EDIT_COUNT+".0";
 
 const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef" };

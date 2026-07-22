@@ -39,5 +39,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   musicRequest: () => ipcRenderer.send("music-request"),
   onMusicList: (cb) => ipcRenderer.on("music-list", (_, l) => cb(l)),
   musicCmd: (c) => ipcRenderer.send("music-cmd", c),
-  onMusicCmd: (cb) => ipcRenderer.on("music-cmd", (_, c) => cb(c))
+  onMusicCmd: (cb) => ipcRenderer.on("music-cmd", (_, c) => cb(c)),
+  musicRead: (p) => ipcRenderer.invoke("music-read", p)
 });
