@@ -1,7 +1,7 @@
 {
   "name": "sinrad",
   "productName": "Sinrad",
-  "version": "1.44.0",
+  "version": "1.51.0",
   "description": "S.I.R — Personal Command Center (Vault, Links, Quick Folders, device folder search, Console).",
   "main": "main.js",
   "author": {

@@ -21,6 +21,9 @@
   #pet .emo{font-size:62px;line-height:1}
 
   #menu .mi svg{width:15px;height:15px;flex:0 0 auto}
+
+  #pinDot{position:absolute;top:4px;left:4px;width:9px;height:9px;border-radius:50%;background:transparent;border:1.5px solid #ff79a6;box-shadow:0 0 5px rgba(255,77,141,.55),inset 0 0 2px rgba(255,77,141,.35);cursor:pointer;z-index:12;opacity:.9}
+  #pinDot:hover{opacity:1;transform:scale(1.25);border-color:#fff;background:rgba(255,77,141,.12);box-shadow:0 0 8px rgba(255,77,141,.9),inset 0 0 3px rgba(255,77,141,.6)}
 </style>
 </head>
 <body>
@@ -29,10 +32,9 @@
       <div class="mi" data-nav="vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Vault</div>
       <div class="mi" data-nav="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg> Links</div>
       <div class="mi" data-nav="folders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Folders</div>
-      <div class="dv"></div>
-      <div class="mi" data-pin"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg> Pin to panel</div>
     </div>
     <div id="pet" data-hit><span class="emo">🤖</span></div>
+    <div id="pinDot" title="Pin to panel"></div>
   </div>
 <script>
 const E = window.electronAPI || {};
@@ -54,12 +56,12 @@ function buildMask(img){
     const cv = document.createElement("canvas"); cv.width=GW; cv.height=GH;
     const ctx = cv.getContext("2d"); ctx.drawImage(img,0,0,GW,GH);
     const d = ctx.getImageData(0,0,GW,GH).data;
-    const solid = new Uint8Array(GW*GH); let translucent=false;
-    for(let i=0;i<GW*GH;i++){ const a=d[i*4+3]; solid[i]= a>30?1:0; if(a<250) translucent=true; }
+    const solid = new Uint8Array(GW*GH); let translucent=false; let minGX=GW,maxGX=-1,minGY=GH,maxGY=-1;
+    for(let i=0;i<GW*GH;i++){ const a=d[i*4+3]; const s=a>30?1:0; solid[i]=s; if(a<250) translucent=true; if(s){ const gx=i%GW, gy=(i/GW)|0; if(gx<minGX)minGX=gx; if(gx>maxGX)maxGX=gx; if(gy<minGY)minGY=gy; if(gy>maxGY)maxGY=gy; } }
     // size the pet box to the image aspect so the grid maps 1:1 (no letterbox)
     const BASE=120; if(ar>=1){ petW=BASE; petH=Math.round(BASE/ar); } else { petH=BASE; petW=Math.round(BASE*ar); }
     pet.style.width=petW+"px"; pet.style.height=petH+"px";
-    MASK = translucent ? {GW,GH,solid} : null;   // fully opaque image -> no passthrough possible
+    MASK = translucent ? {GW,GH,solid,bbox:[minGX,maxGX,minGY,maxGY]} : null;   // fully opaque image -> no passthrough possible
   }catch(e){ MASK=null; petW=120; petH=120; }     // canvas read blocked -> whole-box fallback
 }
 
@@ -78,6 +80,7 @@ E.setMouseIgnore && E.setMouseIgnore(true, { forward:true });
 document.addEventListener("mousemove",(e)=>{
   if(menuOpen){ setIgnoreFalse(); return; }              // whole window interactive while the menu is open
   const el=document.elementFromPoint(e.clientX,e.clientY);
+  const inDot = el && el.closest("#pinDot"); if(inDot){ setIgnoreFalse(); return; }
   const inPet = el && el.closest("#pet");
   if(inPet){
     if(MASK){
@@ -85,7 +88,7 @@ document.addEventListener("mousemove",(e)=>{
       if(cx<0||cy<0||cx>=rect.width||cy>=rect.height){ setIgnoreTrue(); return; }
       const gx=Math.min(MASK.GW-1,Math.max(0,Math.floor(cx/rect.width*MASK.GW)));
       const gy=Math.min(MASK.GH-1,Math.max(0,Math.floor(cy/rect.height*MASK.GH)));
-      if(MASK.solid[gy*MASK.GW+gx]) setIgnoreFalse(); else setIgnoreTrue();   // only the character is "solid"
+      const b=MASK.bbox; if(b&&gx>=b[0]&&gx<=b[1]&&gy>=b[2]&&gy<=b[3]) setIgnoreFalse(); else setIgnoreTrue();   // only the character is "solid"
     } else setIgnoreFalse();
   } else {
     setIgnoreTrue();
@@ -95,15 +98,16 @@ document.addEventListener("mousemove",(e)=>{
 pet.addEventListener("pointerdown",(e)=>{ if(e.button!==0) return; E.petDragStart && E.petDragStart({x:e.clientX,y:e.clientY}); });
 window.addEventListener("pointerup",()=>{ E.petDragEnd && E.petDragEnd(); });
 
-function openMenu(){ menu.classList.add("show"); menuOpen=true; }
+function openMenu(){ menu.classList.add("show"); menuOpen=true; setIgnoreFalse(); }
 function closeMenu(){ menu.classList.remove("show"); menuOpen=false; }
 pet.addEventListener("contextmenu",(e)=>{ e.preventDefault(); menuOpen?closeMenu():openMenu(); });
 menu.addEventListener("contextmenu",(e)=>e.preventDefault());
-menu.addEventListener("click",(e)=>{
-  const nav=e.target.closest("[data-nav]"); const pin=e.target.closest("[data-pin]");
-  if(nav){ E.petNav && E.petNav(nav.dataset.nav); closeMenu(); }
-  else if(pin){ E.petPin && E.petPin(); closeMenu(); }
-});
+menu.addEventListener("click",doMenuAct);
+menu.addEventListener("pointerup",(e)=>{ if(e.button===0) doMenuAct(e); });
+function doMenuAct(e){ const nav=e.target.closest("[data-nav]"); const pin=e.target.closest("[data-pin]"); if(!nav&&!pin) return; const now=Date.now(); if(now-(doMenuAct._t||0)<250) return; doMenuAct._t=now; if(nav){ E.petNav && E.petNav(nav.dataset.nav); } else { E.petPin && E.petPin(); } closeMenu(); }
+const pinDot=document.getElementById("pinDot");
+function pinBack(){ const n=Date.now(); if(n-(pinBack._t||0)<250)return; pinBack._t=n; E.petPin && E.petPin(); }
+if(pinDot){ pinDot.addEventListener("click",pinBack); pinDot.addEventListener("pointerup",(e)=>{if(e.button===0)pinBack();}); pinDot.addEventListener("contextmenu",(e)=>{e.preventDefault();pinBack();}); }
 </script>
 </body>
 </html>

@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>S.I.R — Personal Command Center</title>
+<title>S.I.R</title>
 <style>
   :root{
     --page:#060608; --win:#0b0b10; --win-border:#1b1b24; --titlebar:#0d0d13;
@@ -318,6 +318,19 @@
   .winctl .tsep{width:1px;height:18px;background:var(--border-soft)}
 
   .upd-pill{white-space:nowrap;flex:0 0 auto}
+
+  .upd-ico{display:inline-block;transform-origin:50% 50%}
+  .upd-pill:hover .upd-ico{animation:updspin .8s linear infinite}
+  @keyframes updspin{to{transform:rotate(360deg)}}
+  .um-head{position:relative;overflow:hidden;min-height:120px;display:flex;align-items:center;justify-content:center;padding:26px 18px 18px}
+  .um-head .um-ico{position:absolute;inset:0;width:auto;height:auto;margin:0;background:transparent;display:block;border-radius:0}
+  .um-head .um-ico svg{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:42px;height:42px}
+  .um-gif{width:100%;height:100%;object-fit:cover;border-radius:0;display:block}
+  .um-head::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(12,12,22,.12),rgba(12,12,22,.58));z-index:1;pointer-events:none}
+  .um-head h2{position:relative;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.7)}
+
+  .ndot{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:transparent;border:1.5px solid #ff79a6;box-shadow:0 0 5px rgba(255,77,141,.55),inset 0 0 2px rgba(255,77,141,.35);cursor:pointer;z-index:5;opacity:.9;pointer-events:auto}
+  .ndot:hover{opacity:1;transform:scale(1.25);border-color:#fff;background:rgba(255,77,141,.12);box-shadow:0 0 8px rgba(255,77,141,.9),inset 0 0 3px rgba(255,77,141,.6)}
 </style>
 </head>
 <body>
@@ -356,7 +369,7 @@
       <span class="sep">|</span><span id="appver">v1.0.0</span>
       <span class="sep">|</span><span id="appedits" class="edits">#0 edits</span>
       <div class="thinkbar" id="thinkbar" title="processing"><div class="tb-wave" id="tbWave"></div></div>
-      <button class="upd-pill" data-action="update-check" title="Check for updates">&#10227; Check Update</button>
+      <button class="upd-pill" data-action="update-check" title="Check for updates"><span class="upd-ico" aria-hidden="true">&#10227;</span> Check Update</button>
       <button class="gh-btn" data-action="open-github" title="Open GitHub repository"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></button>
       <span class="upd-sep"></span>
       
@@ -367,7 +380,7 @@
     </div>
   </div>
 
-  <div id="norma-bubble" title="Norma (preview) — click/right-click for menu · 📌 Pin"><img id="normaGif" src="" alt="Norma" draggable="false" /></div>
+  <div id="norma-bubble" title="Norma (preview) — click/right-click for menu"><img id="normaGif" src="" alt="Norma" draggable="false" /><span id="bubbleDot" class="ndot" title="Pin to panel"></span></div>
   <div id="ctxmenu"></div>
 
   <div id="celebrate">
@@ -463,7 +476,7 @@ function renderSettings(){ const b=$("#settings-body"); if(!b)return; const cur=
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 44;
+const EDIT_COUNT = 51;
 const APP_VERSION="1."+EDIT_COUNT+".0";
 
 const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef" };
@@ -699,15 +712,16 @@ $("#ctxmenu").addEventListener("click",hideMenu);
 document.addEventListener("click",(e)=>{ const m=$("#ctxmenu"); if(m.classList.contains("show")&&!m.contains(e.target)&&!e.target.closest("#norma-bubble")&&!e.target.closest("#norma"))hideMenu(); });
 
 function isFloating(){ return $("#norma").classList.contains("hidden"); }
-function setFloating(f){ if(f){ $("#norma").classList.add("hidden"); if(E&&E.petShow){E.petShow();} else { $("#norma-bubble").classList.add("show"); } log("info","Norma sent floating"); } else { $("#norma").classList.remove("hidden"); $("#norma-bubble").classList.remove("show"); if(E&&E.petHide)E.petHide(); log("info","Norma pinned to panel"); } }
+function setFloating(f){ if(f){ $("#norma").classList.add("hidden"); if(E&&E.petShow){E.petShow();} else { $("#norma-bubble").classList.add("show"); } log("info","Norma sent floating"); } else { $("#norma").classList.remove("hidden"); try{ $("#norma").scrollIntoView({block:"nearest"}); }catch(_){} $("#norma-bubble").classList.remove("show"); if(E&&E.petHide)E.petHide(); log("info","Norma pinned to panel"); } }
 (function(){ const card=$("#norma"),bubble=$("#norma-bubble"); let moved=false;
-  function menu(x,y){ showMenu(x,y,`<div class="ci" data-action="nav" data-nav="vault">${ICO_LOCK} Vault</div><div class="ci" data-action="nav" data-nav="links">${ICO_LINK} Links</div><div class="ci" data-action="nav" data-nav="folders">${ICO_FOLDER} Folders</div><div class="cdiv"></div><div class="ci" data-action="norma-pin">${isFloating()?ICO_PIN+" Pin to panel":"– Send floating"}</div>`); }
+  function menu(x,y){ showMenu(x,y,`<div class="ci" data-action="nav" data-nav="vault">${ICO_LOCK} Vault</div><div class="ci" data-action="nav" data-nav="links">${ICO_LINK} Links</div><div class="ci" data-action="nav" data-nav="folders">${ICO_FOLDER} Folders</div>`); }
   card.addEventListener("contextmenu",e=>{e.preventDefault();const m=$("#ctxmenu");if(m.classList.contains("show")){hideMenu();}else{menu(e.clientX,e.clientY);}});
   bubble.addEventListener("contextmenu",e=>{e.preventDefault();const m=$("#ctxmenu");if(m.classList.contains("show")){hideMenu();}else{moved=false;menu(e.clientX,e.clientY);const br=bubble.getBoundingClientRect();alignMenuToBubble(bubble);}});
   let drag=false,ox=0,oy=0;
   bubble.addEventListener("pointerdown",e=>{if(e.button!==0)return;drag=true;moved=false;ox=e.clientX-bubble.offsetLeft;oy=e.clientY-bubble.offsetTop;try{bubble.setPointerCapture(e.pointerId);}catch(_){}bubble.style.cursor="grabbing";});
   bubble.addEventListener("pointermove",e=>{if(!drag)return;moved=true;let x=e.clientX-ox,y=e.clientY-oy;x=Math.max(4,Math.min(window.innerWidth-72,x));y=Math.max(4,Math.min(window.innerHeight-72,y));bubble.style.left=x+"px";bubble.style.top=y+"px"; if($("#ctxmenu").classList.contains("show")){ const br=bubble.getBoundingClientRect(); alignMenuToBubble(bubble); } });
   bubble.addEventListener("pointerup",e=>{if(e.button!==0)return;drag=false;bubble.style.cursor="grab";});
+  const bdot=$("#bubbleDot"); if(bdot){ bdot.addEventListener("pointerdown",e=>e.stopPropagation()); bdot.addEventListener("click",e=>{e.stopPropagation();setFloating(false);}); }
 })();
 
 function handleCommand(line){

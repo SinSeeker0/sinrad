@@ -14,7 +14,7 @@ let petWin = null;
 function createWindow(){
   mainWin = new BrowserWindow({
     width:1280, height:900, minWidth:900, minHeight:640,
-    frame:false, backgroundColor:"#060608", title:"Sinrad", icon:path.join(__dirname,"icon.png"),
+    frame:false, backgroundColor:"#060608", title:"S.I.R", icon:path.join(__dirname,"icon.png"),
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false }
   });
   mainWin.loadFile(path.join(__dirname,"index.html"));
@@ -26,9 +26,9 @@ function createPet(){
   if(petWin) return petWin;
   const wa = screen.getPrimaryDisplay().workArea;
   petWin = new BrowserWindow({
-    width:200, height:220, x:wa.x+24, y:wa.y+wa.height-240,
+    width:300, height:200, x:wa.x+24, y:wa.y+wa.height-240,
     transparent:true, frame:false, alwaysOnTop:true, resizable:false,
-    skipTaskbar:true, hasShadow:false, focusable:false, fullscreenable:false,
+    skipTaskbar:true, hasShadow:false, focusable:true, fullscreenable:false,
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false }
   });
   petWin.setAlwaysOnTop(true, "screen-saver");           // float above everything
@@ -83,7 +83,7 @@ ipcMain.on("pet-drag-start", (e,off)=>startDrag(off));
 ipcMain.on("pet-drag-end",   ()=>stopDrag());
 ipcMain.on("set-mouse-ignore", (e,b,opts)=>{ const w=BrowserWindow.fromWebContents(e.sender); if(w) w.setIgnoreMouseEvents(!!b, opts||{}); });
 ipcMain.on("pet-nav", (e,mod)=>{ if(mainWin){ mainWin.webContents.send("norma-nav", mod); if(mainWin.isMinimized()) mainWin.restore(); } });
-ipcMain.on("pet-pin", ()=>{ hidePet(); if(mainWin) mainWin.webContents.send("norma-dock"); });
+ipcMain.on("pet-pin", ()=>{ hidePet(); if(mainWin){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.webContents.send("norma-dock"); } });
 const activeScans = new Map();
 ipcMain.handle("fs-home", ()=> app.getPath("home"));
 ipcMain.on("fs-scan", (e, payload)=>{
@@ -151,7 +151,7 @@ ipcMain.handle("update-install", async function(e, tempPath){
   if(plat==="darwin"){ shell.openExternal(UPD_PAGE); return {ok:true, manual:true}; }
   const spawn=require("child_process").spawn;
   if(plat==="win32"){
-    const target=process.execPath; const bat=path.join(app.getPath("temp"),"sinrad_update.bat");
+    const target=process.env.PORTABLE_EXECUTABLE_FILE||process.execPath; const bat=path.join(app.getPath("temp"),"sinrad_update.bat");
     const body=`@echo off\r
 :loop\r
 ping 127.0.0.1 -n 2 > nul\r
