@@ -33,8 +33,7 @@
       <div class="mi" data-nav="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg> Links</div>
       <div class="mi" data-nav="folders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Folders</div>
     </div>
-    <div id="pet" data-hit><span class="emo">🤖</span></div>
-    <div id="pinDot" title="Pin to panel"></div>
+    <div id="pet" data-hit><span class="emo">🤖</span><div id="pinDot" title="Pin to panel"></div></div>
   </div>
 <script>
 const E = window.electronAPI || {};
@@ -70,7 +69,7 @@ function buildMask(img){
   (function next(){
     if(i>=names.length) return;
     const im=new Image();
-    im.onload=()=>{ pet.innerHTML=""; const img=document.createElement("img"); img.src=names[i]; img.alt="Norma"; img.draggable=false; pet.appendChild(img); buildMask(img); };
+    im.onload=()=>{ Array.from(pet.children).forEach(c=>{if(c.id!=="pinDot")c.remove();}); const img=document.createElement("img"); img.src=names[i]; img.alt="Norma"; img.draggable=false; pet.appendChild(img); buildMask(img); };
     im.onerror=()=>{ i++; next(); };
     im.src=names[i];
   })();
@@ -107,7 +106,7 @@ menu.addEventListener("pointerup",(e)=>{ if(e.button===0) doMenuAct(e); });
 function doMenuAct(e){ const nav=e.target.closest("[data-nav]"); const pin=e.target.closest("[data-pin]"); if(!nav&&!pin) return; const now=Date.now(); if(now-(doMenuAct._t||0)<250) return; doMenuAct._t=now; if(nav){ E.petNav && E.petNav(nav.dataset.nav); } else { E.petPin && E.petPin(); } closeMenu(); }
 const pinDot=document.getElementById("pinDot");
 function pinBack(){ const n=Date.now(); if(n-(pinBack._t||0)<250)return; pinBack._t=n; E.petPin && E.petPin(); }
-if(pinDot){ pinDot.addEventListener("click",pinBack); pinDot.addEventListener("pointerup",(e)=>{if(e.button===0)pinBack();}); pinDot.addEventListener("contextmenu",(e)=>{e.preventDefault();pinBack();}); }
+if(pinDot){ pinDot.addEventListener("pointerdown",(e)=>e.stopPropagation()); pinDot.addEventListener("click",pinBack); pinDot.addEventListener("pointerup",(e)=>{if(e.button===0)pinBack();}); pinDot.addEventListener("contextmenu",(e)=>{e.preventDefault();pinBack();}); }
 </script>
 </body>
 </html>
