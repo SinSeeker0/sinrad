@@ -149,8 +149,8 @@
   .thinkbar::before{content:"";position:absolute;inset:0;background:linear-gradient(90deg,transparent,var(--acc,#27b4ff),transparent);opacity:.22;transform:translateX(-100%);animation:shimmer 2.4s linear infinite}
   @keyframes shimmer{to{transform:translateX(100%)}}
   .tb-wave{position:absolute;inset:0;display:flex;align-items:flex-end;gap:2px;padding:0 5px}
-  .tb-wave i{flex:1;min-width:1px;height:30%;background:var(--acc,#27b4ff);border-radius:2px 2px 0 0;opacity:.5;animation:eqbar 1s ease-in-out infinite}
-  @keyframes eqbar{0%,100%{height:calc(var(--h,60%) * .35)}50%{height:var(--h,60%)}}
+  .tb-wave i{flex:1;min-width:1px;height:30%;background:var(--acc,#27b4ff);border-radius:2px 2px 0 0;opacity:.5;animation:eq 1s ease-in-out infinite}
+  @keyframes eq{0%,100%{height:18%;opacity:.3}50%{height:100%;opacity:.9}}
   @keyframes dotbounce{0%,80%,100%{transform:translateY(0);opacity:.35}40%{transform:translateY(-4px);opacity:1}}
   .store-badge{display:inline-flex;align-items:center;gap:6px;background:#13131b;border:1px solid var(--border-soft);padding:3px 9px;border-radius:20px}
 
@@ -209,6 +209,56 @@
   @keyframes celcard{0%{opacity:0;transform:scale(.82)}9%{opacity:1;transform:scale(1)}34%{opacity:1;transform:scale(1.3)}100%{opacity:0;transform:scale(1.65)}}
 
   .hidden{display:none !important}
+
+  .console-dock{flex:0 0 380px;display:flex;flex-direction:column;border-left:1px solid var(--border-soft);background:var(--panel,#0b0b11);min-height:0}
+  .console-dock .dock-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border-soft)}
+  .console-dock .dock-title{font-weight:700;font-size:13px;letter-spacing:.3px}
+  .console-dock .dock-tools{margin-left:auto;display:flex;gap:6px}
+  .console-dock .dock-search{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--border-soft);color:var(--dim)}
+  .console-dock .dock-search svg{width:15px;height:15px;flex:0 0 auto}
+  .console-dock .dock-search input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--txt);font-size:12.5px}
+  .console-dock .dock-term{flex:1 1 auto;min-height:0;display:flex;flex-direction:column}
+  .console-dock .term{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;border:none;border-radius:0;background:transparent}
+  .console-dock .term-body{flex:1 1 auto;max-height:none;overflow:auto}
+  .console-dock .dock-input{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border-soft);background:#0a0f14}
+  .console-dock .di-prompt{color:var(--green);font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700}
+  .console-dock .di-input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--txt);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .term-add{margin-left:8px;border:1px solid var(--cyan);color:var(--cyan);background:rgba(39,180,255,.10);border-radius:6px;padding:1px 8px;font-size:10.5px;font-weight:700;cursor:pointer;vertical-align:middle}
+  .term-add:hover{background:rgba(39,180,255,.20)}
+  .term-add[data-action="console-add-folder"]{border-color:#f5a623;color:#f5a623;background:rgba(245,166,35,.10)}
+  .term-add[data-action="console-add-folder"]:hover{background:rgba(245,166,35,.20)}
+  .content{min-width:0}
+
+  .body{padding:12px;gap:12px;background:var(--page)}
+  .panel-main{flex:1 1 auto;min-width:0;display:flex;border:1px solid var(--win-border);border-radius:14px;overflow:hidden;background:var(--content)}
+  .console-dock{border:1px solid var(--win-border);border-radius:14px;overflow:hidden;background:var(--content)}
+  .upd-pill{display:inline-flex;align-items:center;gap:5px;border:1px solid rgba(39,180,255,.5);color:var(--cyan);background:transparent;border-radius:20px;padding:3px 10px;font-size:11px;font-weight:600;cursor:pointer}
+  .upd-pill:hover{background:rgba(39,180,255,.12);border-color:var(--cyan)}
+  .gh-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border:1px solid var(--border-soft);border-radius:8px;color:var(--muted);background:transparent;cursor:pointer}
+  .gh-btn:hover{color:var(--txt);border-color:var(--border)}
+  .gh-btn svg{width:15px;height:15px}
+  .upd-sep{width:1px;height:16px;background:var(--border-soft)}
+  #update-modal{position:fixed;inset:0;z-index:300;display:none;place-items:center;background:rgba(0,0,0,.6)}
+  #update-modal.show{display:grid}
+  .um-card{width:min(440px,92vw);background:#15151d;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:pop .14s ease}
+  .um-head{padding:22px 18px 16px;text-align:center;color:#fff;background:linear-gradient(135deg,#1f9bf0,#7c5cff)}
+  .um-head .um-ico{width:46px;height:46px;margin:0 auto 10px;border-radius:12px;background:rgba(255,255,255,.18);display:grid;place-items:center}
+  .um-head .um-ico svg{width:22px;height:22px}
+  .um-head h2{font-size:18px;font-weight:800;margin:0}
+  .um-body{padding:16px 18px 18px}
+  .um-row{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .um-ver{border:1px solid rgba(39,180,255,.5);color:var(--cyan);border-radius:8px;padding:3px 10px;font-family:ui-monospace,monospace;font-size:12px;font-weight:700}
+  .um-date{color:var(--dim);font-size:12px}
+  .um-notes{background:#0e0e15;border:1px solid var(--border-soft);border-radius:10px;padding:12px;max-height:170px;overflow:auto;font-size:12.5px;line-height:1.6;color:var(--muted);white-space:pre-wrap}
+  .um-notes .um-lbl{display:block;color:var(--dim);font-size:10.5px;letter-spacing:1px;text-transform:uppercase;margin-bottom:8px}
+  .um-prog{margin-top:12px;display:none}
+  .um-prog.show{display:block}
+  .um-prog .um-ptxt{color:var(--cyan);font-weight:700;font-size:12px;margin-bottom:6px}
+  .um-bar{height:6px;border-radius:6px;background:#0e0e15;overflow:hidden}
+  .um-bar i{display:block;height:100%;width:0;background:linear-gradient(90deg,#1f9bf0,#27b4ff);transition:width .15s}
+  .um-prog .um-pct{display:flex;justify-content:space-between;color:var(--dim);font-size:11px;margin-top:5px}
+  .um-foot{display:flex;gap:10px;margin-top:16px}
+  .um-foot .btn{flex:1}
 </style>
 </head>
 <body>
@@ -224,6 +274,7 @@
       </div>
     </div>
     <div class="body">
+      <div class="panel panel-main">
       <aside class="sidebar">
         <div class="side-label">MODULES</div>
         <nav class="nav" id="nav"></nav>
@@ -238,12 +289,18 @@
         </div>
       </aside>
       <main class="content" id="content"></main>
+      </div>
+      <aside class="console-dock" id="consoleDock"></aside>
     </div>
     <div class="statusbar">
       <span class="dot"></span><span class="ready">READY</span>
       <span class="sep">|</span><span id="appver">v1.0.0</span>
       <span class="sep">|</span><span id="appedits" class="edits">#0 edits</span>
       <div class="thinkbar" id="thinkbar" title="processing"><div class="tb-wave" id="tbWave"></div></div>
+      <button class="upd-pill" data-action="update-check" title="Check for updates">&#10227; Check Update</button>
+      <button class="gh-btn" data-action="open-github" title="Open GitHub repository"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></button>
+      <span class="upd-sep"></span>
+
       <span class="store-badge">💾 <span id="store-mode">Memory</span></span>
       <span id="clock">--:--:--</span>
     </div>
@@ -269,14 +326,65 @@
       </div>
     </div>
   </div>
+  <div id="update-modal"><div class="um-card"><div class="um-head"><div class="um-ico"><svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></div><h2 id="um-title">New Version Available</h2></div><div class="um-body"><div class="um-row"><span class="um-ver" id="um-ver">v0.0.0</span><span class="um-date" id="um-date"></span></div><div class="um-notes"><span class="um-lbl">Release notes</span><span id="um-notes">Checking&#8230;</span></div><div class="um-prog" id="um-prog"><div class="um-ptxt">Downloading&#8230;</div><div class="um-bar"><i id="um-barfill"></i></div><div class="um-pct"><span>Direct (GitHub)</span><span id="um-pct">0%</span></div></div><div class="um-foot"><button class="btn ghost" id="um-later" data-action="update-later">Not now</button><button class="btn primary" id="um-go" data-action="update-go">Update now</button></div></div></div>
   <div id="toasts"></div>
 
 <script>
 "use strict";
 const KEY="sinrad.data.v3";
 const E=window.electronAPI||null;
+/* ---------------- updater UI ---------------- */
+const GH_REPO_URL = "https://github.com/SinSeeker0/sinrad";
+let updState = null;
+function openGithub(){ if(E&&E.shellOpen){ E.shellOpen(GH_REPO_URL); } else { try{ window.open(GH_REPO_URL,"_blank","noopener"); }catch(e){} } }
+function showUpdateModal(){ const m=$("#update-modal"); if(m) m.classList.add("show"); }
+function hideUpdateModal(){ const m=$("#update-modal"); if(m) m.classList.remove("show"); updState=null; }
+function setUpdProgress(show, pct){ const box=$("#um-prog"); if(box) box.classList.toggle("show", !!show); const fill=$("#um-barfill"); if(fill) fill.style.width=(pct||0)+"%"; }
+function renderUpdateResult(r){
+  const t=$("#um-title"), v=$("#um-ver"), d=$("#um-date"), n=$("#um-notes"), go=$("#um-go"), lat=$("#um-later");
+  setUpdProgress(false);
+  if(!r||!r.ok){ if(t)t.textContent="Update check failed"; if(v)v.textContent=""; if(d)d.textContent=""; if(n)n.textContent=(r&&r.error)||"Could not reach GitHub. Check your connection."; if(go){go.style.display="none";} if(lat){lat.style.display="";lat.textContent="Close";} showUpdateModal(); return; }
+  if(!r.available){ if(t)t.textContent="You are up to date"; if(v)v.textContent="v"+r.current; if(d)d.textContent=""; if(n)n.textContent="No newer release on GitHub yet - you are on the latest build."; if(go){go.style.display="none";} if(lat){lat.style.display="";lat.textContent="Close";} showUpdateModal(); return; }
+  if(t)t.textContent="New Version Available";
+  if(v)v.textContent="v"+r.latest;
+  if(d)d.textContent=r.date||"";
+  if(n)n.textContent=(r.notes||"").trim()||"(no release notes)";
+  if(go){ go.style.display=""; go.disabled=false; go.textContent=(r.platform==="darwin"||!r.asset)?"Download page":"Update now"; }
+  if(lat){ lat.style.display=""; lat.disabled=false; lat.textContent="Not now"; }
+  updState = r;
+  showUpdateModal();
+}
+function updateCheckClick(silent){
+  if(!E||!E.updateCheck){ if(!silent) toast("Update check works in the desktop build","warn"); return; }
+  if(!silent){ const t=$("#um-title"); if(t)t.textContent="Checking…"; const n=$("#um-notes"); if(n)n.textContent="Contacting GitHub…"; showUpdateModal(); }
+  Promise.resolve(E.updateCheck(APP_VERSION)).then(renderUpdateResult).catch(function(e){ renderUpdateResult({ok:false,error:String(e&&e.message||e)}); });
+}
+function updateGoClick(){
+  const r=updState; if(!r) return;
+  if(r.platform==="darwin" || (!r.asset && !r.temp)){ openGithub(); hideUpdateModal(); return; }
+  if(r.temp){ doInstall(r.temp); return; }
+  const go=$("#um-go"), lat=$("#um-later"); if(go)go.disabled=true; if(lat)lat.disabled=true;
+  if(!E||!E.updateDownload){ toast("Update download needs the desktop build","warn"); return; }
+  setUpdProgress(true,0); const pctEl=$("#um-pct"); if(pctEl) pctEl.textContent="0%";
+  if(E.onUpdateProgress){ E.onUpdateProgress(function(p){ const tot=p.total||0; const pct=tot?Math.min(100,Math.round((p.got/tot)*100)):0; const mb=function(b){return (b/1048576).toFixed(1);}; setUpdProgress(true,pct); if(pctEl) pctEl.textContent=pct+"%"+(tot?("  "+mb(p.got)+"/"+mb(tot)+" MB"):""); }); }
+  Promise.resolve(E.updateDownload({url:r.asset.url,name:r.asset.name})).then(function(res){
+    setUpdProgress(true,100); if(pctEl) pctEl.textContent="100%";
+    updState=Object.assign({},r,{temp:res&&res.temp});
+    if(go){go.disabled=false; go.textContent="Install & relaunch";} if(lat)lat.disabled=false;
+    toast("Download complete","ok");
+  }).catch(function(e){ setUpdProgress(false); toast("Download failed: "+(e&&e.message||e),"err"); if(go)go.disabled=false; if(lat)lat.disabled=false; });
+}
+function doInstall(temp){
+  if(!E||!E.updateInstall){ toast("Install needs the desktop build","warn"); return; }
+  const go=$("#um-go"); if(go){go.disabled=true; go.textContent="Installing…";}
+  Promise.resolve(E.updateInstall(temp)).then(function(res){ if(res&&res.manual){ openGithub(); } hideUpdateModal(); }).catch(function(e){ toast("Install failed: "+(e&&e.message||e),"err"); if(go){go.disabled=false; go.textContent="Install & relaunch";} });
+}
+function autoCheckUpdate(){ if(!E||!E.updateCheck) return; Promise.resolve(E.updateCheck(APP_VERSION)).then(function(r){ if(r&&r.ok&&r.available){ renderUpdateResult(r); } }).catch(function(){}); }
+(function(){ const m=$("#update-modal"); if(m) m.addEventListener("click",function(e){ if(e.target&&e.target.id==="update-modal") hideUpdateModal(); }); document.addEventListener("keydown",function(e){ if(e.key==="Escape"){ const m2=$("#update-modal"); if(m2&&m2.classList.contains("show")) hideUpdateModal(); } }); })();
+setTimeout(autoCheckUpdate, 1500);
+
 let STORE_MODE="Memory";
-const EDIT_COUNT = 32;
+const EDIT_COUNT = 37;
 const APP_VERSION="1."+EDIT_COUNT+".0";
 
 const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef" };
@@ -299,7 +407,6 @@ const MODULES=[
   {id:"vault",ico:"🔐",name:"Vault",sub:"Passwords"},
   {id:"links",ico:"🔗",name:"Links",sub:"Saved links"},
   {id:"folders",ico:"📁",name:"Folders",sub:"Quick access"},
-  {id:"console",ico:"🖥️",name:"Console",sub:"Activity log"},
 ];
 
 function defaultState(){ return { vault:[], links:[], folders:[], console:[], radCmd:"rad", scanRoots:[], scanDepth:4, scanSkipHidden:true }; }
@@ -326,8 +433,10 @@ function pill(label,active,color,attrs){ const st=active?`color:${color};border-
 function searchRow(key,ph){ return `<div class="mod-search toolbar"><div class="search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"/></svg><input data-search="${key}" placeholder="${ph}" value="${esc(searchTerms[key]||"")}" /></div></div>`; }
 
 function toast(msg,type){ const w=$("#toasts"); const t=document.createElement("div"); t.className="toast"+(type?" "+type:""); t.textContent=msg; w.appendChild(t); setTimeout(()=>{ t.style.transition="opacity .3s, transform .3s"; t.style.opacity="0"; t.style.transform="translateX(20px)"; setTimeout(()=>t.remove(),300); },2600); }
-function log(level,message,meta){ const e={id:uid(),ts:nowMs(),level:level||"info",message:String(message)}; if(meta)e.meta=meta; state.console.unshift(e); if(state.console.length>500)state.console.length=500; saveState(); if(currentView==="console")renderView(); }
-function recordVisit(url,addable){ log("info","VISIT  "+url, addable?{url:url}:null); }
+function log(level,message,meta){ const e={id:uid(),ts:nowMs(),level:level||"info",message:String(message)}; if(meta)e.meta=meta; state.console.unshift(e); if(state.console.length>500)state.console.length=500; saveState(); renderTermBody(); }
+function normUrl(u){ let x=String(u==null?"":u).trim().toLowerCase(); while(x.length&&x.charAt(x.length-1)==="/")x=x.slice(0,-1); return x; }
+function recordVisit(url){ const saved=state.links.some(l=>normUrl(l.url)===normUrl(url)); log("info","VISIT  "+url, saved?null:{url:url}); }
+function recordFolderVisit(p){ const saved=state.folders.some(f=>normUrl(f.path||"")===normUrl(p)); log("info","OPEN   "+p, saved?null:{path:p}); }
 function openTarget(target,type){ if(!target)return; if(type==="url"){ recordVisit(target,true); } if(type==="app"){ if(E&&E.openPath){ E.openPath(target).then(ok=>{ if(ok===false)toast("Could not open path: "+target,"err"); }); } else { toast("Opening local apps requires the desktop build.","warn"); } return; } if(E&&E.shellOpen){ E.shellOpen(target); } else { try{ window.open(target,"_blank","noopener"); }catch(e){ toast("Blocked popup: "+target,"warn"); } } }
 async function copy(text,label){ try{ if(navigator.clipboard&&navigator.clipboard.writeText){ await navigator.clipboard.writeText(text); } else { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); } toast((label||"Value")+" copied","ok"); log("ok","Copied "+(label||"value")+" to clipboard"); }catch(e){ toast("Copy failed","err"); } }
 
@@ -336,7 +445,24 @@ async function loadArt(){ const g=await Promise.all(CELEBRATE_FILES.map(probeImg
 function celebrate(){ const c=$("#celebrate"); if(!c)return; const pool=(EFFECTIVE&&EFFECTIVE.length)?EFFECTIVE:CELEBRATE_EMBED; const im=$("#celImg"); if(im&&pool.length){ let p=0; if(pool.length>1){ do{ p=Math.floor(Math.random()*pool.length); }while(p===celIdx); } celIdx=p; im.src=pool[p]; } c.classList.remove("show"); void c.offsetWidth; c.classList.add("show"); clearTimeout(celebrate._t); celebrate._t=setTimeout(()=>c.classList.remove("show"),4000); }
 
 function renderNav(){ $("#nav").innerHTML=MODULES.map(m=>`<div class="nav-item ${m.id===currentView?"active":""}" data-action="nav" data-nav="${m.id}"><span class="nav-ico">${m.ico}</span><span class="nav-txt"><b>${esc(m.name)}</b><span>${esc(m.sub)}</span></span></div>`).join(""); }
-function renderView(){ const c=$("#content"); switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "folders":c.innerHTML=viewFolders();break; case "console":c.innerHTML=viewConsole();break; default:c.innerHTML=viewVault(); } }
+function renderConsole(){
+  const dock=$("#consoleDock"); if(!dock)return;
+  const t0=searchTerms.console||"";
+  dock.innerHTML=`<div class="dock-head"><div class="dock-title">🖥️ Console</div><div class="dock-tools"><button class="btn sm danger" data-action="console-clear" title="Clear log">🗑 Clear</button></div></div><div class="dock-search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"/></svg><input data-search="console" placeholder="Grep the log…" value="${esc(t0)}"></div><div class="term dock-term"><div class="term-body" id="termBody"></div></div><div class="dock-input"><span class="di-prompt">$</span><input id="termInput" class="di-input" placeholder="type a command — try: ${esc(state.radCmd)} &quot;Anime&quot;  ·  help" autocomplete="off"></div>`;
+}
+function renderTermBody(){
+  const dock=$("#consoleDock"); if(!dock)return;
+  if(!$("#termBody")) renderConsole();
+  const tb=$("#termBody"); if(!tb)return;
+  const atBottom=tb.scrollTop+tb.clientHeight>=tb.scrollHeight-24;
+  const term=searchTerms.console||"";
+  const items=state.console.filter(c=>match(term,c.message,c.level));
+  const lines=items.length?items.map(c=>{ const ts=new Date(c.ts).toLocaleTimeString([],{hour12:false}); let addBtn=""; if(c.meta&&c.meta.url){ if(!state.links.some(l=>normUrl(l.url)===normUrl(c.meta.url))) addBtn=`<button class="term-add" data-action="console-add-link" data-id="${c.id}" title="Save this site to Links">＋ Link</button>`; } else if(c.meta&&c.meta.path){ if(!state.folders.some(f=>normUrl(f.path||"")===normUrl(c.meta.path))) addBtn=`<button class="term-add" data-action="console-add-folder" data-id="${c.id}" title="Save this folder to Quick Folders">＋ Folder</button>`; } return `<div class="term-line"><span class="tt">[${ts}]</span>&nbsp;<span class="lv ${c.level}">${esc(c.level.toUpperCase())}</span>&nbsp;<span class="ms">${esc(c.message)}</span>${addBtn}</div>`; }).join(""):`<div class="term-empty">// no activity yet — open a site or folder, or type ${esc(state.radCmd)} "query"</div>`;
+  const cursor=`<div class="term-line term-cursor"><span class="tt">sir@console</span>:<span class="lv ok">~</span>$&nbsp;<span class="blink">▋</span></div>`;
+  tb.innerHTML=lines+cursor;
+  if(atBottom) tb.scrollTop=tb.scrollHeight;
+}
+function renderView(){ const c=$("#content"); switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "folders":c.innerHTML=viewFolders();break; default:c.innerHTML=viewVault(); } renderTermBody(); }
 function head(t,d,a){ return `<div class="mod-head"><div><h1>${esc(t)}</h1><p>${esc(d)}</p></div><div class="spacer"></div>${a||""}</div>`; }
 function emptyState(i,m){ return `<div class="empty"><div class="e-ico">${i}</div><p>${esc(m)}</p></div>`; }
 
@@ -349,7 +475,7 @@ function viewVault(){
   else if(!items.length) body=emptyState("🔍","Nothing matches your search or filter.");
   else body=`<div class="grid">`+items.map(v=>{ const show=revealed.has(v.id); const pw=show?esc(v.password):"•".repeat(Math.min(14,Math.max(6,(v.password||"").length))); return `<div class="card" style="${edgeShadow(v)}" data-ctx="vault" data-id="${v.id}" data-action="vault-open"><div class="row"><div style="flex:1;min-width:0"><h3>${esc(v.name)}</h3><div class="sub">${esc(v.url||"—")}</div></div></div><div class="meta">User: <span class="mono">${esc(v.username||"—")}</span></div><div class="meta">Pass: <span class="mono">${pw}</span></div></div>`; }).join("")+`</div>`;
   const addbar=`<div class="toolbar linkbar"><div class="lin-input" style="cursor:default;color:var(--muted);opacity:.85;display:flex;align-items:center;gap:8px">🔐 Entries are saved locally on this device</div><button class="btn primary" data-action="vault-new">＋ Add entry</button></div>`;
-  return head("Secure Vault","Left-click opens · right-click for more · Ctrl+F to search")+addbar+searchRow("vault","Search vault...")+pills+body;
+  return head("Secure Vault","Double-click opens · right-click for more · Ctrl+F to search")+addbar+searchRow("vault","Search vault...")+pills+body;
 }
 
 function viewLinks(){
@@ -361,7 +487,7 @@ function viewLinks(){
   if(!state.links.length) body=emptyState("🔗","No links yet — add your first one above.");
   else if(!items.length) body=emptyState("🔍","Nothing matches. Try a different tab or Ctrl+F.");
   else body=`<div class="grid linkgrid">`+items.map(l=>`<div class="link-card" style="${edgeShadow(l)}" data-ctx="link" data-id="${l.id}" data-action="link-open"><h3 class="lc-title">${esc(l.title)}</h3><div class="lc-url" title="${esc(l.url)}">${esc(l.url)}</div></div>`).join("")+`</div>`;
-  return head("Link Saver","Left-click opens · right-click to tag · Ctrl+F to search · combine a tab + ★ Favorites")+addbar+searchRow("links","Search links...")+pills+body;
+  return head("Link Saver","Double-click opens · right-click to tag · Ctrl+F to search · combine a tab + ★ Favorites")+addbar+searchRow("links","Search links...")+pills+body;
 }
 function doLinkAdd(){ const t=$("#lk_title"),u=$("#lk_url"); const title=t?t.value.trim():"",url=u?u.value.trim():""; if(!title||!url){ toast("Title and URL required","warn"); return; } const category=linkCat!=="all"?linkCat:""; state.links.unshift({id:uid(),title,url,category,favorite:false,created:nowMs()}); log("ok","Saved link: "+title+(category?" ["+category+"]":"")); saveState(); celebrate(); renderView(); toast("Link saved","ok"); }
 
@@ -371,10 +497,10 @@ function viewFolders(){
   const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="fd_name" placeholder="Name (optional)"><input class="lin-input lk-url" id="fd_path" placeholder="Folder path  e.g. C:\\Users\\you\\Documents"><button class="btn primary" data-action="folder-add">＋ Add</button></div>`;
   const pills=`<div class="toolbar"><div class="lf-left">${pill("All",folderFilter==="all",ALL_COLOR,'data-action="folder-filter" data-filter="all"')}${pill("★ Favorites",folderFilter==="fav",FAV_COLOR,'data-action="folder-filter" data-filter="fav"')}</div></div>`;
   let body;
-  if(!state.folders.length) body=emptyState("📁","No quick folders yet — paste a path above. Left-click opens · right-click for more.");
+  if(!state.folders.length) body=emptyState("📁","No quick folders yet — paste a path above. Double-click opens · right-click for more.");
   else if(!items.length) body=emptyState("🔍","Nothing matches. Try a different tab or Ctrl+F.");
   else body=`<div class="folder-list">`+items.map(f=>{ const p=f.path||f.name||""; const label=(f.name&&f.path)?f.name:baseName(p); return `<div class="folder-row" style="${edgeShadow(f)}" data-ctx="folder" data-id="${f.id}" data-action="folder-open"><span class="fr-ico">📁</span><div class="fr-main"><div class="fr-name">${esc(label||"Untitled")}</div><div class="fr-path" title="${esc(p)}">${esc(p)}</div></div></div>`; }).join("")+`</div>`;
-  return head("Quick Folders","Left-click opens · right-click for more · Ctrl+F to search")+addbar+searchRow("folders","Search folders...")+pills+body;
+  return head("Quick Folders","Double-click opens · right-click for more · Ctrl+F to search")+addbar+searchRow("folders","Search folders...")+pills+body;
 }
 function doFolderAdd(){ const n=$("#fd_name"),p=$("#fd_path"); const name=n?n.value.trim():"",path=p?p.value.trim():""; if(!path){ toast("Paste a folder path","warn"); return; } state.folders.unshift({id:uid(),name,path,favorite:false,created:nowMs()}); log("ok","Added quick folder: "+(name||baseName(path))); saveState(); celebrate(); renderView(); toast("Folder saved","ok"); }
 function folderEditModal(id){ const f=find(state.folders,id); if(!f)return; const p=f.path||f.name||""; openModal("✏️ Edit Quick Folder",`<div class="field"><label>Name (optional)</label><input id="fe_name" value="${esc(f.name||"")}"></div><div class="field"><label>Folder path</label><input id="fe_path" value="${esc(p)}"></div>`,"Save",()=>{ const path=$("#fe_path").value.trim(); if(!path){ toast("Path required","warn"); return; } f.name=$("#fe_name").value.trim(); f.path=path; log("info","Updated quick folder: "+(f.name||baseName(path))); saveState(); closeModal(); renderView(); toast("Folder updated","ok"); }); }
@@ -411,8 +537,15 @@ function showCardMenu(type,id,x,y){
   showMenu(x,y,it);
 }
 
+function openByAction(a,id){
+  if(a==="vault-open"){ const v=find(state.vault,id); if(v&&v.url){ openTarget(v.url,"url"); log("info","Opened site: "+v.name); } }
+  else if(a==="link-open"){ const l=find(state.links,id); if(l){ openTarget(l.url,"url"); log("info","Opened link: "+l.title); } }
+  else if(a==="folder-open"){ const f=find(state.folders,id); if(f){ const p=f.path||f.name||""; if(p){ openTarget(p,"app"); recordFolderVisit(p); } } }
+}
+document.addEventListener("dblclick",(ev)=>{ const t=ev.target.closest("[data-action]"); if(!t)return; const a=t.dataset.action; if(a==="vault-open"||a==="link-open"||a==="folder-open"){ openByAction(a,t.dataset.id); } });
 document.addEventListener("click",async(ev)=>{
   const t=ev.target.closest("[data-action]"); if(!t)return; const a=t.dataset.action,id=t.dataset.id;
+  if((a==="vault-open"||a==="link-open"||a==="folder-open")&&!t.closest("#ctxmenu"))return;
   switch(a){
     case "nav": currentView=t.dataset.nav; $("#content").classList.remove("searching"); searchTerms={}; renderNav(); renderView(); break;
     case "win-min": E&&E.winMin?E.winMin():toast("Window controls work in the desktop build"); break;
@@ -424,7 +557,7 @@ document.addEventListener("click",async(ev)=>{
     case "vault-fav": { const v=find(state.vault,id); if(v){ v.favorite=!v.favorite; log("info",(v.favorite?"Favorited":"Unfavorited")+": "+v.name); saveState(); renderView(); } break; }
     case "vault-pri": { const v=find(state.vault,id); if(v){ v.priority=!v.priority; log("info",(v.priority?"Priority on":"Priority off")+": "+v.name); saveState(); renderView(); } break; }
     case "vault-eye": if(revealed.has(id))revealed.delete(id); else revealed.add(id); renderView(); break;
-    case "vault-open": { const v=find(state.vault,id); if(v&&v.url){ openTarget(v.url,"url"); log("info","Opened site: "+v.name); } break; }
+    case "vault-open": openByAction("vault-open",id); break;
     case "vault-copy-u": { const v=find(state.vault,id); if(v)copy(v.username||"","Username"); break; }
     case "vault-copy-p": { const v=find(state.vault,id); if(v)copy(v.password||"","Password"); break; }
     case "vault-filter": vaultFilter=t.dataset.filter; renderView(); break;
@@ -433,17 +566,22 @@ document.addEventListener("click",async(ev)=>{
     case "link-fav": linkFav=!linkFav; renderView(); break;
     case "link-fav-toggle": { const l=find(state.links,id); if(l){ l.favorite=!l.favorite; log("info",(l.favorite?"Favorited":"Unfavorited")+" link: "+l.title); saveState(); renderView(); } break; }
     case "link-cat-set": { const l=find(state.links,id); if(l){ l.category=(t.dataset.cat==="__none__")?"":t.dataset.cat; log("info","Tagged link "+l.title+" → "+(l.category||"none")); saveState(); renderView(); } break; }
-    case "link-open": { const l=find(state.links,id); if(l){ openTarget(l.url,"url"); log("info","Opened link: "+l.title); } break; }
+    case "link-open": openByAction("link-open",id); break;
     case "link-del": { const l=find(state.links,id); if(l&&await confirmModal("Delete "+l.title+"?")){ state.links=state.links.filter(x=>x.id!==id); log("warn","Deleted link: "+l.title); saveState(); renderView(); } break; }
     case "folder-add": doFolderAdd(); break;
-    case "folder-open": { const f=find(state.folders,id); if(f){ const p=f.path||f.name||""; if(p){ openTarget(p,"app"); log("info","Opened folder: "+(f.name||baseName(p))); } } break; }
+    case "folder-open": openByAction("folder-open",id); break;
     case "folder-edit": folderEditModal(id); break;
     case "folder-fav": { const f=find(state.folders,id); if(f){ f.favorite=!f.favorite; log("info",(f.favorite?"Favorited":"Unfavorited")+" folder: "+(f.name||"")); saveState(); renderView(); } break; }
     case "folder-del": { const f=find(state.folders,id); if(f&&await confirmModal("Remove "+(f.name||baseName(f.path||f.name))+"?")){ state.folders=state.folders.filter(x=>x.id!==id); log("warn","Removed quick folder"); saveState(); renderView(); } break; }
     case "folder-filter": folderFilter=t.dataset.filter; renderView(); break;
     case "console-clear": if(await confirmModal("Clear the entire activity log?")){ state.console=[]; log("warn","Activity log cleared"); saveState(); renderView(); } break;
     case "console-add-link": { const c=find(state.console,id); if(c&&c.meta&&c.meta.url){ const u=c.meta.url; state.links.unshift({id:uid(),title:hostOf(u),url:u,category:"",favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved visited site to Links: "+u); saveState(); renderView(); toast("Added to Links","ok"); } break; }
+    case "console-add-folder": { const c=find(state.console,id); if(c&&c.meta&&c.meta.path){ const p=c.meta.path; state.folders.unshift({id:uid(),name:baseName(p),path:p,favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved opened folder to Quick Folders: "+p); saveState(); renderView(); toast("Added to Folders","ok"); } break; }
     case "norma-min": setFloating(true); break;
+    case "update-check": updateCheckClick(false); break;
+    case "open-github": openGithub(); break;
+    case "update-later": hideUpdateModal(); break;
+    case "update-go": updateGoClick(); break;
     case "modal-cancel": cancelModal(); break;
     case "modal-confirm": if(typeof modalOnConfirm==="function")modalOnConfirm(); break;
   }
@@ -471,7 +609,7 @@ document.addEventListener("click",(e)=>{ const m=$("#ctxmenu"); if(m.classList.c
 function isFloating(){ return $("#norma").classList.contains("hidden"); }
 function setFloating(f){ if(f){ $("#norma").classList.add("hidden"); if(E&&E.petShow){E.petShow();} else { $("#norma-bubble").classList.add("show"); } log("info","Norma sent floating"); } else { $("#norma").classList.remove("hidden"); $("#norma-bubble").classList.remove("show"); if(E&&E.petHide)E.petHide(); log("info","Norma pinned to panel"); } }
 (function(){ const card=$("#norma"),bubble=$("#norma-bubble"); let moved=false;
-  function menu(x,y){ showMenu(x,y,`<div class="ci" data-action="nav" data-nav="vault">🔐 Vault</div><div class="ci" data-action="nav" data-nav="links">🔗 Links</div><div class="ci" data-action="nav" data-nav="folders">📁 Folders</div><div class="ci" data-action="nav" data-nav="console">🖥️ Console</div><div class="cdiv"></div><div class="ci" data-action="norma-pin">${isFloating()?"📌 Pin to panel":"– Send floating"}</div>`); }
+  function menu(x,y){ showMenu(x,y,`<div class="ci" data-action="nav" data-nav="vault">🔐 Vault</div><div class="ci" data-action="nav" data-nav="links">🔗 Links</div><div class="ci" data-action="nav" data-nav="folders">📁 Folders</div><div class="cdiv"></div><div class="ci" data-action="norma-pin">${isFloating()?"📌 Pin to panel":"– Send floating"}</div>`); }
   card.addEventListener("contextmenu",e=>{e.preventDefault();menu(e.clientX,e.clientY);});
   bubble.addEventListener("contextmenu",e=>{e.preventDefault();moved=false;menu(e.clientX,e.clientY);});
   bubble.addEventListener("click",e=>{if(e.button!==0)return;if(moved){moved=false;return;}menu(e.clientX,e.clientY);});
@@ -510,7 +648,7 @@ if(E){ if(E.onFsChunk)E.onFsChunk(p=>{ const pend=pendingScans[p.id]; if(!pend)r
 
 function tickClock(){ $("#clock").textContent=new Date().toLocaleTimeString([],{hour12:false}); }
 setInterval(tickClock,1000);
-function buildThinkBar(){ const w=$("#tbWave"); if(w){ let h=""; for(let i=0;i<64;i++){ h+='<i style="--h:'+(30+Math.random()*70).toFixed(0)+'%;animation-delay:'+(Math.random()*1.1).toFixed(2)+'s;animation-duration:'+(0.7+Math.random()*0.9).toFixed(2)+'s"></i>'; } w.innerHTML=h; } const tb=$("#thinkbar"); if(tb){ const cols=["#27b4ff","#b14bff","#ff4d8d","#33d17a"]; let ci=0; tb.style.setProperty("--acc",cols[0]); setInterval(()=>{ ci=(ci+1)%cols.length; tb.style.setProperty("--acc",cols[ci]); },4200); } }
+function buildThinkBar(){ const w=$("#tbWave"); if(w){ let h=""; for(let i=0;i<64;i++){ h+='<i style="animation-delay:'+(Math.random()*1.2).toFixed(2)+'s;animation-duration:'+(0.8+Math.random()*0.9).toFixed(2)+'s"></i>'; } w.innerHTML=h; } const tb=$("#thinkbar"); if(tb){ const cols=["#27b4ff","#b14bff","#ff4d8d","#33d17a"]; let ci=0; tb.style.setProperty("--acc",cols[0]); setInterval(()=>{ ci=(ci+1)%cols.length; tb.style.setProperty("--acc",cols[ci]); },4200); } }
 (async function boot(){
   await loadState();
   const av=$("#appver"); if(av)av.textContent="v"+APP_VERSION;

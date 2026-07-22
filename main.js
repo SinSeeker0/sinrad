@@ -14,7 +14,7 @@ let petWin = null;
 function createWindow(){
   mainWin = new BrowserWindow({
     width:1280, height:900, minWidth:900, minHeight:640,
-    frame:false, backgroundColor:"#060608", title:"Sinrad",
+    frame:false, backgroundColor:"#060608", title:"Sinrad", icon:path.join(__dirname,"icon.png"),
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false }
   });
   mainWin.loadFile(path.join(__dirname,"index.html"));
@@ -101,3 +101,78 @@ ipcMain.on("fs-scan", (e, payload)=>{
   activeScans.set(id, ctrl);
 });
 ipcMain.on("fs-scan-cancel", (e, payload)=>{ const c = activeScans.get(payload && payload.id); if(c){ c.abort(); activeScans.delete(payload && payload.id); } });
+
+/* ===================== auto-updater (GitHub Releases, no installer needed) ===================== */
+const https = require("https");
+const UPD_OWNER = "SinSeeker0";
+const UPD_REPO  = "sinrad";
+const UPD_API   = "https://api.github.com/repos/" + UPD_OWNER + "/" + UPD_REPO + "/releases/latest";
+const UPD_PAGE  = "https://github.com/" + UPD_OWNER + "/" + UPD_REPO + "/releases/latest";
+function updVerTuple(v){ const p=String(v==null?"":v).split("."); const o=[]; for(let i=0;i<3;i++){ o.push(parseInt(p[i],10)||0); } return o; }
+function updCmp(a,b){ for(let i=0;i<3;i++){ if(a[i]>b[i])return 1; if(a[i]<b[i])return -1; } return 0; }
+function updGetJSON(url){ return new Promise(function(res,rej){ const u=new URL(url); const req=https.get({hostname:u.hostname,path:u.pathname+u.search,headers:{"User-Agent":"S.I.R-updater","Accept":"application/vnd.github+json"}},function(r){ let d=""; r.on("data",function(c){d+=c;}); r.on("end",function(){ try{res(JSON.parse(d));}catch(e){rej(e);} }); }); req.on("error",rej); req.setTimeout(15000,function(){req.destroy(new Error("timeout"));}); }); }
+function updGetFile(url,dest,onProg){ return new Promise(function(res,rej){ const u=new URL(url); const req=https.get({hostname:u.hostname,path:u.pathname+u.search,headers:{"User-Agent":"S.I.R-updater"}},function(r){ if(r.statusCode>=300&&r.statusCode<400&&r.headers.location){ r.resume(); updGetFile(r.headers.location,dest,onProg).then(res,rej); return; } if(r.statusCode!==200){ r.resume(); rej(new Error("HTTP "+r.statusCode)); return; } const total=parseInt(r.headers["content-length"]||"0",10)||0; let got=0; const out=fs.createWriteStream(dest); r.on("data",function(c){ got+=c.length; if(onProg)onProg(got,total); }); r.pipe(out); out.on("finish",function(){ out.close(function(){ res(dest); }); }); out.on("error",rej); }); req.on("error",rej); req.setTimeout(120000,function(){req.destroy(new Error("timeout"));}); }); }
+function updPickAsset(assets,latestVer){
+  const plat=process.platform; const cur=String(app.getVersion()||"");
+  if(plat==="darwin") return null;
+  const low=function(n){return String(n||"").toLowerCase();};
+  if(plat==="win32"){
+    const base=path.basename(process.execPath);
+    if(cur && base.indexOf(cur)>=0){ const guess=base.split(cur).join(latestVer); for(const a of assets){ if(a.name===guess) return a; } }
+    for(const a of assets){ const n=low(a.name); if(n.slice(-4)===".exe" && n.indexOf("setup")<0 && n.indexOf("installer")<0 && n.indexOf("nsis")<0) return a; }
+    for(const a of assets){ if(low(a.name).slice(-4)===".exe") return a; }
+    return null;
+  }
+  const base=path.basename(process.env.APPIMAGE||process.execPath);
+  if(cur && base.indexOf(cur)>=0){ const guess=base.split(cur).join(latestVer); for(const a of assets){ if(a.name===guess) return a; } }
+  for(const a of assets){ if(low(a.name).indexOf(".appimage")>=0) return a; }
+  return null;
+}
+ipcMain.handle("update-check", async function(e, currentVer){
+  try{
+    const rel=await updGetJSON(UPD_API);
+    let tag=String(rel.tag_name||""); if(tag.charAt(0)==="v"||tag.charAt(0)==="V") tag=tag.slice(1);
+    const cur=String(currentVer||app.getVersion()||"0.0.0");
+    const available=updCmp(updVerTuple(tag),updVerTuple(cur))>0;
+    const asset=updPickAsset(rel.assets||[], tag);
+    return { ok:true, available:available, latest:tag, current:cur, notes:String(rel.body||""), date:String(rel.published_at||"").slice(0,10), platform:process.platform, repoUrl:UPD_PAGE, asset: asset?{name:asset.name,url:asset.browser_download_url,size:asset.size||0}:null };
+  }catch(err){ return { ok:false, error:String(err&&err.message||err) }; }
+});
+let updTemp=null;
+ipcMain.handle("update-download", async function(e, payload){
+  const url=payload&&payload.url; if(!url) throw new Error("no url");
+  const dest=path.join(app.getPath("temp"), "sinrad_update_"+Date.now()+".part"); updTemp=dest;
+  const win=BrowserWindow.fromWebContents(e.sender);
+  await updGetFile(url, dest, function(got,total){ if(win&&!win.isDestroyed()) win.webContents.send("update-progress",{got:got,total:total}); });
+  return { ok:true, temp:dest };
+});
+ipcMain.handle("update-install", async function(e, tempPath){
+  const plat=process.platform; const src=tempPath||updTemp; if(!src) throw new Error("no downloaded file");
+  if(plat==="darwin"){ shell.openExternal(UPD_PAGE); return {ok:true, manual:true}; }
+  const spawn=require("child_process").spawn;
+  if(plat==="win32"){
+    const target=process.execPath; const bat=path.join(app.getPath("temp"),"sinrad_update.bat");
+    const body=`@echo off\r
+:loop\r
+ping 127.0.0.1 -n 2 > nul\r
+move /Y "${src}" "${target}" > nul 2>&1\r
+if errorlevel 1 goto loop\r
+start "" "${target}"\r
+del "%~f0"\r
+`;
+    fs.writeFileSync(bat, body);
+    const child=spawn("cmd.exe", ["/c", bat], {detached:true, stdio:"ignore", windowsHide:true}); child.unref();
+    setTimeout(function(){ app.quit(); }, 300); return {ok:true};
+  } else {
+    const target=process.env.APPIMAGE||process.execPath; const sh=path.join(app.getPath("temp"),"sinrad_update.sh");
+    const body=`#!/bin/sh
+sleep 1
+mv -f "${src}" "${target}" && chmod +x "${target}"
+nohup "${target}" >/dev/null 2>&1 &
+`;
+    fs.writeFileSync(sh, body); try{ fs.chmodSync(sh, 0o755); }catch(_){}
+    const child=spawn("sh", [sh], {detached:true, stdio:"ignore"}); child.unref();
+    setTimeout(function(){ app.quit(); }, 300); return {ok:true};
+  }
+});
+

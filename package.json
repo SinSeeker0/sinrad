@@ -1,8 +1,8 @@
 {
   "name": "sinrad",
   "productName": "Sinrad",
-  "version": "1.32.0",
-  "description": "S.I.R — Personal Command Center (Vault, Links, Quick Folders, device folder search, Spotify, Console).",
+  "version": "1.37.0",
+  "description": "S.I.R — Personal Command Center (Vault, Links, Quick Folders, device folder search, Console).",
   "main": "main.js",
   "author": {
     "name": "SinSeeker0",
@@ -46,13 +46,15 @@
       "target": [
         "dmg",
         "zip"
-      ]
+      ],
+      "icon": "icon.png"
     },
     "win": {
       "target": [
         "portable",
         "nsis"
-      ]
+      ],
+      "icon": "icon.ico"
     },
     "linux": {
       "category": "Utility",
@@ -60,7 +62,8 @@
       "target": [
         "AppImage",
         "deb"
-      ]
+      ],
+      "icon": "icon.png"
     }
   }
 }

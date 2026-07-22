@@ -31,5 +31,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   fsScanCancel: (o) => ipcRenderer.send("fs-scan-cancel", o),
   onFsChunk: (cb) => ipcRenderer.on("fs-scan-chunk", (_, p) => cb(p)),
   onFsDone: (cb) => ipcRenderer.on("fs-scan-done", (_, p) => cb(p)),
-  fsHome: () => ipcRenderer.invoke("fs-home")
+  fsHome: () => ipcRenderer.invoke("fs-home"),
+  updateCheck: (v) => ipcRenderer.invoke("update-check", v),
+  updateDownload: (o) => ipcRenderer.invoke("update-download", o),
+  updateInstall: (t) => ipcRenderer.invoke("update-install", t),
+  onUpdateProgress: (cb) => ipcRenderer.on("update-progress", (_, p) => cb(p))
 });
