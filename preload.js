@@ -35,5 +35,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   updateCheck: (v) => ipcRenderer.invoke("update-check", v),
   updateDownload: (o) => ipcRenderer.invoke("update-download", o),
   updateInstall: (t) => ipcRenderer.invoke("update-install", t),
-  onUpdateProgress: (cb) => ipcRenderer.on("update-progress", (_, p) => cb(p))
+  onUpdateProgress: (cb) => ipcRenderer.on("update-progress", (_, p) => cb(p)),
+  musicRequest: () => ipcRenderer.send("music-request"),
+  onMusicList: (cb) => ipcRenderer.on("music-list", (_, l) => cb(l)),
+  musicCmd: (c) => ipcRenderer.send("music-cmd", c),
+  onMusicCmd: (cb) => ipcRenderer.on("music-cmd", (_, c) => cb(c))
 });

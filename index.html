@@ -331,6 +331,19 @@
 
   .ndot{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:transparent;border:1.5px solid #ff79a6;box-shadow:0 0 5px rgba(255,77,141,.55),inset 0 0 2px rgba(255,77,141,.35);cursor:pointer;z-index:5;opacity:.9;pointer-events:auto}
   .ndot:hover{opacity:1;transform:scale(1.25);border-color:#fff;background:rgba(255,77,141,.12);box-shadow:0 0 8px rgba(255,77,141,.9),inset 0 0 3px rgba(255,77,141,.6)}
+
+  .norma-music{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,77,141,.18)}
+  .nm-track{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px}
+  .nm-controls{display:flex;align-items:center;justify-content:center;gap:10px}
+  .nm-btn{display:inline-flex;align-items:center;justify-content:center;width:26px;height:26px;border-radius:8px;border:1px solid var(--border-soft);background:transparent;color:var(--muted);cursor:pointer}
+  .nm-btn:hover{color:#fff;border-color:var(--pink)}
+  .nm-btn svg{width:14px;height:14px}
+  .nm-play{width:32px;height:32px;color:var(--pink);border-color:rgba(255,77,141,.5)}
+  .nm-play:hover{box-shadow:0 0 10px rgba(255,77,141,.4)}
+
+  .nm-trackrow{display:flex;align-items:center;gap:6px;margin-bottom:8px}
+  .nm-track{flex:1;min-width:0;margin-bottom:0}
+  .nm-folder{width:24px;height:24px;flex:0 0 auto}
 </style>
 </head>
 <body>
@@ -358,6 +371,7 @@
             <button class="norma-min" data-action="norma-min" title="Send floating">–</button>
           </div>
           <div class="norma-hint">Minimize (–) to send her floating on your desktop.<br>Right-click her (or the floating pet) for quick access · Pin to dock.</div>
+          <div class="norma-music"><div class="nm-trackrow"><div class="nm-track" id="nm-track">No tracks</div><button class="nm-btn nm-folder" data-action="music-open-folder" title="Open music folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></div><div class="nm-controls"><button class="nm-btn" data-action="music-prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 6h2v12H6zM20 6v12l-9-6z"/></svg></button><button class="nm-btn nm-play" data-action="music-toggle" title="Play / Pause" id="nm-play"></button><button class="nm-btn" data-action="music-next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button></div></div>
         </div>
       </aside>
       <main class="content" id="content"></main>
@@ -463,6 +477,23 @@ function setUpdateGif(phase){ const gif=$("#um-gif"), svg=$("#um-ico-svg"); cons
 let UPD_GIF_SRC={checking:null,updating:null,complete:null};
 function hideSettings(){ const m=$("#settings-modal"); if(m)m.classList.remove("show"); }
 function openSettings(){ const m=$("#settings-modal"); if(m){ m.classList.add("show"); renderSettings(); } }
+const NM_PLAY=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>`;
+const NM_PAUSE=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
+const bgmAudio=new Audio(); bgmAudio.volume=0.5; let bgmTracks=[]; let bgmIdx=0; let bgmDir="";
+try{ if(state.music&&state.music.volume!=null) bgmAudio.volume=state.music.volume; if(state.music&&state.music.idx) bgmIdx=state.music.idx; }catch(_){}
+function updateMusicUI(){ const t=$("#nm-track"); const p=$("#nm-play"); if(t) t.textContent = bgmTracks.length? bgmTracks[bgmIdx].name : ("No tracks — drop audio files in: "+(bgmDir||"the bgm folder")); if(p) p.innerHTML = (bgmTracks.length && !bgmAudio.paused)? NM_PAUSE : NM_PLAY; }
+function musicSetTrack(i){ if(!bgmTracks.length) return; bgmIdx=((i%bgmTracks.length)+bgmTracks.length)%bgmTracks.length; bgmAudio.src=bgmTracks[bgmIdx].url; const pr=bgmAudio.play(); if(pr&&pr.catch) pr.catch(function(){}); updateMusicUI(); try{ if(!state.music) state.music={}; state.music.idx=bgmIdx; saveState(); }catch(_){} }
+function musicToggle(){ if(!bgmTracks.length) return; if(bgmAudio.paused){ const pr=bgmAudio.play(); if(pr&&pr.catch) pr.catch(function(){}); } else { bgmAudio.pause(); } updateMusicUI(); }
+function musicNext(){ musicSetTrack(bgmIdx+1); }
+function musicPrev(){ musicSetTrack(bgmIdx-1); }
+bgmAudio.addEventListener("ended", musicNext);
+bgmAudio.addEventListener("play", updateMusicUI);
+bgmAudio.addEventListener("pause", updateMusicUI);
+function musicLoadList(payload){ bgmDir=(payload&&payload.dir)||""; const list=(payload&&payload.files)||[]; bgmTracks=list.map(function(f){ return {name:f.name, url:"file://"+f.path}; }); if(bgmTracks.length){ musicSetTrack(bgmIdx<bgmTracks.length?bgmIdx:0); } else { bgmAudio.pause(); updateMusicUI(); } }
+if(E&&E.onMusicList) E.onMusicList(musicLoadList);
+if(E&&E.onMusicCmd) E.onMusicCmd(function(c){ if(c==="toggle") musicToggle(); else if(c==="next") musicNext(); else if(c==="prev") musicPrev(); });
+if(E&&E.musicRequest) E.musicRequest();
+updateMusicUI();
 function renderSettings(){ const b=$("#settings-body"); if(!b)return; const cur=(state.openMode||"double"); b.innerHTML=`<div class="set-row"><div class="set-info"><div class="set-label">Open links, folders and sites</div><div class="set-hint">How a vault site, saved link or quick folder opens when you click it.</div></div><div class="set-control"><div class="seg2"><button type="button" class="seg2-opt${cur==="double"?" on":""}" data-mode="double">Double Click</button><button type="button" class="seg2-opt${cur==="single"?" on":""}" data-mode="single">Single Click</button></div></div></div>`; }
 (function(){
   document.addEventListener("click",function(e){
@@ -476,7 +507,7 @@ function renderSettings(){ const b=$("#settings-body"); if(!b)return; const cur=
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 52;
+const EDIT_COUNT = 55;
 const APP_VERSION="1."+EDIT_COUNT+".0";
 
 const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef" };
@@ -682,6 +713,10 @@ document.addEventListener("click",async(ev)=>{
     case "console-add-folder": { const c=find(state.console,id); if(c&&c.meta&&c.meta.path){ const p=c.meta.path; state.folders.unshift({id:uid(),name:baseName(p),path:p,favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved opened folder to Quick Folders: "+p); saveState(); renderView(); toast("Added to Folders","ok"); } break; }
     case "norma-min": setFloating(true); break;
     case "norma-pin": setFloating(!isFloating()); break;
+    case "music-toggle": musicToggle(); break;
+    case "music-next": musicNext(); break;
+    case "music-prev": musicPrev(); break;
+    case "music-open-folder": if(bgmDir && E && E.openPath){ E.openPath(bgmDir); } else if(bgmDir && E && E.shellOpen){ E.shellOpen(bgmDir); } break;
     case "update-check": updateCheckClick(false); break;
     case "open-github": openGithub(); break;
     case "update-later": hideUpdateModal(); break;

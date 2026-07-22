@@ -1,5 +1,6 @@
 // Sinrad — Electron main process (main window + floating desktop "pet" window)
 const { app, BrowserWindow, ipcMain, shell, screen } = require("electron");
+app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
 const path = require("path");
 const fs = require("fs");
 const scanFolders = require("./scan.js");
@@ -15,7 +16,7 @@ function createWindow(){
   mainWin = new BrowserWindow({
     width:1280, height:900, minWidth:900, minHeight:640,
     frame:false, backgroundColor:"#060608", title:"S.I.R", icon:path.join(__dirname,"icon.png"),
-    webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false }
+    webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false }
   });
   mainWin.loadFile(path.join(__dirname,"index.html"));
   mainWin.on("closed", ()=>{ mainWin=null; if(petWin){ try{petWin.close();}catch(e){} petWin=null; } });
@@ -82,8 +83,15 @@ ipcMain.on("pet-hide", ()=>hidePet());
 ipcMain.on("pet-drag-start", (e,off)=>startDrag(off));
 ipcMain.on("pet-drag-end",   ()=>stopDrag());
 ipcMain.on("set-mouse-ignore", (e,b,opts)=>{ const w=BrowserWindow.fromWebContents(e.sender); if(w) w.setIgnoreMouseEvents(!!b, opts||{}); });
-ipcMain.on("pet-nav", (e,mod)=>{ if(mainWin){ mainWin.webContents.send("norma-nav", mod); if(mainWin.isMinimized()) mainWin.restore(); } });
-ipcMain.on("pet-pin", ()=>{ hidePet(); if(mainWin){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.webContents.send("norma-dock"); } });
+ipcMain.on("pet-nav", (e,mod)=>{ if(mainWin){ mainWin.webContents.send("norma-nav", mod); if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.focus(); } });
+ipcMain.on("pet-pin", ()=>{ hidePet(); if(mainWin){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.focus(); mainWin.webContents.send("norma-dock"); } });
+const BGM_DIR = path.join(app.getPath("userData"),"bgm");
+const BUNDLED_BGM = path.join(__dirname,"bgm");
+function syncBundled(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){} const exts=[".mp3",".ogg",".wav",".m4a",".flac",".webm",".opus"]; try{ fs.readdirSync(BUNDLED_BGM).forEach(function(f){ if(exts.indexOf(path.extname(f).toLowerCase())<0) return; const dest=path.join(BGM_DIR,f); if(!fs.existsSync(dest)){ try{ fs.writeFileSync(dest, fs.readFileSync(path.join(BUNDLED_BGM,f))); }catch(_){} } }); }catch(_){} }
+function scanBgm(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){} const exts=[".mp3",".ogg",".wav",".m4a",".flac",".webm",".opus"]; let out=[]; try{ out=fs.readdirSync(BGM_DIR).filter(function(f){ return exts.indexOf(path.extname(f).toLowerCase())>=0; }).map(function(f){ return {name:f, path:path.join(BGM_DIR,f)}; }); }catch(_){} return out; }
+ipcMain.on("music-request",(e)=>{ syncBundled(); const w=BrowserWindow.fromWebContents(e.sender); if(w) w.webContents.send("music-list", {files:scanBgm(), dir:BGM_DIR}); });
+ipcMain.on("music-cmd",(e,c)=>{ if(mainWin) mainWin.webContents.send("music-cmd", c); });
+
 const activeScans = new Map();
 ipcMain.handle("fs-home", ()=> app.getPath("home"));
 ipcMain.on("fs-scan", (e, payload)=>{
