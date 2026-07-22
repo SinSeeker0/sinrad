@@ -16,6 +16,7 @@ Was a password manger at first but kinda turned into something more idk i kept c
 - Color-coded cards — gold left edge for favorites, right edge for category or priority; colored right-click menus; filter pills.
 - Cards open on double-click; a single click does nothing on them, and right-click opens the per-item menu.
 - Status bar now has a cyan Check Update button (auto-checks your GitHub Releases on launch; on Windows and Linux it downloads with a progress bar and installs in one click, on macOS it opens the release page) plus a GitHub icon that opens the project page.
+- A Settings panel (gear, bottom-right) holds preferences — currently a glowing Double Click / Single Click toggle for opening items (more options to come), and the UI uses clean line-icons instead of emoji.
 - Ctrl+F search inside every module (Esc closes and clears it).
 - Floating Norma — send the companion out as a transparent, always-on-top, click-through desktop window you can drag anywhere; right-click menu; docks back into the panel.
 - Celebration popup on every save — the image zooms through the screen over a glitching "COMPLETE" wordmark with scanlines, picking random art each time.
