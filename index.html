@@ -516,17 +516,18 @@ function renderSettings(){ const b=$("#settings-body"); if(!b)return; const cur=
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 57;
-const APP_VERSION="1."+EDIT_COUNT+".0";
+const EDIT_COUNT = 58;
+const APP_VERSION="2.0.1";
 
-const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef" };
+const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6" };
+const FOLDER_CATS={ "Mods":"#964B00" };
 const FAV_COLOR="#f5a623", PRI_COLOR="#ff4d8d", ALL_COLOR="#27b4ff";
 
 const revealed=new Set();
 let currentView="vault";
 let searchTerms={};
 let vaultFilter="all", folderFilter="all";
-let linkCat="all", linkFav=false;
+let linkCat="all", linkFav=false, folderCat="all";
 let modalOnConfirm=null, modalOnCancel=null;
 
 const CELEBRATE_FILES=[["complete.gif","complete.png","complete.webp"]];
@@ -569,7 +570,7 @@ function find(a,id){ return a.find(x=>x.id===id); }
 function baseName(p){ const s=String(p||"").replace(/[\\/]+$/,""); const i=Math.max(s.lastIndexOf("/"),s.lastIndexOf("\\")); return i>=0?s.slice(i+1):s; }
 function normCat(l){ return (l&&l.category&&String(l.category).trim())||(l&&Array.isArray(l.tags)&&l.tags[0])||""; }
 function match(term,...f){ term=(term||"").trim().toLowerCase(); if(!term) return true; return f.some(x=>String(x==null?"":x).toLowerCase().includes(term)); }
-function edgeShadow(it){ const L=it.favorite?FAV_COLOR:null; const R=(it.category&&CAT_COLORS[it.category])?CAT_COLORS[it.category]:(it.priority?PRI_COLOR:null); const p=[]; if(L)p.push("inset 3px 0 0 "+L); if(R)p.push("inset -3px 0 0 "+R); return p.length?("box-shadow:"+p.join(",")):""; }
+function edgeShadow(it){ const L=it.favorite?FAV_COLOR:null; const cc=it.category?(CAT_COLORS[it.category]||FOLDER_CATS[it.category]):null; const R=cc?cc:(it.priority?PRI_COLOR:null); const p=[]; if(L)p.push("inset 3px 0 0 "+L); if(R)p.push("inset -3px 0 0 "+R); return p.length?("box-shadow:"+p.join(",")):""; }
 function pill(label,active,color,attrs){ const st=active?`color:${color};border-color:${color};background:color-mix(in srgb, ${color} 18%, transparent);box-shadow:0 0 12px color-mix(in srgb, ${color} 45%, transparent)`:`color:${color};border-color:color-mix(in srgb, ${color} 38%, transparent)`; return `<button class="pill" style="${st}" ${attrs}>${label}</button>`; }
 function searchRow(key,ph){ return `<div class="mod-search toolbar"><div class="search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"/></svg><input data-search="${key}" placeholder="${ph}" value="${esc(searchTerms[key]||"")}" /></div></div>`; }
 
@@ -634,16 +635,16 @@ function doLinkAdd(){ const t=$("#lk_title"),u=$("#lk_url"); const title=t?t.val
 
 function viewFolders(){
   const term=searchTerms.folders||"";
-  let items=state.folders.filter(f=>{ const passF=folderFilter==="all"?true:!!f.favorite; return passF&&match(term,f.name,f.path); });
+  let items=state.folders.filter(f=>{ const catOk=folderCat==="all"||normCat(f)===folderCat; const passF=folderFilter==="all"?true:!!f.favorite; return catOk&&passF&&match(term,f.name,f.path); });
   const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="fd_name" placeholder="Name (optional)"><input class="lin-input lk-url" id="fd_path" placeholder="Folder path  e.g. C:\\Users\\you\\Documents"><button class="btn primary" data-action="folder-add">＋ Add</button></div>`;
-  const pills=`<div class="toolbar"><div class="lf-left">${pill("All",folderFilter==="all",ALL_COLOR,'data-action="folder-filter" data-filter="all"')}${pill(ICO_STAR+" Favorites",folderFilter==="fav",FAV_COLOR,'data-action="folder-filter" data-filter="fav"')}</div></div>`;
+  const pills=`<div class="toolbar linkfilter"><div class="lf-left">${pill("All",folderCat==="all",ALL_COLOR,'data-action="folder-cat" data-cat="all"')}${Object.keys(FOLDER_CATS).map(c=>pill(c,folderCat===c,FOLDER_CATS[c],'data-action="folder-cat" data-cat="'+esc(c)+'"')).join("")}</div><div class="lf-right">${pill(ICO_STAR+" Favorites",folderFilter==="fav",FAV_COLOR,'data-action="folder-filter" data-filter="'+(folderFilter==="fav"?"all":"fav")+'"')}</div></div>`;
   let body;
   if(!state.folders.length) body=emptyState(ICO_FOLDER,"No quick folders yet — paste a path above. "+openVerb()+" · right-click for more.");
   else if(!items.length) body=emptyState(ICO_SEARCH,"Nothing matches. Try a different tab or Ctrl+F.");
   else body=`<div class="folder-list">`+items.map(f=>{ const p=f.path||f.name||""; const label=(f.name&&f.path)?f.name:baseName(p); return `<div class="folder-row" style="${edgeShadow(f)}" data-ctx="folder" data-id="${f.id}" data-action="folder-open"><span class="fr-ico">${ICO_FOLDER}</span><div class="fr-main"><div class="fr-name">${esc(label||"Untitled")}</div><div class="fr-path" title="${esc(p)}">${esc(p)}</div></div></div>`; }).join("")+`</div>`;
   return head("Quick Folders",""+openVerb()+" · right-click for more · Ctrl+F to search")+addbar+searchRow("folders","Search folders...")+pills+body;
 }
-function doFolderAdd(){ const n=$("#fd_name"),p=$("#fd_path"); const name=n?n.value.trim():"",path=p?p.value.trim():""; if(!path){ toast("Paste a folder path","warn"); return; } state.folders.unshift({id:uid(),name,path,favorite:false,created:nowMs()}); log("ok","Added quick folder: "+(name||baseName(path))); saveState(); celebrate(); renderView(); toast("Folder saved","ok"); }
+function doFolderAdd(){ const n=$("#fd_name"),p=$("#fd_path"); const name=n?n.value.trim():"",path=p?p.value.trim():""; if(!path){ toast("Paste a folder path","warn"); return; } state.folders.unshift({id:uid(),name,path,category:folderCat!=="all"?folderCat:"",favorite:false,created:nowMs()}); log("ok","Added quick folder: "+(name||baseName(path))+(folderCat!=="all"?" ["+folderCat+"]":"")); saveState(); celebrate(); renderView(); toast("Folder saved","ok"); }
 function folderEditModal(id){ const f=find(state.folders,id); if(!f)return; const p=f.path||f.name||""; openModal("✏️ Edit Quick Folder",`<div class="field"><label>Name (optional)</label><input id="fe_name" value="${esc(f.name||"")}"></div><div class="field"><label>Folder path</label><input id="fe_path" value="${esc(p)}"></div>`,"Save",()=>{ const path=$("#fe_path").value.trim(); if(!path){ toast("Path required","warn"); return; } f.name=$("#fe_name").value.trim(); f.path=path; log("info","Updated quick folder: "+(f.name||baseName(path))); saveState(); closeModal(); renderView(); toast("Folder updated","ok"); }); }
 
 function viewConsole(){
@@ -667,6 +668,7 @@ function vaultModal(e){ e=e||{}; openModal(`${e.id?"✏️ Edit":"🔐 New"} Vau
 function mi(a,id,label,color,danger){ const st=color?` style="color:${color}"`:``; return `<div class="ci${danger?" danger":""}" data-action="${a}" data-id="${id}"${st}>${esc(label)}</div>`; }
 function miT(a,id,label,on,color){ const st=color?` style="color:${color}"`:``; return `<div class="ci${on?" on":""}" data-action="${a}" data-id="${id}"${st}>${on?"✓ ":""}${esc(label)}</div>`; }
 function miCat(id,cat,on){ const color=CAT_COLORS[cat]||"#cfd3dc"; return `<div class="ci${on?" on":""}" data-action="link-cat-set" data-id="${id}" data-cat="${esc(cat)}" style="color:${color}"><span class="cdot" style="background:${color}"></span>${on?"✓ ":""}${esc(cat)}</div>`; }
+function miCatF(id,cat,on){ const color=FOLDER_CATS[cat]||"#cfd3dc"; return `<div class="ci${on?" on":""}" data-action="folder-cat-set" data-id="${id}" data-cat="${esc(cat)}" style="color:${color}"><span class="cdot" style="background:${color}"></span>${on?"✓ ":""}${esc(cat)}</div>`; }
 function showMenu(x,y,html){ const m=$("#ctxmenu"); m.innerHTML=html; m.classList.add("show"); const r=m.getBoundingClientRect(); let top=y,left=x; if(top+r.height>window.innerHeight-8)top=window.innerHeight-r.height-8; if(left+r.width>window.innerWidth-8)left=window.innerWidth-r.width-8; m.style.top=Math.max(4,top)+"px"; m.style.left=Math.max(4,left)+"px"; }
 function hideMenu(){ $("#ctxmenu").classList.remove("show"); }
 function moveMenuTo(x,y){ const m=$("#ctxmenu"); const r=m.getBoundingClientRect(); let top=y,left=x; if(top+r.height>window.innerHeight-8)top=window.innerHeight-r.height-8; if(left+r.width>window.innerWidth-8)left=window.innerWidth-r.width-8; m.style.top=Math.max(4,top)+"px"; m.style.left=Math.max(4,left)+"px"; }
@@ -675,7 +677,7 @@ function showCardMenu(type,id,x,y){
   let it="";
   if(type==="vault"){ const v=find(state.vault,id); if(!v)return; if(v.url)it+=mi("vault-open",id,"Open site"); it+=mi("vault-copy-u",id,"Copy username")+mi("vault-copy-p",id,"Copy password")+mi("vault-eye",id,revealed.has(id)?"Hide password":"Show password")+miT("vault-fav",id,"Favorite",v.favorite,FAV_COLOR)+miT("vault-pri",id,"Priority",v.priority,PRI_COLOR)+mi("vault-edit",id,"Edit")+`<div class="cdiv"></div>`+mi("vault-del",id,"Delete","#ff5470",true); }
   else if(type==="link"){ const l=find(state.links,id); if(!l)return; it+=mi("link-open",id,"Open")+miT("link-fav-toggle",id,"Favorite",l.favorite,FAV_COLOR)+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(CAT_COLORS).map(c=>miCat(id,c,normCat(l)===c)).join("")+miCat(id,"__none__",!normCat(l))+`<div class="cdiv"></div>`+mi("link-del",id,"Delete","#ff5470",true); }
-  else if(type==="folder"){ const f=find(state.folders,id); if(!f)return; it+=mi("folder-open",id,"Open")+miT("folder-fav",id,"Favorite",f.favorite,FAV_COLOR)+mi("folder-edit",id,"Edit")+`<div class="cdiv"></div>`+mi("folder-del",id,"Remove","#ff5470",true); }
+  else if(type==="folder"){ const f=find(state.folders,id); if(!f)return; it+=mi("folder-open",id,"Open")+miT("folder-fav",id,"Favorite",f.favorite,FAV_COLOR)+mi("folder-edit",id,"Edit")+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(FOLDER_CATS).map(c=>miCatF(id,c,normCat(f)===c)).join("")+miCatF(id,"__none__",!normCat(f))+`<div class="cdiv"></div>`+mi("folder-del",id,"Remove","#ff5470",true); }
   else return;
   showMenu(x,y,it);
 }
@@ -716,10 +718,12 @@ document.addEventListener("click",async(ev)=>{
     case "folder-edit": folderEditModal(id); break;
     case "folder-fav": { const f=find(state.folders,id); if(f){ f.favorite=!f.favorite; log("info",(f.favorite?"Favorited":"Unfavorited")+" folder: "+(f.name||"")); saveState(); renderView(); } break; }
     case "folder-del": { const f=find(state.folders,id); if(f&&await confirmModal("Remove "+(f.name||baseName(f.path||f.name))+"?")){ state.folders=state.folders.filter(x=>x.id!==id); log("warn","Removed quick folder"); saveState(); renderView(); } break; }
+    case "folder-cat": folderCat=t.dataset.cat; renderView(); break;
+    case "folder-cat-set": { const f=find(state.folders,id); if(f){ f.category=(t.dataset.cat==="__none__")?"":t.dataset.cat; log("info","Tagged folder "+(f.name||baseName(f.path||f.name))+" → "+(f.category||"none")); saveState(); renderView(); } break; }
     case "folder-filter": folderFilter=t.dataset.filter; renderView(); break;
     case "console-clear": if(await confirmModal("Clear the entire activity log?")){ state.console=[]; log("warn","Activity log cleared"); saveState(); renderView(); } break;
     case "console-add-link": { const c=find(state.console,id); if(c&&c.meta&&c.meta.url){ const u=c.meta.url; state.links.unshift({id:uid(),title:hostOf(u),url:u,category:"",favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved visited site to Links: "+u); saveState(); renderView(); toast("Added to Links","ok"); } break; }
-    case "console-add-folder": { const c=find(state.console,id); if(c&&c.meta&&c.meta.path){ const p=c.meta.path; state.folders.unshift({id:uid(),name:baseName(p),path:p,favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved opened folder to Quick Folders: "+p); saveState(); renderView(); toast("Added to Folders","ok"); } break; }
+    case "console-add-folder": { const c=find(state.console,id); if(c&&c.meta&&c.meta.path){ const p=c.meta.path; state.folders.unshift({id:uid(),name:baseName(p),path:p,category:"",favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved opened folder to Quick Folders: "+p); saveState(); renderView(); toast("Added to Folders","ok"); } break; }
     case "norma-min": setFloating(true); break;
     case "norma-pin": setFloating(!isFloating()); break;
     case "music-toggle": musicToggle(); break;

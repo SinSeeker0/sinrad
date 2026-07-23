@@ -7,6 +7,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   winMax:   () => ipcRenderer.send("win-max"),
   winClose: () => ipcRenderer.send("win-close"),
 
+  // boot splash (video plays first, then the app opens)
+  bootDone: () => ipcRenderer.send("boot-done"),
+
   // open things with the OS
   shellOpen: (url) => ipcRenderer.send("shell-open", url),
   openPath:  (p)   => ipcRenderer.invoke("open-path", p),

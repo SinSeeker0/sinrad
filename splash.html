@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; media-src file: blob:; style-src 'unsafe-inline'">
+<style>
+html,body{margin:0;height:100%;background:#000;overflow:hidden}
+#bv{position:fixed;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+</style>
+</head>
+<body>
+<video id="bv" autoplay playsinline></video>
+<script>
+var done=false;
+function finish(){ if(done) return; done=true; try{ if(window.electronAPI&&window.electronAPI.bootDone) window.electronAPI.bootDone(); }catch(e){} }
+function toFileURL(p){ return /^([a-zA-Z]:)/.test(p) ? "file:///"+p.replace(/\\/g,"/") : "file://"+p; }
+var video=document.getElementById("bv");
+video.muted=false; try{ video.volume=1; }catch(e){}
+video.addEventListener("ended", finish);           // video played to the end -> open the app
+video.addEventListener("error", finish);            // can't play -> don't get stuck, open the app
+// safety net: if the video never even starts within 8s, open the app anyway
+var startGuard=setTimeout(finish, 8000);
+video.addEventListener("playing", function(){ clearTimeout(startGuard); });
+function setSrc(v){ if(!v){ finish(); return; } video.src=toFileURL(v); var pr=video.play(); if(pr&&pr.catch) pr.catch(function(){ finish(); }); }
+window.__bootGotVideo=function(){ setSrc(window.__BOOT_VIDEO); };
+if(window.__BOOT_VIDEO) setSrc(window.__BOOT_VIDEO);
+</script>
+</body>
+</html>

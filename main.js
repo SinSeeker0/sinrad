@@ -15,10 +15,11 @@ let petWin = null;
 function createWindow(){
   mainWin = new BrowserWindow({
     width:1280, height:900, minWidth:900, minHeight:640,
-    frame:false, backgroundColor:"#060608", title:"S.I.R", icon:path.join(__dirname,"icon.png"),
+    frame:false, show:false, backgroundColor:"#060608", title:"S.I.R", icon:path.join(__dirname,"icon.png"),
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false }
   });
   mainWin.loadFile(path.join(__dirname,"index.html"));
+  try{ mainWin.webContents.setAudioMuted(true); }catch(e){}   // keep the app silent during the intro video; showMain() un-mutes it
   mainWin.on("closed", ()=>{ mainWin=null; if(petWin){ try{petWin.close();}catch(e){} petWin=null; } });
 }
 
@@ -58,10 +59,28 @@ function startDrag(off){
 }
 function stopDrag(){ dragging=false; if(dragTimer){ clearInterval(dragTimer); dragTimer=null; } }
 
+const BOOT_DIR=path.join(app.getPath("userData"),"boot");
+let splashWin=null;
+function syncBoot(){ const dest=BOOT_DIR; try{ fs.mkdirSync(dest,{recursive:true}); }catch(e){} const exts=[".mp4",".webm",".mkv",".mov",".ogg",".ogv",".m4v"]; const src=path.join(__dirname,"boot"); try{ fs.readdirSync(src).forEach(function(f){ if(exts.indexOf(path.extname(f).toLowerCase())<0) return; const dp=path.join(dest,f); if(!fs.existsSync(dp)){ try{ fs.writeFileSync(dp, fs.readFileSync(path.join(src,f))); }catch(e){} } }); }catch(e){} }
+function pickBootVideo(){ try{ if(!fs.existsSync(BOOT_DIR)) return null; const exts=[".mp4",".webm",".mkv",".mov",".ogg",".ogv",".m4v"]; const files=fs.readdirSync(BOOT_DIR).filter(function(f){ return exts.indexOf(path.extname(f).toLowerCase())>=0; }); if(!files.length) return null; return path.join(BOOT_DIR, files[Math.floor(Math.random()*files.length)]); }catch(e){ return null; } }
+function createSplash(vid){ try{ splashWin=new BrowserWindow({ width:720, height:408, frame:false, transparent:false, alwaysOnTop:true, skipTaskbar:true, resizable:false, show:true, backgroundColor:"#000000", webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false } }); splashWin.setMenuBarVisibility(false); splashWin.loadFile(path.join(__dirname,"splash.html")); splashWin.webContents.once("did-finish-load",function(){ try{ splashWin.webContents.executeJavaScript("window.__BOOT_VIDEO="+JSON.stringify(vid)+"; if(window.__bootGotVideo) window.__bootGotVideo();"); }catch(e){} }); splashWin.on("closed",function(){ splashWin=null; finishBoot(); }); try{ splashWin.webContents.on("render-process-gone",function(){ finishBoot(); }); splashWin.webContents.on("crashed",function(){ finishBoot(); }); }catch(e){} }catch(e){ splashWin=null; } }
+/* Boot flow: the splash video plays FIRST (to completion or until skipped).
+   The main window loads hidden in the background and only appears once the
+   video is done, so the user always gets to see the boot video. */
+let mainReady=false, bootFinished=false, hasSplash=false;
+function showMain(){ if(mainWin && !mainWin.isDestroyed()){ try{ mainWin.webContents.setAudioMuted(false); }catch(e){} mainWin.show(); try{ mainWin.focus(); }catch(e){} } }
+function finishBoot(){ if(bootFinished) return; bootFinished=true; try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(e){} splashWin=null; if(mainReady) showMain(); }
 app.whenReady().then(()=>{
+  syncBoot();
+  const vid=pickBootVideo();
+  if(vid){ hasSplash=true; createSplash(vid); }
   createWindow();
+  mainWin.once("ready-to-show",()=>{ mainReady=true; if(!hasSplash || bootFinished){ bootFinished=true; showMain(); } });
+  // pure anti-brick guard: never stay stuck on the splash forever (10 min cap)
+  setTimeout(finishBoot, 600000);
   app.on("activate", ()=>{ if(BrowserWindow.getAllWindows().length===0) createWindow(); });
 });
+ipcMain.on("boot-done", ()=>finishBoot());
 app.on("window-all-closed", ()=>{ if(process.platform!=="darwin") app.quit(); });
 
 /* ---------- IPC: main window controls ---------- */
