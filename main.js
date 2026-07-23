@@ -73,7 +73,8 @@ function finishBoot(){ if(bootFinished) return; bootFinished=true; try{ if(splas
 app.whenReady().then(()=>{
   syncBoot();
   const vid=pickBootVideo();
-  if(vid){ hasSplash=true; createSplash(vid); }
+  const _st=readStore(); const _introOn=!(_st&&_st.settings&&_st.settings.introEnabled===false);
+  if(vid && _introOn){ hasSplash=true; createSplash(vid); }
   createWindow();
   mainWin.once("ready-to-show",()=>{ mainReady=true; if(!hasSplash || bootFinished){ bootFinished=true; showMain(); } });
   // pure anti-brick guard: never stay stuck on the splash forever (10 min cap)

@@ -133,6 +133,7 @@
   .term-line .lv{display:inline-block;min-width:4.2ch;font-weight:700}
   .term-line .lv.info{color:var(--cyan)} .term-line .lv.ok{color:var(--green)} .term-line .lv.warn{color:var(--yellow)} .term-line .lv.err{color:var(--red)}
   .term-line .ms{color:#c7d0db}
+  .term-line .lnk{color:var(--cyan);text-decoration:underline;text-underline-offset:2px}
   .term-add{margin-left:8px;background:transparent;border:1px solid var(--border);color:var(--cyan);border-radius:6px;padding:0 7px;font-size:12px;line-height:16px;font-family:var(--font)}
   .term-add:hover{border-color:var(--cyan);background:rgba(39,180,255,.12)}
   .term-cursor{color:var(--green)} .term-cursor .blink{animation:blink 1s steps(1,end) infinite}
@@ -224,6 +225,8 @@
   .console-dock .dock-input{display:flex;align-items:center;gap:8px;padding:8px 12px;border-top:1px solid var(--border-soft);background:#0a0f14}
   .console-dock .di-prompt{color:var(--green);font-family:ui-monospace,Menlo,Consolas,monospace;font-weight:700}
   .console-dock .di-input{flex:1;min-width:0;background:none;border:none;outline:none;color:var(--txt);font-family:ui-monospace,Menlo,Consolas,monospace;font-size:12.5px}
+  .console-dock .dock-asbtn{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted);font:700 11px/1 ui-monospace,Menlo,Consolas,monospace;letter-spacing:.3px;padding:5px 9px;border-radius:7px;cursor:pointer;transition:.15s;white-space:nowrap}
+  .console-dock .dock-asbtn.on{color:var(--green);border-color:var(--green);background:rgba(47,224,122,.12);box-shadow:0 0 10px rgba(47,224,122,.35)}
   .term-add{margin-left:8px;border:1px solid var(--cyan);color:var(--cyan);background:rgba(39,180,255,.10);border-radius:6px;padding:1px 8px;font-size:10.5px;font-weight:700;cursor:pointer;vertical-align:middle}
   .term-add:hover{background:rgba(39,180,255,.20)}
   .term-add[data-action="console-add-folder"]{border-color:#f5a623;color:#f5a623;background:rgba(245,166,35,.10)}
@@ -280,25 +283,6 @@
   .e-ico svg{width:36px;height:36px;opacity:.85}
   .lin-input svg{width:16px;height:16px;color:var(--muted);flex:0 0 auto}
   .ci svg{width:14px;height:14px;vertical-align:-3px;margin-right:7px}
-  #settings-modal{position:fixed;inset:0;z-index:300;display:none;place-items:center;background:rgba(0,0,0,.6)}
-  #settings-modal.show{display:grid}
-  .set-card{width:min(520px,92vw);max-height:86vh;display:flex;flex-direction:column;background:#15151d;border:1px solid var(--border);border-radius:16px;overflow:hidden;box-shadow:0 30px 80px rgba(0,0,0,.6);animation:pop .14s ease}
-  .set-head{display:flex;align-items:center;justify-content:space-between;padding:18px 20px;border-bottom:1px solid var(--border-soft)}
-  .set-head h2{font-size:16px;font-weight:800;margin:0}
-  .set-x{background:none;border:none;color:var(--muted);font-size:22px;line-height:1;cursor:pointer}
-  .set-x:hover{color:var(--txt)}
-  .set-body{padding:8px 20px;overflow:auto}
-  .set-row{display:flex;align-items:center;justify-content:space-between;gap:16px;padding:16px 0;border-bottom:1px solid var(--border-soft)}
-  .set-row:last-child{border-bottom:none}
-  .set-info{min-width:0}
-  .set-label{font-size:13.5px;font-weight:600;color:var(--txt)}
-  .set-hint{font-size:11.5px;color:var(--dim);margin-top:3px}
-  .set-control{flex:0 0 auto}
-  .seg2{display:inline-flex;border:1px solid var(--border);border-radius:10px;overflow:hidden;background:#0e0e15}
-  .seg2-opt{appearance:none;border:none;background:transparent;color:var(--muted);font-family:var(--mono);font-size:11.5px;letter-spacing:.5px;text-transform:uppercase;padding:9px 14px;cursor:pointer;transition:.15s}
-  .seg2-opt+.seg2-opt{border-left:1px solid var(--border)}
-  .seg2-opt.on{color:var(--cyan);background:rgba(39,180,255,.12);box-shadow:0 0 12px rgba(39,180,255,.35),inset 0 0 0 1px rgba(39,180,255,.5);text-shadow:0 0 8px rgba(39,180,255,.5)}
-  .set-foot{display:flex;justify-content:flex-end;gap:10px;padding:14px 20px;border-top:1px solid var(--border-soft)}
 
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 11px}
   .pill svg{width:13px;height:13px;flex:0 0 auto}
@@ -421,7 +405,6 @@
     </div>
   </div>
   <div id="update-modal"><div class="um-card"><div class="um-head"><div class="um-ico"><img id="um-gif" class="um-gif" alt="" style="display:none"><svg id="um-ico-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></div><h2 id="um-title">New Version Available</h2></div><div class="um-body"><div class="um-row"><span class="um-ver" id="um-ver">v0.0.0</span><span class="um-date" id="um-date"></span></div><div class="um-notes"><span class="um-lbl">Release notes</span><span id="um-notes">Checking&#8230;</span></div><div class="um-prog" id="um-prog"><div class="um-ptxt">Downloading&#8230;</div><div class="um-bar"><i id="um-barfill"></i></div><div class="um-pct"><span>Direct (GitHub)</span><span id="um-pct">0%</span></div></div><div class="um-foot"><button class="btn ghost" id="um-later" data-action="update-later">Not now</button><button class="btn primary" id="um-go" data-action="update-go">Update now</button></div></div></div>
-  <div id="settings-modal"><div class="set-card"><div class="set-head"><h2>Settings</h2><button type="button" class="set-closebtn set-x" title="Close">&times;</button></div><div class="set-body" id="settings-body"></div><div class="set-foot"><button type="button" class="btn primary set-closebtn">Done</button></div></div></div>
   <div id="toasts"></div>
 
 <script>
@@ -432,7 +415,7 @@ const E=window.electronAPI||null;
 const GH_REPO_URL = "https://github.com/SinSeeker0/sinrad";
 let updState = null;
 function openGithub(){ if(E&&E.shellOpen){ E.shellOpen(GH_REPO_URL); } else { try{ window.open(GH_REPO_URL,"_blank","noopener"); }catch(e){} } }
-function showUpdateModal(){ const m=$("#update-modal"); if(m) m.classList.add("show"); }
+function showUpdateModal(){ const m=$("#update-modal"); if(m){ hideSettings(); m.classList.add("show"); } }
 function hideUpdateModal(){ const m=$("#update-modal"); if(m) m.classList.remove("show"); updState=null; }
 function setUpdProgress(show, pct){ const box=$("#um-prog"); if(box) box.classList.toggle("show", !!show); const fill=$("#um-barfill"); if(fill) fill.style.width=(pct||0)+"%"; }
 function renderUpdateResult(r){
@@ -478,11 +461,41 @@ function doInstall(temp){
 function autoCheckUpdate(){ if(!E||!E.updateCheck) return; Promise.resolve(E.updateCheck(APP_VERSION)).then(function(r){ if(r&&r.ok&&r.available){ renderUpdateResult(r); } }).catch(function(){}); }
 (function(){ const m=$("#update-modal"); if(m) m.addEventListener("click",function(e){ if(e.target&&e.target.id==="update-modal") hideUpdateModal(); }); document.addEventListener("keydown",function(e){ if(e.key==="Escape"){ const m2=$("#update-modal"); if(m2&&m2.classList.contains("show")) hideUpdateModal(); } }); })();
 setTimeout(autoCheckUpdate, 1500);
-function openVerb(){ return (state.openMode==="single")?"Single-click":"Double-click"; }
+function openVerb(){ return (state.openMode==='single')?'Single-click':'Double-click'; }
 function setUpdateGif(phase){ const gif=$("#um-gif"), svg=$("#um-ico-svg"); const src=phase?UPD_GIF_SRC[phase]:null; if(gif){ if(src){ gif.src=src; gif.style.display="block"; if(svg)svg.style.display="none"; } else { gif.style.display="none"; gif.removeAttribute("src"); if(svg)svg.style.display="block"; } } }
 let UPD_GIF_SRC={checking:null,updating:null,complete:null};
-function hideSettings(){ const m=$("#settings-modal"); if(m)m.classList.remove("show"); }
-function openSettings(){ const m=$("#settings-modal"); if(m){ m.classList.add("show"); renderSettings(); } }
+function settingsMenu(push){
+  function p(s,n){ s=String(s); while(s.length<n)s+=' '; return s; }
+  var musicOn=!!(state.settings&&state.settings.autoplayMusic);
+  var introOn=!(state.settings&&state.settings.introEnabled===false);
+  var hiddenOn=state.scanSkipHidden!==false;
+  var scrollOn=!(state.settings&&state.settings.autoScroll===false);
+  var click=(state.openMode==='single')?'single':'double';
+  var st=function(on){ return on?'ON':'off'; };
+  var L=[];
+  L.push('settings  ·  type  '+state.radCmd+' set <name>  to toggle  ·  '+state.radCmd+' set <name> on|off  to force');
+  L.push(p('  music on boot',22)+p(st(musicOn),5)+state.radCmd+' set music');
+  L.push(p('  boot intro video',22)+p(st(introOn),5)+state.radCmd+' set intro');
+  L.push(p('  skip hidden folders',22)+p(st(hiddenOn),5)+state.radCmd+' set hidden');
+  L.push(p('  auto-scroll console',22)+p(st(scrollOn),5)+state.radCmd+' set autoscroll');
+  L.push(p('  open with',22)+p(click,5)+state.radCmd+' set click');
+  push(L.join('\n'));
+}
+function handleSet(inner,push){
+  var t=(inner||'').trim().toLowerCase();
+  if(t===''){ settingsMenu(push); return; }
+  var parts=t.split(/\s+/); var k=parts[0]; var v=parts[1]||'';
+  function setClick(m){ state.openMode=m; saveState(); }
+  function onoff(x){ return x?'ON':'off'; }
+  if(k==='click'||k==='open'||k==='openmode'){ setClick(state.openMode==='single'?'double':'single'); push('> open with: '+state.openMode+'-click'); return; }
+  if(k==='single'){ setClick('single'); push('> open with: single-click'); return; }
+  if(k==='double'){ setClick('double'); push('> open with: double-click'); return; }
+  if(k==='music'||k==='autoplay'||k==='bgm'){ if(!state.settings)state.settings={}; var c=!!state.settings.autoplayMusic; var n=(v==='on')?true:(v==='off')?false:!c; state.settings.autoplayMusic=n; saveState(); push('> music on boot: '+onoff(n)); return; }
+  if(k==='intro'||k==='boot'||k==='splash'||k==='bootvideo'){ if(!state.settings)state.settings={}; var ci=!(state.settings.introEnabled===false); var ni=(v==='on')?true:(v==='off')?false:!ci; state.settings.introEnabled=ni; saveState(); push('> boot intro video: '+onoff(ni)); return; }
+  if(k==='hidden'){ var ch=state.scanSkipHidden!==false; var nh=(v==='on')?true:(v==='off')?false:!ch; state.scanSkipHidden=nh; saveState(); push('> skip hidden folders: '+onoff(nh)); return; }
+  if(k==='autoscroll'||k==='scroll'){ if(!state.settings)state.settings={}; var cs=!(state.settings.autoScroll===false); var ns=(v==='on')?true:(v==='off')?false:!cs; state.settings.autoScroll=ns; saveState(); push('> auto-scroll console: '+onoff(ns)); updateAutoScrollBtn(); renderTermBody(); return; }
+  push('> usage: '+state.radCmd+' set <name>  toggles · names: intro, music, hidden, autoscroll, click   (add on|off to force)');
+}
 const NM_PLAY=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>`;
 const NM_PAUSE=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
 const bgmAudio=new Audio(); bgmAudio.volume=0.5; let bgmTracks=[]; let bgmIdx=0; let bgmDir="";
@@ -498,28 +511,19 @@ function musicPrev(){ musicSetTrack(bgmIdx-1); }
 bgmAudio.addEventListener("ended", musicNext);
 bgmAudio.addEventListener("play", updateMusicUI);
 bgmAudio.addEventListener("pause", updateMusicUI);
-function musicLoadList(payload){ bgmDir=(payload&&payload.dir)||""; const list=(payload&&payload.files)||[]; bgmTracks=list.map(function(f){ return {name:f.name, url:"file://"+f.path}; }); if(bgmTracks.length){ musicSetTrack(bgmIdx<bgmTracks.length?bgmIdx:0); } else { bgmAudio.pause(); updateMusicUI(); } }
+let bgmFirstList=true;
+function musicLoadList(payload){ bgmDir=(payload&&payload.dir)||''; const list=(payload&&payload.files)||[]; bgmTracks=list.map(function(f){ return {name:f.name, url:'file://'+f.path}; }); if(bgmTracks.length){ const i=bgmIdx<bgmTracks.length?bgmIdx:0; if(bgmFirstList){ bgmFirstList=false; if(state.settings && state.settings.autoplayMusic){ musicSetTrack(i); } else { bgmIdx=i; bgmAudio.src=bgmTracks[i].url; updateMusicUI(); try{ if(!state.music) state.music={}; state.music.idx=i; saveState(); }catch(_){} } } else { musicSetTrack(i); } } else { bgmAudio.pause(); updateMusicUI(); } }
 if(E&&E.onMusicList) E.onMusicList(musicLoadList);
 if(E&&E.onMusicCmd) E.onMusicCmd(function(c){ if(c==="toggle") musicToggle(); else if(c==="next") musicNext(); else if(c==="prev") musicPrev(); });
-if(E&&E.musicRequest) E.musicRequest();
 updateMusicUI();
-function renderSettings(){ const b=$("#settings-body"); if(!b)return; const cur=(state.openMode||"double"); b.innerHTML=`<div class="set-row"><div class="set-info"><div class="set-label">Open links, folders and sites</div><div class="set-hint">How a vault site, saved link or quick folder opens when you click it.</div></div><div class="set-control"><div class="seg2"><button type="button" class="seg2-opt${cur==="double"?" on":""}" data-mode="double">Double Click</button><button type="button" class="seg2-opt${cur==="single"?" on":""}" data-mode="single">Single Click</button></div></div></div>`; }
-(function(){
-  document.addEventListener("click",function(e){
-    const opt=e.target.closest&&e.target.closest(".seg2-opt");
-    if(opt){ const sm=$("#settings-modal"); if(sm&&sm.classList.contains("show")){ const mode=opt.getAttribute("data-mode"); const newMode=(mode===state.openMode)?(mode==="double"?"single":"double"):mode; if(newMode!==state.openMode){ state.openMode=newMode; saveState(); renderSettings(); renderView(); } } return; }
-    if(e.target.closest&&e.target.closest(".set-closebtn")){ hideSettings(); return; }
-    if(e.target&&e.target.id==="settings-modal"){ hideSettings(); return; }
-  });
-  document.addEventListener("keydown",function(e){ if(e.key==="Escape"){ const m=$("#settings-modal"); if(m&&m.classList.contains("show")) hideSettings(); } });
-})();
+
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 58;
-const APP_VERSION="2.0.1";
+const EDIT_COUNT = 59;
+const APP_VERSION="2.0.2";
 
-const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6" };
+const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6", "Guides":"#16c79a" };
 const FOLDER_CATS={ "Mods":"#964B00" };
 const FAV_COLOR="#f5a623", PRI_COLOR="#ff4d8d", ALL_COLOR="#27b4ff";
 
@@ -564,6 +568,7 @@ function saveState(){ const s=JSON.parse(JSON.stringify(state)); if(E&&E.storeSa
 
 function uid(){ try{ return crypto.randomUUID(); }catch(e){ return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function linkify(m){ var e=esc(m); try{ return e.replace(/(https?:\/\/[^\s<]+)/g,'<span class="lnk">$1</span>'); }catch(_){ return e; } }
 function $(s,r){ return (r||document).querySelector(s); }
 function nowMs(){ return Date.now(); }
 function find(a,id){ return a.find(x=>x.id===id); }
@@ -590,19 +595,30 @@ function renderNav(){ $("#nav").innerHTML=MODULES.map(m=>`<div class="nav-item $
 function renderConsole(){
   const dock=$("#consoleDock"); if(!dock)return;
   const t0=searchTerms.console||"";
-  dock.innerHTML=`<div class="dock-head"><div class="dock-title">${ICO_TERM}CONSOLE</div><div class="dock-tools"><button class="btn sm danger" data-action="console-clear" title="Clear log">🗑 Clear</button></div></div><div class="dock-search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"/></svg><input data-search="console" placeholder="Grep the log…" value="${esc(t0)}"></div><div class="term dock-term"><div class="term-body" id="termBody"></div></div><div class="dock-input"><span class="di-prompt">$</span><input id="termInput" class="di-input" placeholder="type a command — try: ${esc(state.radCmd)} &quot;Anime&quot;  ·  help" autocomplete="off"></div>`;
+  const asOn=!(state.settings&&state.settings.autoScroll===false);
+  dock.innerHTML=
+    '<div class="dock-head"><div class="dock-title">'+ICO_TERM+'CONSOLE</div><div class="dock-tools">'+
+    '<button class="btn sm danger" data-action="console-clear" title="Clear log">🗑 Clear</button>'+
+    '<button id="autoScrollBtn" class="dock-asbtn'+(asOn?' on':'')+'" data-action="toggle-autoscroll" title="Toggle auto-scroll">'+(asOn?'✓ ':'')+'Auto Scroll</button>'+
+    '</div></div>'+
+    '<div class="dock-search"><svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7" stroke="currentColor" stroke-width="2"/><line x1="16.5" y1="16.5" x2="21" y2="21" stroke="currentColor" stroke-width="2"/></svg>'+
+    '<input data-search="console" placeholder="Grep the log…" value="'+esc(t0)+'"></div>'+
+    '<div class="term dock-term"><div class="term-body" id="termBody"></div></div>'+
+    '<div class="dock-input"><span class="di-prompt">$</span><input id="termInput" class="di-input" placeholder="type a command — try: '+state.radCmd+' &quot;Anime&quot;  ·  help" autocomplete="off"></div>';
+  updateAutoScrollBtn();
 }
+function updateAutoScrollBtn(){ var b=$("#autoScrollBtn"); if(!b) return; var on=!(state.settings&&state.settings.autoScroll===false); b.classList.toggle("on",on); b.textContent=(on?"✓ ":"")+"Auto Scroll"; }
+
 function renderTermBody(){
   const dock=$("#consoleDock"); if(!dock)return;
   if(!$("#termBody")) renderConsole();
   const tb=$("#termBody"); if(!tb)return;
-  const atBottom=tb.scrollTop+tb.clientHeight>=tb.scrollHeight-24;
+  const autoScroll=!(state.settings&&state.settings.autoScroll===false); const savedTop=tb.scrollTop;
   const term=searchTerms.console||"";
-  const items=state.console.filter(c=>match(term,c.message,c.level));
-  const lines=items.length?items.map(c=>{ const ts=new Date(c.ts).toLocaleTimeString([],{hour12:false}); let addBtn=""; if(c.meta&&c.meta.url){ if(!state.links.some(l=>normUrl(l.url)===normUrl(c.meta.url))) addBtn=`<button class="term-add" data-action="console-add-link" data-id="${c.id}" title="Save this site to Links">＋ Link</button>`; } else if(c.meta&&c.meta.path){ if(!state.folders.some(f=>normUrl(f.path||"")===normUrl(c.meta.path))) addBtn=`<button class="term-add" data-action="console-add-folder" data-id="${c.id}" title="Save this folder to Quick Folders">＋ Folder</button>`; } return `<div class="term-line"><span class="tt">[${ts}]</span>&nbsp;<span class="lv ${c.level}">${esc(c.level.toUpperCase())}</span>&nbsp;<span class="ms">${esc(c.message)}</span>${addBtn}</div>`; }).join(""):`<div class="term-empty">// no activity yet — open a site or folder, or type ${esc(state.radCmd)} "query"</div>`;
-  const cursor=`<div class="term-line term-cursor"><span class="tt">sir@console</span>:<span class="lv ok">~</span>$&nbsp;<span class="blink">▋</span></div>`;
-  tb.innerHTML=lines+cursor;
-  if(atBottom) tb.scrollTop=tb.scrollHeight;
+  const items=state.console.filter(c=>match(term,c.message,c.level)).slice().reverse();
+  const lines=items.length?items.map(c=>{ const ts=new Date(c.ts).toLocaleTimeString([],{hour12:false}); let addBtn=""; if(c.meta&&c.meta.url){ if(!state.links.some(l=>normUrl(l.url)===normUrl(c.meta.url))) addBtn=`<button class="term-add" data-action="console-add-link" data-id="${c.id}" title="Save this site to Links">＋ Link</button>`; } else if(c.meta&&c.meta.path){ if(!state.folders.some(f=>normUrl(f.path||"")===normUrl(c.meta.path))) addBtn=`<button class="term-add" data-action="console-add-folder" data-id="${c.id}" title="Save this folder to Quick Folders">＋ Folder</button>`; } return `<div class="term-line"><span class="tt">[${ts}]</span>&nbsp;<span class="lv ${c.level}">${esc(c.level.toUpperCase())}</span>&nbsp;<span class="ms">${linkify(c.message)}</span>${addBtn}</div>`; }).join(""):`<div class="term-empty">// no activity yet — open a site or folder, or type ${esc(state.radCmd)} "query"</div>`;
+  tb.innerHTML=lines;
+  if(autoScroll){ tb.scrollTop=tb.scrollHeight; } else { tb.scrollTop=Math.min(savedTop, tb.scrollHeight); }
 }
 function renderView(){ const c=$("#content"); switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "folders":c.innerHTML=viewFolders();break; default:c.innerHTML=viewVault(); } renderTermBody(); }
 function head(t,d,a){ return `<div class="mod-head"><div><h1>${esc(t)}</h1><p>${esc(d)}</p></div><div class="spacer"></div>${a||""}</div>`; }
@@ -649,11 +665,10 @@ function folderEditModal(id){ const f=find(state.folders,id); if(!f)return; cons
 
 function viewConsole(){
   const term=searchTerms.console||"";
-  const items=state.console.filter(c=>match(term,c.message,c.level));
+  const items=state.console.filter(c=>match(term,c.message,c.level)).slice().reverse();
   const toolbar=`<div class="toolbar"><button class="btn sm danger" data-action="console-clear">🗑 Clear log</button></div>`;
-  const lines=items.length?items.map(c=>{ const ts=new Date(c.ts).toLocaleTimeString([],{hour12:false}); const addBtn=(c.meta&&c.meta.url)?`<button class="term-add" data-action="console-add-link" data-id="${c.id}" title="Save this site to Links">＋</button>`:""; return `<div class="term-line"><span class="tt">[${ts}]</span>&nbsp;<span class="lv ${c.level}">${esc(c.level.toUpperCase())}</span>&nbsp;<span class="ms">${esc(c.message)}</span>${addBtn}</div>`; }).join(""):`<div class="term-empty">// no activity yet — type a command below (try: ${esc(state.radCmd)} "Anime")</div>`;
-  const cursor=`<div class="term-line term-cursor"><span class="tt">sinrad@console</span>:<span class="lv ok">~</span>$&nbsp;<span class="blink">▋</span></div>`;
-  const termHtml=`<div class="term"><div class="term-bar"><span class="d r"></span><span class="d y"></span><span class="d g"></span><span class="t">activity.log · Ctrl+F to grep · ＋ saves a VISIT to Links</span></div><div class="term-body">${lines}${cursor}</div></div>`;
+  const lines=items.length?items.map(c=>{ const ts=new Date(c.ts).toLocaleTimeString([],{hour12:false}); const addBtn=(c.meta&&c.meta.url)?`<button class="term-add" data-action="console-add-link" data-id="${c.id}" title="Save this site to Links">＋</button>`:""; return `<div class="term-line"><span class="tt">[${ts}]</span>&nbsp;<span class="lv ${c.level}">${esc(c.level.toUpperCase())}</span>&nbsp;<span class="ms">${linkify(c.message)}</span>${addBtn}</div>`; }).join(""):`<div class="term-empty">// no activity yet — type a command below (try: ${esc(state.radCmd)} "Anime")</div>`;
+  const termHtml=`<div class="term"><div class="term-bar"><span class="d r"></span><span class="d y"></span><span class="d g"></span><span class="t">activity.log · Ctrl+F to grep · ＋ saves a VISIT to Links</span></div><div class="term-body">${lines}</div></div>`;
   return head("Console","Live log + commands · Ctrl+F to grep")+searchRow("console","Grep the log...")+toolbar+termHtml;
 }
 
@@ -687,10 +702,10 @@ function openByAction(a,id){
   else if(a==="link-open"){ const l=find(state.links,id); if(l){ openTarget(l.url,"url"); log("info","Opened link: "+l.title); } }
   else if(a==="folder-open"){ const f=find(state.folders,id); if(f){ const p=f.path||f.name||""; if(p){ openTarget(p,"app"); recordFolderVisit(p); } } }
 }
-document.addEventListener("dblclick",(ev)=>{ const t=ev.target.closest("[data-action]"); if(!t)return; const a=t.dataset.action; if((a==="vault-open"||a==="link-open"||a==="folder-open")&&(state.openMode||"double")==="double"){ openByAction(a,t.dataset.id); } });
+document.addEventListener("dblclick",(ev)=>{ const t=ev.target.closest("[data-action]"); if(!t)return; const a=t.dataset.action; if((a==="vault-open"||a==="link-open"||a==="folder-open")&&(state.openMode||'double')==='double'){ openByAction(a,t.dataset.id); } });
 document.addEventListener("click",async(ev)=>{
   const t=ev.target.closest("[data-action]"); if(!t)return; const a=t.dataset.action,id=t.dataset.id;
-  if((a==="vault-open"||a==="link-open"||a==="folder-open")&&!t.closest("#ctxmenu")&&(state.openMode||"double")==="double")return;
+  if((a==="vault-open"||a==="link-open"||a==="folder-open")&&!t.closest("#ctxmenu")&&(state.openMode||'double')==='double')return;
   switch(a){
     case "nav": currentView=t.dataset.nav; $("#content").classList.remove("searching"); searchTerms={}; renderNav(); renderView(); break;
     case "win-min": E&&E.winMin?E.winMin():toast("Window controls work in the desktop build"); break;
@@ -732,9 +747,9 @@ document.addEventListener("click",async(ev)=>{
     case "music-open-folder": if(bgmDir && E && E.openPath){ E.openPath(bgmDir); } else if(bgmDir && E && E.shellOpen){ E.shellOpen(bgmDir); } break;
     case "update-check": updateCheckClick(false); break;
     case "open-github": openGithub(); break;
+    case "toggle-autoscroll": { if(!state.settings)state.settings={}; state.settings.autoScroll=(state.settings.autoScroll===false); saveState(); updateAutoScrollBtn(); log("info","auto-scroll: "+(state.settings.autoScroll?"on":"off")); break; }
     case "update-later": hideUpdateModal(); break;
     case "update-go": updateGoClick(); break;
-    case "open-settings": openSettings(); break;
     case "modal-cancel": cancelModal(); break;
     case "modal-confirm": if(typeof modalOnConfirm==="function")modalOnConfirm(); break;
   }
@@ -779,7 +794,9 @@ function handleCommand(line){
   const flush=()=>{ if(!out.length)return; for(let i=out.length-1;i>=0;i--)pushRaw(out[i].message,out[i].meta,true); out.length=0; renderView(); };
   push("> "+line);
   if(cmd===state.radCmd){
-    if(!arg){ push('> usage: '+state.radCmd+' "search term"'); flush(); return; }
+    var _setInner=(arg==='set'||arg==='settings')?'':((arg||'').indexOf('set ')===0?(arg||'').slice(4):((arg||'').indexOf('settings ')===0?(arg||'').slice(9):null));
+    if(_setInner!==null){ handleSet(_setInner,push); flush(); return; }
+    if(!arg){ push('> usage: '+state.radCmd+' <search term>   ·   '+state.radCmd+' set  for settings'); flush(); return; }
     const rootsLabel=(state.scanRoots&&state.scanRoots.length)?state.scanRoots.join(", "):"~ (home)";
     push("> ...searching "+rootsLabel+"   depth<="+(state.scanDepth||4)+(state.scanSkipHidden?"   (hidden skipped)":""));
     if(!E){ push("> (preview: searching saved folders only - disk search needs the desktop app)"); const q=arg.toLowerCase(); const matches=state.folders.filter(f=>{ const nm=(f.name||baseName(f.path||f.name)||"").toLowerCase(); const pa=(f.path||"").toLowerCase(); return nm.indexOf(q)>=0||pa.indexOf(q)>=0; }); if(!matches.length)push('> no folders match "'+arg+'"'); else { matches.forEach(f=>push("> "+(f.name||baseName(f.path||f.name)||f.path),{folderId:f.id,path:f.path||""})); push("> "+matches.length+" folder(s) found"); } flush(); return; }
@@ -790,8 +807,8 @@ function handleCommand(line){
   else if(cmd==="setrad"){ if(arg){ state.radCmd=arg.split(/\s+/)[0]; saveState(); push("> search command set to: "+state.radCmd); } else push("> usage: setrad <word>"); flush(); return; }
   else if(cmd==="roots"){ if(!arg){ push("> scan roots: "+((state.scanRoots&&state.scanRoots.length)?state.scanRoots.join(" | "):"(default: home)")); } else if(arg==="clear"){ state.scanRoots=[]; saveState(); push("> scan roots cleared (default: home)"); } else if(arg.indexOf("add ")===0){ const p=arg.slice(4).trim(); if(p){ state.scanRoots=state.scanRoots||[]; state.scanRoots.push(p); saveState(); push("> added root: "+p); } } else if(arg.indexOf("rm ")===0){ const p=arg.slice(3).trim(); state.scanRoots=(state.scanRoots||[]).filter(r=>r!==p); saveState(); push("> removed root: "+p); } else push("> usage: roots | roots add /path | roots rm /path | roots clear"); flush(); return; }
   else if(cmd==="depth"){ const n=parseInt(arg,10); if(arg&&!isNaN(n)&&n>=0){ state.scanDepth=n; saveState(); push("> scan depth set to: "+n); } else push("> scan depth: "+(state.scanDepth||4)+"   usage: depth <number>"); flush(); return; }
-  else if(cmd==="set"){ const parts=(arg||"").split(/\s+/); if(parts[0]==="hidden"&&(parts[1]==="on"||parts[1]==="off")){ state.scanSkipHidden=(parts[1]==="on"); saveState(); push("> skip hidden folders: "+(state.scanSkipHidden?"on":"off")); } else push("> usage: set hidden on|off"); flush(); return; }
-  else if(cmd==="help"){ push("> commands:"); push('>   '+state.radCmd+' "term"        search folders on your device by name'); push(">   stop                  cancel a running scan"); push(">   roots [add|rm|clear]  folders to scan (default: home)"); push(">   depth <n>             how deep to scan (default 4)"); push(">   set hidden on|off     skip dot-folders (default on)"); push(">   setrad <word>         rename the search command"); push(">   help                  show this list"); flush(); return; }
+  else if(cmd==='set'||cmd==='settings'||cmd==='setting'){ push('> settings moved under  '+state.radCmd+' set  — try:  '+state.radCmd+' set   for the menu'); flush(); return; }
+  else if(cmd==="help"){ push("> commands:"); push('>   '+state.radCmd+' "term"        search folders on your device by name'); push(">   stop                  cancel a running scan"); push(">   roots [add|rm|clear]  folders to scan (default: home)"); push(">   depth <n>             how deep to scan (default 4)"); push('>   '+state.radCmd+' set              settings menu (intro / music / hidden / click-mode)'); push('>   '+state.radCmd+' set single|double click   open with one or two clicks'); push(">   setrad <word>         rename the search command"); push(">   help                  show this list"); flush(); return; }
   else { push("> unknown command: "+cmd+"  -  type  help"); flush(); return; }
 }
 function parseCommand(line){ const m=line.match(/^(\S+)\s*([\s\S]*)$/); if(!m)return {cmd:line.trim(),arg:""}; let arg=(m[2]||"").trim(); if(arg.length>=2&&arg[0]==='"'&&arg[arg.length-1]==='"')arg=arg.slice(1,-1); return {cmd:m[1],arg:arg}; }
@@ -804,7 +821,9 @@ setInterval(tickClock,1000);
 function buildThinkBar(){ const w=$("#tbWave"); if(w){ let h=""; for(let i=0;i<64;i++){ h+='<i style="animation-delay:'+(Math.random()*1.2).toFixed(2)+'s;animation-duration:'+(0.8+Math.random()*0.9).toFixed(2)+'s"></i>'; } w.innerHTML=h; } const tb=$("#thinkbar"); if(tb){ const cols=["#27b4ff","#b14bff","#ff4d8d","#33d17a"]; let ci=0; tb.style.setProperty("--acc",cols[0]); setInterval(()=>{ ci=(ci+1)%cols.length; tb.style.setProperty("--acc",cols[ci]); },4200); } }
 (async function boot(){
   await loadState();
-  const av=$("#appver"); if(av)av.textContent="v"+APP_VERSION;
+  try{ if(state.music&&state.music.volume!=null) bgmAudio.volume=state.music.volume; if(state.music&&typeof state.music.idx==='number'&&state.music.idx) bgmIdx=state.music.idx; }catch(_){}
+  if(E&&E.musicRequest) E.musicRequest();
+  const av=$('#appver'); if(av)av.textContent='v'+APP_VERSION;
   const ae=$("#appedits"); if(ae)ae.textContent="#"+EDIT_COUNT+" edits";
   buildThinkBar(); renderNav(); renderView(); tickClock();
   { const ng=$("#normaGif"); const nd=(NORMA_EMBED&&NORMA_EMBED.indexOf("data:")===0)?NORMA_EMBED:""; if(ng&&nd)ng.src=nd; }
