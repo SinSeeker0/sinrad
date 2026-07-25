@@ -37,13 +37,7 @@ fs.writeFileSync(idxPath, idx);
 pkg.version = ver;
 fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
 console.log("Bumped -> " + ver + "  (EDIT_COUNT " + newN + ")\n");
-// 4. Write EDIT_COUNT + APP_VERSION (index.html) and version (package.json) in sync
-idx = idx.replace(/const EDIT_COUNT\s*=\s*\d+/, "const EDIT_COUNT = " + newN);
-idx = idx.replace(/const APP_VERSION\s*=\s*[^\n;]+;/, 'const APP_VERSION="' + ver + '";');
-fs.writeFileSync(idxPath, idx);
-pkg.version = ver;
-fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
-console.log("Bumped -> " + ver + "  (EDIT_COUNT " + newN + ")\n");
+
 
 // 4. Commit + push + tag + push tags  (a sign-in window may pop up the first time)
 run("git add -A");
