@@ -4,8 +4,17 @@ app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
 const path = require("path");
 const fs = require("fs");
 const scanFolders = require("./scan.js");
+let autoUpdater=null; try{ autoUpdater=require("electron-updater").autoUpdater; }catch(_e){ try{ console.error("[sinrad] electron-updater unavailable:", _e&&_e.message); }catch(_){} }
 
-const DATA_FILE = path.join(app.getPath("userData"), "sinrad-data.json");
+function _writableDir(d){ try{ const t=path.join(d,".sinrad_wtest"); fs.writeFileSync(t,"1"); fs.unlinkSync(t); return true; }catch(_){ return false; } }
+const DATA_FILE = _writableDir(__dirname) ? path.join(__dirname,"sinrad-data.json") : path.join(app.getPath("userData"),"sinrad-data.json");
+const _SEED_STORE = path.join(app.getPath("userData"),"sinrad-data.json");
+try{
+  const _leg=[ path.join(path.dirname(DATA_FILE),"sinrad-SANDBOX.json"), path.join(app.getPath("userData"),"sinrad-SANDBOX.json") ].filter(function(p,i,a){ return a.indexOf(p)===i; });
+  const _legF=_leg.find(function(p){ try{ return fs.existsSync(p) && path.resolve(p)!==path.resolve(DATA_FILE); }catch(_){ return false; } });
+  if(_legF){ if(fs.existsSync(DATA_FILE)){ try{ fs.renameSync(DATA_FILE, path.join(path.dirname(DATA_FILE),"sinrad-data-before-parkinglot-backup.json")); }catch(_){} } try{ fs.renameSync(_legF, DATA_FILE); }catch(_){} }
+  else if(!fs.existsSync(DATA_FILE) && fs.existsSync(_SEED_STORE) && path.resolve(DATA_FILE)!==path.resolve(_SEED_STORE)){ try{ fs.writeFileSync(DATA_FILE, fs.readFileSync(_SEED_STORE)); }catch(_){} }
+}catch(_){}
 function readStore(){ try{ if(fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE,"utf8")); }catch(e){ console.error("[sinrad] read store failed:", e.message); } return null; }
 function writeStore(data){ try{ fs.writeFileSync(DATA_FILE, JSON.stringify(data,null,2), "utf8"); return true; }catch(e){ console.error("[sinrad] write store failed:", e.message); return false; } }
 
@@ -72,10 +81,17 @@ function showMain(){ if(mainWin && !mainWin.isDestroyed()){ try{ mainWin.webCont
 function finishBoot(){ if(bootFinished) return; bootFinished=true; try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(e){} splashWin=null; if(mainReady) showMain(); }
 app.whenReady().then(()=>{
   syncBoot();
+  try{ if(autoUpdater){ autoUpdater.autoDownload=false; autoUpdater.autoInstallOnAppQuit=true; autoUpdater.allowDowngrade=false; autoUpdater.on("error", function(e){ try{ console.error("[sinrad] autoUpdater:", e&&e.message); }catch(_){} }); } }catch(_e){ try{ console.error("[sinrad] autoUpdater config failed:", _e&&_e.message); }catch(_){} }
   const vid=pickBootVideo();
   const _st=readStore(); const _introOn=!(_st&&_st.settings&&_st.settings.introEnabled===false);
   if(vid && _introOn){ hasSplash=true; createSplash(vid); }
   createWindow();
+  try{ mainWin.webContents.once('did-finish-load', function(){ try{ mainWin.webContents.send('data-path', DATA_FILE); }catch(_){} }); }catch(_){}
+  let _hkOk=false; try{ const {globalShortcut}=require('electron'); _hkOk=!!globalShortcut.register('CommandOrControl+Alt+P', function(){ try{ const t=require('electron').clipboard.readText(); if(mainWin){ mainWin.webContents.send('hotkey-park', t); if(mainWin.isMinimized())mainWin.restore(); mainWin.show(); mainWin.focus(); } }catch(_){} }); try{ mainWin.webContents.once('did-finish-load', function(){ try{ mainWin.webContents.send('hotkey-status',{ok:_hkOk,combo:'Ctrl+Alt+P'}); }catch(_){} }); }catch(_){} }catch(_e){}
+  var _rgTries=0;
+  function _closeSplash(){ try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(_){} splashWin=null; }
+  setTimeout(function(){ _closeSplash(); try{ if(mainWin && !mainWin.isDestroyed()) mainWin.show(); }catch(_){} }, 6000);
+  if(mainWin&&mainWin.webContents) mainWin.webContents.on("render-process-gone", function(_e, details){ try{ console.error("[sinrad] renderer gone:", details&&details.reason); _closeSplash(); if(_rgTries++ < 3){ setTimeout(function(){ try{ if(mainWin&&!mainWin.isDestroyed()){ mainWin.reload(); mainWin.show(); } }catch(_){} }, 1500); } else { try{ mainWin.show(); }catch(_){} } }catch(_){} });
   mainWin.once("ready-to-show",()=>{ mainReady=true; if(!hasSplash || bootFinished){ bootFinished=true; showMain(); } });
   // pure anti-brick guard: never stay stuck on the splash forever (10 min cap)
   setTimeout(finishBoot, 600000);
@@ -112,6 +128,7 @@ function scanBgm(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){} con
 ipcMain.on("music-request",(e)=>{ syncBundled(); const w=BrowserWindow.fromWebContents(e.sender); if(w) w.webContents.send("music-list", {files:scanBgm(), dir:BGM_DIR}); });
 ipcMain.on("music-cmd",(e,c)=>{ if(mainWin) mainWin.webContents.send("music-cmd", c); });
 ipcMain.handle("music-read", async (e,p)=>{ try{ return await fs.promises.readFile(p); }catch(_){ return Buffer.alloc(0); } });
+ipcMain.handle("clip-read", async () => { try { return require("electron").clipboard.readText(); } catch(_){ return ""; } });
 
 const activeScans = new Map();
 ipcMain.handle("fs-home", ()=> app.getPath("home"));
@@ -157,51 +174,8 @@ function updPickAsset(assets,latestVer){
   for(const a of assets){ if(low(a.name).indexOf(".appimage")>=0) return a; }
   return null;
 }
-ipcMain.handle("update-check", async function(e, currentVer){
-  try{
-    const rel=await updGetJSON(UPD_API);
-    let tag=String(rel.tag_name||""); if(tag.charAt(0)==="v"||tag.charAt(0)==="V") tag=tag.slice(1);
-    const cur=String(currentVer||app.getVersion()||"0.0.0");
-    const available=updCmp(updVerTuple(tag),updVerTuple(cur))>0;
-    const asset=updPickAsset(rel.assets||[], tag);
-    return { ok:true, available:available, latest:tag, current:cur, notes:String(rel.body||""), date:String(rel.published_at||"").slice(0,10), platform:process.platform, repoUrl:UPD_PAGE, asset: asset?{name:asset.name,url:asset.browser_download_url,size:asset.size||0}:null };
-  }catch(err){ return { ok:false, error:String(err&&err.message||err) }; }
-});
-let updTemp=null;
-ipcMain.handle("update-download", async function(e, payload){
-  const url=payload&&payload.url; if(!url) throw new Error("no url");
-  const dest=path.join(app.getPath("temp"), "sinrad_update_"+Date.now()+".part"); updTemp=dest;
-  const win=BrowserWindow.fromWebContents(e.sender);
-  await updGetFile(url, dest, function(got,total){ if(win&&!win.isDestroyed()) win.webContents.send("update-progress",{got:got,total:total}); });
-  return { ok:true, temp:dest };
-});
-ipcMain.handle("update-install", async function(e, tempPath){
-  const plat=process.platform; const src=tempPath||updTemp; if(!src) throw new Error("no downloaded file");
-  if(plat==="darwin"){ shell.openExternal(UPD_PAGE); return {ok:true, manual:true}; }
-  const spawn=require("child_process").spawn;
-  if(plat==="win32"){
-    const target=process.env.PORTABLE_EXECUTABLE_FILE||process.execPath; const bat=path.join(app.getPath("temp"),"sinrad_update.bat");
-    const body=`@echo off\r
-:loop\r
-ping 127.0.0.1 -n 2 > nul\r
-move /Y "${src}" "${target}" > nul 2>&1\r
-if errorlevel 1 goto loop\r
-start "" "${target}"\r
-del "%~f0"\r
-`;
-    fs.writeFileSync(bat, body);
-    const child=spawn("cmd.exe", ["/c", bat], {detached:true, stdio:"ignore", windowsHide:true}); child.unref();
-    setTimeout(function(){ app.quit(); }, 300); return {ok:true};
-  } else {
-    const target=process.env.APPIMAGE||process.execPath; const sh=path.join(app.getPath("temp"),"sinrad_update.sh");
-    const body=`#!/bin/sh
-sleep 1
-mv -f "${src}" "${target}" && chmod +x "${target}"
-nohup "${target}" >/dev/null 2>&1 &
-`;
-    fs.writeFileSync(sh, body); try{ fs.chmodSync(sh, 0o755); }catch(_){}
-    const child=spawn("sh", [sh], {detached:true, stdio:"ignore"}); child.unref();
-    setTimeout(function(){ app.quit(); }, 300); return {ok:true};
-  }
-});
+function _updNotes(info){ var rn=info&&info.releaseNotes; if(Array.isArray(rn)){ rn=rn.map(function(x){ return (x&&(x.note||x.body))||""; }).join(" "); } return String(rn||(info&&info.releaseName)||"").trim(); }
+ipcMain.handle("update-check", async function(){ if(!autoUpdater){ return {ok:false, error:"auto-updater not available in this build (packaged build only)", platform:process.platform}; } return await new Promise(function(resolve){ var done=false; function cleanup(){ try{ autoUpdater.removeListener("update-available",onAvail); autoUpdater.removeListener("update-not-available",onNot); autoUpdater.removeListener("error",onErr); }catch(_){} } function finish(r){ if(done)return; done=true; cleanup(); resolve(r); } function onAvail(info){ finish({ok:true, available:true, latest:info.version, current:app.getVersion(), date:String(info.releaseDate||"").slice(0,10), notes:_updNotes(info), platform:process.platform, asset:{url:"auto", name:"auto"}}); } function onNot(){ finish({ok:true, available:false, current:app.getVersion(), platform:process.platform}); } function onErr(e){ finish({ok:false, error:String(e&&e.message||e), platform:process.platform}); } autoUpdater.once("update-available",onAvail); autoUpdater.once("update-not-available",onNot); autoUpdater.once("error",onErr); autoUpdater.checkForUpdates().catch(onErr); }); });
+ipcMain.handle("update-download", async function(){ if(!autoUpdater){ return {temp:false}; } function onProg(pp){ if(mainWin&&!mainWin.isDestroyed()){ mainWin.webContents.send("update-progress", {got:pp.transferred||0, total:pp.total||0, percent:pp.percent||0}); } } function onDone(){ try{ autoUpdater.removeListener("download-progress",onProg); }catch(_){} } autoUpdater.on("download-progress",onProg); autoUpdater.once("update-downloaded",onDone); try{ await autoUpdater.downloadUpdate(); }catch(e){ try{ autoUpdater.removeListener("download-progress",onProg); }catch(_){} throw e; } return {temp:true}; });
+ipcMain.handle("update-install", async function(){ if(!autoUpdater){ return {manual:true}; } try{ autoUpdater.quitAndInstall(false, true); return {ok:true}; }catch(e){ return {manual:true}; } });
 

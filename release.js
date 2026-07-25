@@ -18,33 +18,25 @@ if (!porcelain) {
   process.exit(0);
 }
 
-// 2. Next EDIT_COUNT — copy-proof: never go backwards vs the last committed value
-//    (the workspace copy can reset the in-file number, so we trust git history as the floor)
 const idxPath = "index.html";
 let idx = fs.readFileSync(idxPath, "utf8");
-const editsIn = (t) => { const mm = t.match(/const EDIT_COUNT\s*=\s*(\d+)/); return mm ? parseInt(mm[1], 10) : 0; };
-const headIdx = out("git show HEAD:index.html");
-const newN = Math.max(editsIn(idx), headIdx ? editsIn(headIdx) : 0) + 1;
-
-// 3. Next VERSION — v2, patch bump per release. Copy-proof + always v2:
-//    continue from package.json when it's already 2.0.x, otherwise fall back to the
-//    highest existing v2 tag (so a stale/uncopied folder still produces a v2 tag).
-const tagExists = (v) => out('git tag -l "' + v + '"') !== "";
+const em = idx.match(/const EDIT_COUNT\s*=\s*(\d+)/);
+const newN = (em ? parseInt(em[1], 10) : 0) + 1;
 const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-const pm = String(pkg.version || "").match(/^(\d+)\.(\d+)\.(\d+)/);
-let basePatch;
-if (pm && pm[1] === "2" && pm[2] === "0") {
-  basePatch = parseInt(pm[3], 10);
-} else {
-  basePatch = 0;
-  const tags = out("git tag --list v2.*").split(/\r?\n/);
-  for (const t of tags) { const mm = t.trim().match(/^v2\.0\.(\d+)$/); if (mm) basePatch = Math.max(basePatch, parseInt(mm[1], 10)); }
-}
-let patch = basePatch + 1;
-while (tagExists("v2.0." + patch)) patch++;        // never reuse a tag
-const ver = "2.0." + patch;
+const pm = String(pkg.version || "2.0.0").match(/^(\d+)\.(\d+)\.(\d+)/);
+const b0 = pm ? (parseInt(pm[1],10)||2) : 2;
+const b1 = pm ? (parseInt(pm[2],10)||0) : 0;
+let patchN = (pm ? (parseInt(pm[3],10)||0) : 0) + 1;
+const tagExists = (v) => out('git tag -l "v' + v + '"') !== "";
+while (tagExists(b0 + "." + b1 + "." + patchN)) patchN++;
+const ver = b0 + "." + b1 + "." + patchN;
 const tag = "v" + ver;
-
+idx = idx.replace(/const EDIT_COUNT\s*=\s*\d+/, "const EDIT_COUNT = " + newN);
+idx = idx.replace(/const APP_VERSION\s*=\s*"[^"]*"/, 'const APP_VERSION="' + ver + '"');
+fs.writeFileSync(idxPath, idx);
+pkg.version = ver;
+fs.writeFileSync("package.json", JSON.stringify(pkg, null, 2) + "\n");
+console.log("Bumped -> " + ver + "  (EDIT_COUNT " + newN + ")\n");
 // 4. Write EDIT_COUNT + APP_VERSION (index.html) and version (package.json) in sync
 idx = idx.replace(/const EDIT_COUNT\s*=\s*\d+/, "const EDIT_COUNT = " + newN);
 idx = idx.replace(/const APP_VERSION\s*=\s*[^\n;]+;/, 'const APP_VERSION="' + ver + '";');

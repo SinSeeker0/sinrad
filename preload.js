@@ -43,5 +43,9 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMusicList: (cb) => ipcRenderer.on("music-list", (_, l) => cb(l)),
   musicCmd: (c) => ipcRenderer.send("music-cmd", c),
   onMusicCmd: (cb) => ipcRenderer.on("music-cmd", (_, c) => cb(c)),
-  musicRead: (p) => ipcRenderer.invoke("music-read", p)
+  musicRead: (p) => ipcRenderer.invoke("music-read", p),
+  clipRead: () => ipcRenderer.invoke("clip-read"),
+  onHotkeyPark: (cb) => ipcRenderer.on("hotkey-park", (_, t) => cb(t)),
+  hotkeyStatus: (cb) => ipcRenderer.on("hotkey-status", (_, mm) => cb(mm)),
+  dataPath: (cb) => ipcRenderer.on("data-path", (_, pp) => cb(pp))
 });

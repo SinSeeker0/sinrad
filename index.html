@@ -133,6 +133,61 @@
   .term-line .lv{display:inline-block;min-width:4.2ch;font-weight:700}
   .term-line .lv.info{color:var(--cyan)} .term-line .lv.ok{color:var(--green)} .term-line .lv.warn{color:var(--yellow)} .term-line .lv.err{color:var(--red)}
   .term-line .ms{color:#c7d0db}
+  .coll-card{cursor:pointer}
+  .coll-card .cc-top{display:flex;align-items:center;justify-content:space-between;gap:8px}
+  .coll-card .cc-name{font-weight:700;font-size:13.5px}
+  .coll-card .cc-count{font:700 11px/1 ui-monospace,Menlo,Consolas,monospace;color:var(--muted);border:1px solid var(--border);border-radius:999px;padding:2px 8px}
+  .coll-card .cc-hint{font-size:11px;color:var(--dim);margin-top:6px}
+  .drill-head{display:flex;align-items:center;gap:10px;margin:4px 0 14px}
+  .drill-head .dh-back{appearance:none;border:1px solid var(--border);background:transparent;color:var(--txt);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px}
+  .drill-head .dh-title{font-weight:800;font-size:15px}
+  .drill-head .dh-open{margin-left:auto;appearance:none;border:1px solid var(--cyan);color:var(--cyan);background:rgba(39,180,255,.1);border-radius:8px;padding:6px 10px;cursor:pointer;font-size:12px;font-weight:700}
+  .link-card .lc-note{font-size:11px;color:var(--dim);margin-top:5px;font-style:italic}
+  .link-card .lc-tag{display:inline-block;font-size:10px;color:var(--cyan);border:1px solid var(--border);border-radius:6px;padding:0 6px;margin-left:6px;vertical-align:middle}
+  .nav-item[data-nav="lot"] .nav-ico{color:#ff79c6}
+  .nav-item[data-nav="lot"].active{background:linear-gradient(90deg, rgba(255,121,198,.18), transparent)}
+  .lot-view .mod-head h1{color:#ff79c6}
+  .lot-banner{display:flex;gap:12px;align-items:center;background:linear-gradient(90deg, rgba(255,121,198,.12), rgba(139,92,246,.08));border:1px solid rgba(255,121,198,.35);border-radius:12px;padding:12px 14px;margin-bottom:14px}
+  .lot-banner .lb-ico{display:inline-flex;color:#ff79c6}
+  .lot-banner b{color:#ff79c6}
+  .lot-banner .lb-cmd{font-family:ui-monospace,Menlo,Consolas,monospace;color:var(--cyan)}
+  .lot-view .coll-card{border:1px solid rgba(255,121,198,.25)}
+  .panel-main.lot-active{background-image:linear-gradient(180deg, rgba(255,121,198,.18), rgba(255,121,198,.05) 180px, transparent 380px)}
+  .lot-row .lr-rename{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;width:26px;height:24px;cursor:pointer;font-size:12px;line-height:1}
+  .lot-row .lr-rename:hover{color:#ff79c6;border-color:#ff79c6}
+  .lot-row .lr-send{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:6px;padding:4px 8px;font-size:11px;cursor:pointer;white-space:nowrap}
+  .lot-row .lr-send:hover{color:var(--cyan);border-color:var(--cyan)}
+  .lot-bar .lb-send{border-color:var(--cyan);color:#7fd0ff}
+  .lot-bar .lb-send:hover{background:rgba(39,180,255,.14)}
+  .lot-item.sel{background:rgba(255,77,141,.16);box-shadow:inset 0 0 0 1px var(--red,#ff4d6a)}
+  .lot-row.sel{border-color:var(--red,#ff4d6a);box-shadow:0 0 0 1px var(--red,#ff4d6a) inset;background:#1a0e14}
+  .lot-bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:160;display:flex;gap:10px;align-items:center;background:#1a1014;border:1px solid rgba(255,77,141,.55);border-radius:8px;padding:9px 12px;box-shadow:0 12px 34px rgba(0,0,0,.55)}
+  .lot-bar .lb-n{font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;color:#ff79c6}
+  .lot-bar button{appearance:none;border:1px solid var(--border);background:transparent;color:var(--txt);border-radius:6px;padding:6px 12px;font-size:12px;cursor:pointer}
+  .lot-bar .lb-del{border-color:var(--red,#ff4d6a);color:#ff8aa0;font-weight:700}
+  .lot-bar .lb-del:hover{background:rgba(255,77,141,.16)}
+  .lot-bar .lb-clear:hover{border-color:var(--cyan);color:var(--cyan)}
+  .lot-banner{align-items:center}
+  .lot-banner .lb-ico svg{display:block}
+  .lot-view{background:transparent}
+  .lot-list{display:flex;flex-direction:column;gap:8px}
+  .lot-row{position:relative;display:flex;align-items:center;gap:12px;padding:12px 14px 12px 16px;background:#120c12;border:1px solid rgba(255,121,198,.22);border-radius:10px;cursor:pointer;transition:.15s}
+  .lot-row:hover{border-color:var(--lc,#ff79c6);background:#170e16;box-shadow:0 0 0 1px var(--lc,#ff79c6) inset}
+  .lot-row .lr-bar{position:absolute;left:0;top:8px;bottom:8px;width:4px;border-radius:3px;background:var(--lc,#ff79c6)}
+  .lot-row .lr-name{font-weight:700;font-size:14px;color:#f3d9ec;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lot-row .lr-count{font:700 11px/1 ui-monospace,Menlo,Consolas,monospace;color:#ff79c6;border:1px solid rgba(255,121,198,.4);border-radius:999px;padding:3px 9px}
+  .lot-row .lr-open{appearance:none;border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:7px;padding:5px 9px;font-size:11px;cursor:pointer}
+  .lot-row .lr-open:hover{color:var(--cyan);border-color:var(--cyan)}
+  .lot-row .lr-hint{font-size:11px;color:var(--dim)}
+  .lot-items{display:flex;flex-direction:column;gap:2px;margin-top:4px}
+  .lot-item{display:flex;align-items:center;gap:10px;padding:8px 10px;border-radius:8px;cursor:pointer}
+  .lot-item:hover{background:rgba(255,121,198,.08)}
+  .lot-item .li-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .lot-item .li-main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .lot-item .li-title{font-size:13px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lot-item .li-url{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lot-item .li-tag{font-size:10px;color:var(--cyan);border:1px solid var(--border);border-radius:6px;padding:0 6px}
+  .lot-item .li-note{font-size:11px;color:var(--dim);font-style:italic}
   .term-line .lnk{color:var(--cyan);text-decoration:underline;text-underline-offset:2px}
   .term-add{margin-left:8px;background:transparent;border:1px solid var(--border);color:var(--cyan);border-radius:6px;padding:0 7px;font-size:12px;line-height:16px;font-family:var(--font)}
   .term-add:hover{border-color:var(--cyan);background:rgba(39,180,255,.12)}
@@ -314,7 +369,7 @@
   .um-head::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(12,12,22,.12),rgba(12,12,22,.58));z-index:1;pointer-events:none}
   .um-head h2{position:relative;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.7)}
 
-  .ndot{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:50%;background:transparent;border:1.5px solid #ff79a6;box-shadow:0 0 5px rgba(255,77,141,.55),inset 0 0 2px rgba(255,77,141,.35);cursor:pointer;z-index:5;opacity:.9;pointer-events:auto}
+  .ndot{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:2px;background:transparent;border:1.5px solid #ff79a6;box-shadow:0 0 5px rgba(255,77,141,.55),inset 0 0 2px rgba(255,77,141,.35);cursor:pointer;z-index:5;opacity:.9;pointer-events:auto}
   .ndot:hover{opacity:1;transform:scale(1.25);border-color:#fff;background:rgba(255,77,141,.12);box-shadow:0 0 8px rgba(255,77,141,.9),inset 0 0 3px rgba(255,77,141,.6)}
 
   .norma-music{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,77,141,.18)}
@@ -520,8 +575,8 @@ updateMusicUI();
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 59;
-const APP_VERSION="2.0.2";
+const EDIT_COUNT = 67;
+const APP_VERSION="2.0.5";
 
 const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6", "Guides":"#16c79a" };
 const FOLDER_CATS={ "Mods":"#964B00" };
@@ -531,7 +586,7 @@ const revealed=new Set();
 let currentView="vault";
 let searchTerms={};
 let vaultFilter="all", folderFilter="all";
-let linkCat="all", linkFav=false, folderCat="all";
+let linkCat="all", linkFav=false, linkDrill=null, folderCat="all";
 let modalOnConfirm=null, modalOnCancel=null;
 
 const CELEBRATE_FILES=[["complete.gif","complete.png","complete.webp"]];
@@ -552,6 +607,7 @@ const ICO_EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke
 const MODULES=[
   {id:"vault",ico:ICO_LOCK,name:"Vault",sub:"Passwords"},
   {id:"links",ico:ICO_LINK,name:"Links",sub:"Saved links"},
+  {id:"lot",ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3"/></svg>',name:"Parking Lot",sub:"Parked stacks"},
   {id:"folders",ico:ICO_FOLDER,name:"Folders",sub:"Quick access"},
 ];
 
@@ -620,7 +676,15 @@ function renderTermBody(){
   tb.innerHTML=lines;
   if(autoScroll){ tb.scrollTop=tb.scrollHeight; } else { tb.scrollTop=Math.min(savedTop, tb.scrollHeight); }
 }
-function renderView(){ const c=$("#content"); switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "folders":c.innerHTML=viewFolders();break; default:c.innerHTML=viewVault(); } renderTermBody(); }
+function _sendCollToLinks(coll){ if(!coll) return; var n=0; state.links.forEach(function(l){ if((l.coll||"")===coll && !l.inLinks){ l.inLinks=true; n++; } }); if(n){ saveState(); renderView(); log("info","sent "+n+" link(s) from "+coll+" to Links"); } }
+function _lotSendSel(){ var ids=Object.keys(lotSelLinks), colls=Object.keys(lotSelColls); var n=0; ids.forEach(function(x){ var l=find(state.links,x); if(l && !l.inLinks){ l.inLinks=true; n++; } }); colls.forEach(function(c){ state.links.forEach(function(l){ if((l.coll||"")===c && !l.inLinks){ l.inLinks=true; n++; } }); }); saveState(); lotSelLinks={}; lotSelColls={}; renderView(); log("info","sent "+n+" parked link(s) to Links"); }
+function renameStack(coll){
+  if(!coll) return;
+  openModal("✏️ Rename stack", '<div class="field"><label>New name</label><input id="rs_name" value="'+esc(coll).replace(/"/g,'&quot;')+'"></div>', "Rename", function(){ var el=document.getElementById("rs_name"); var v=el?el.value:""; v=(v||"").trim(); if(!v || v===coll){ closeModal(); return; } var exists=state.links.some(function(l){ return (l.coll||"")===v; }); state.links.forEach(function(l){ if((l.coll||"")===coll) l.coll=v; }); saveState(); closeModal(); log("info","renamed stack "+coll+" -> "+v+(exists?" (merged into existing)":"")); renderView(); });
+  setTimeout(function(){ var i=document.getElementById("rs_name"); if(i){ i.focus(); i.select(); } },30);
+}
+
+function renderView(){ if(currentView!=="lot"){ lotSelLinks={}; lotSelColls={}; } const c=$("#content"); try{ c.parentElement.classList.toggle("lot-active", currentView==="lot"); }catch(_){} switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "lot":c.innerHTML=viewLot();break; case "folders":c.innerHTML=viewFolders();break; default:c.innerHTML=viewVault(); } renderTermBody(); }
 function head(t,d,a){ return `<div class="mod-head"><div><h1>${esc(t)}</h1><p>${esc(d)}</p></div><div class="spacer"></div>${a||""}</div>`; }
 function emptyState(i,m){ return `<div class="empty"><div class="e-ico">${i}</div><p>${esc(m)}</p></div>`; }
 
@@ -636,17 +700,55 @@ function viewVault(){
   return head("Secure Vault",""+openVerb()+" · right-click for more · Ctrl+F to search")+addbar+searchRow("vault","Search vault...")+pills+body;
 }
 
+function collColor(name){ var h=0; name=String(name||''); for(var i=0;i<name.length;i++){ h=(h*31+name.charCodeAt(i))%360; } return 'hsl('+h+',55%,55%)'; }
+function isTagPage(u){ var s=String(u||''); return s.indexOf('/tags/')>=0 || s.indexOf('/tag/')>=0; }
 function viewLinks(){
   const term=searchTerms.links||"";
-  let items=state.links.filter(l=>{ const catOk=linkCat==="all"||normCat(l)===linkCat; const favOk=!linkFav||!!l.favorite; return catOk&&favOk&&match(term,l.title,l.url); });
+  const card=(l)=>`<div class="link-card" style="${edgeShadow(l)}" data-ctx="link" data-id="${l.id}" data-action="link-open"><h3 class="lc-title">${esc(l.title)}</h3><div class="lc-url" title="${esc(l.url)}">${esc(l.url)}</div>${l.note?`<div class="lc-note">${esc(l.note)}</div>`:""}${isTagPage(l.url)?`<span class="lc-tag">tag page</span>`:""}</div>`;
   const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="lk_title" placeholder="Title"><input class="lin-input lk-url" id="lk_url" placeholder="https://..."><button class="btn primary" data-action="link-add">＋ Add</button></div>`;
   const pills=`<div class="toolbar linkfilter"><div class="lf-left">${pill("All",linkCat==="all",ALL_COLOR,'data-action="link-cat" data-cat="all"')}${Object.keys(CAT_COLORS).map(c=>pill(c,linkCat===c,CAT_COLORS[c],'data-action="link-cat" data-cat="'+esc(c)+'"')).join("")}</div><div class="lf-right">${pill(ICO_STAR+" Favorites",linkFav,FAV_COLOR,'data-action="link-fav"')}</div></div>`;
+  const items=state.links.filter(l=>{ if(_inLot(l)) return false; const catOk=linkCat==="all"||normCat(l)===linkCat; const favOk=!linkFav||!!l.favorite; return catOk&&favOk&&match(term,l.title,l.url,l.note||""); });
   let body;
-  if(!state.links.length) body=emptyState(ICO_LINK,"No links yet — add your first one above.");
-  else if(!items.length) body=emptyState(ICO_SEARCH,"Nothing matches. Try a different tab or Ctrl+F.");
-  else body=`<div class="grid linkgrid">`+items.map(l=>`<div class="link-card" style="${edgeShadow(l)}" data-ctx="link" data-id="${l.id}" data-action="link-open"><h3 class="lc-title">${esc(l.title)}</h3><div class="lc-url" title="${esc(l.url)}">${esc(l.url)}</div></div>`).join("")+`</div>`;
-  return head("Link Saver",""+openVerb()+" · right-click to tag · Ctrl+F to search · combine a tab + Favorites")+addbar+searchRow("links","Search links...")+pills+body;
+  if(!items.length) body=emptyState(ICO_LINK,"No saved links yet — add one above. Parked / imported links live in the Parking Lot.");
+  else body=`<div class="grid linkgrid">`+items.map(card).join("")+`</div>`;
+  return head("Link Saver",""+openVerb()+" · your saved links · parked stacks live in the Parking Lot")+addbar+pills+searchRow("links","Search links...")+body;
 }
+function viewLot(){
+  const term=searchTerms.lot||"";
+  const THRESH=(state.settings&&state.settings.stackMin)||3;
+  const selN=(typeof _lotCountSel==="function")?_lotCountSel():0;
+  const bar=selN?`<div class="lot-bar"><span class="lb-n">${selN} selected</span><button type="button" class="lb-send">→ Links</button><button type="button" class="lb-del">Delete</button><button type="button" class="lb-clear">clear</button></div>`:"";
+  const itemRow=(l,col)=>`<div class="lot-item${lotSelLinks[l.id]?" sel":""}" data-ctx="link" data-id="${l.id}" data-action="link-open"><span class="li-dot" style="background:${col}"></span><span class="li-main"><span class="li-title">${esc(l.title)}</span><span class="li-url">${esc(l.url)}</span></span>${l.note?`<span class="li-note">${esc(l.note)}</span>`:""}${isTagPage(l.url)?`<span class="li-tag">tag</span>`:""}</div>`;
+  if(linkDrill){
+    let items=parked0().filter(l=>(l.coll||"")===linkDrill);
+    items=items.slice().sort((a,b)=>(isTagPage(b.url)?1:0)-(isTagPage(a.url)?1:0));
+    const col=collColor(linkDrill);
+    const dhead=`<div class="drill-head"><button class="dh-back" data-action="link-drill-back">‹ back</button><span class="dh-title" style="color:#ff79c6">${esc(linkDrill)}</span><span class="cc-count" style="margin-left:8px">${items.length}</span><button class="dh-open" data-action="link-openall" data-coll="${esc(linkDrill)}">open all (${items.length})</button></div>`;
+    let body; if(!items.length) body=emptyState(ICO_FOLDER,"nothing in this stack yet"); else body=`<div class="lot-items">`+items.map(l=>itemRow(l,col)).join("")+`</div>`;
+    return `<div class="lot-view">`+head("Parking Lot","stack: "+linkDrill+" · ctrl-click to select · Delete to remove")+dhead+searchRow("lot","Search in "+linkDrill+"...")+body+bar+`</div>`;
+  }
+  const parked=parked0();
+  const groups={};
+  parked.forEach(l=>{ const k=l.coll||""; (groups[k]=groups[k]||[]).push(l); });
+  const stackKeys=Object.keys(groups).filter(k=>k!=="" && groups[k].length>=THRESH).sort((a,b)=>groups[b].length-groups[a].length);
+  const flatKeys=Object.keys(groups).filter(k=>k==="" || groups[k].length<THRESH);
+  let html="";
+  if(stackKeys.length){
+    html+=`<div class="lot-list">`+stackKeys.map(k=>{ const col=collColor(k); return `<div class="lot-row${lotSelColls[k]?" sel":""}" style="--lc:${col}" data-action="link-drill" data-coll="${esc(k)}"><span class="lr-bar"></span><span class="lr-name">${esc(k)}</span><span class="lr-count">${groups[k].length}</span><button class="lr-open" data-action="link-openall" data-coll="${esc(k)}" title="open all in browser">open all</button><span class="lr-hint">open stack ›</span><button type="button" class="lr-send" title="send stack to Links">→ Links</button><button type="button" class="lr-rename" title="rename stack">✎</button></div>`; }).join("")+`</div>`;
+  }
+  let flat=[]; flatKeys.forEach(k=>groups[k].forEach(l=>flat.push(l)));
+  if(flat.length){ html+=`<div style="margin:16px 0 6px;font-size:11px;letter-spacing:.5px;color:var(--dim);text-transform:uppercase">unstacked · ${flat.length}</div><div class="lot-items">`+flat.map(l=>itemRow(l,collColor(l.coll||l.url))).join("")+`</div>`; }
+  if(!stackKeys.length && !flat.length) html=emptyState(ICO_FOLDER,"Parking Lot is empty — use  park ,  parklist , or the hotkey to send tabs here.");
+  const total=parked.length; const stacks=stackKeys.length;
+  const banner=`<div class="lot-banner"><span class="lb-ico"><svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3"/></svg></span><div><b>${total}</b> parked · <b>${stacks}</b> stack${stacks===1?"":"s"} · forms at ${THRESH}+ · <span class="lb-cmd">stackmin &lt;n&gt;</span> to change</div></div>`;
+  return `<div class="lot-view">`+head("Parking Lot","ctrl-click to select · Delete to remove · click a row to open a stack")+banner+searchRow("lot","Search the parking lot...")+html+bar+`</div>`;
+}
+function _inLot(l){ return l.src==="park" && !l.category && !l.inLinks; }
+function parked0(){ const term=searchTerms.lot||""; return state.links.filter(l=> _inLot(l) && match(term,l.title,l.url,l.note||"")); }
+
+
+
+
 function doLinkAdd(){ const t=$("#lk_title"),u=$("#lk_url"); const title=t?t.value.trim():"",url=u?u.value.trim():""; if(!title||!url){ toast("Title and URL required","warn"); return; } const category=linkCat!=="all"?linkCat:""; state.links.unshift({id:uid(),title,url,category,favorite:false,created:nowMs()}); log("ok","Saved link: "+title+(category?" ["+category+"]":"")); saveState(); celebrate(); renderView(); toast("Link saved","ok"); }
 
 function viewFolders(){
@@ -691,7 +793,7 @@ function alignMenuToBubble(el){ const m=$("#ctxmenu"); const br=el.getBoundingCl
 function showCardMenu(type,id,x,y){
   let it="";
   if(type==="vault"){ const v=find(state.vault,id); if(!v)return; if(v.url)it+=mi("vault-open",id,"Open site"); it+=mi("vault-copy-u",id,"Copy username")+mi("vault-copy-p",id,"Copy password")+mi("vault-eye",id,revealed.has(id)?"Hide password":"Show password")+miT("vault-fav",id,"Favorite",v.favorite,FAV_COLOR)+miT("vault-pri",id,"Priority",v.priority,PRI_COLOR)+mi("vault-edit",id,"Edit")+`<div class="cdiv"></div>`+mi("vault-del",id,"Delete","#ff5470",true); }
-  else if(type==="link"){ const l=find(state.links,id); if(!l)return; it+=mi("link-open",id,"Open")+miT("link-fav-toggle",id,"Favorite",l.favorite,FAV_COLOR)+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(CAT_COLORS).map(c=>miCat(id,c,normCat(l)===c)).join("")+miCat(id,"__none__",!normCat(l))+`<div class="cdiv"></div>`+mi("link-del",id,"Delete","#ff5470",true); }
+  else if(type==="link"){ const l=find(state.links,id); if(!l)return; it+=mi("link-open",id,"Open")+miT("link-fav-toggle",id,"Favorite",l.favorite,FAV_COLOR)+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(CAT_COLORS).map(c=>miCat(id,c,normCat(l)===c)).join("")+miCat(id,"__none__",!normCat(l))+mi(l.inLinks?"link-unsend":"link-send", id, l.inLinks?"Remove from Links":"Send to Links")+`<div class="cdiv"></div>`+mi("link-del",id,"Delete","#ff5470",true); }
   else if(type==="folder"){ const f=find(state.folders,id); if(!f)return; it+=mi("folder-open",id,"Open")+miT("folder-fav",id,"Favorite",f.favorite,FAV_COLOR)+mi("folder-edit",id,"Edit")+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(FOLDER_CATS).map(c=>miCatF(id,c,normCat(f)===c)).join("")+miCatF(id,"__none__",!normCat(f))+`<div class="cdiv"></div>`+mi("folder-del",id,"Remove","#ff5470",true); }
   else return;
   showMenu(x,y,it);
@@ -699,7 +801,7 @@ function showCardMenu(type,id,x,y){
 
 function openByAction(a,id){
   if(a==="vault-open"){ const v=find(state.vault,id); if(v&&v.url){ openTarget(v.url,"url"); log("info","Opened site: "+v.name); } }
-  else if(a==="link-open"){ const l=find(state.links,id); if(l){ openTarget(l.url,"url"); log("info","Opened link: "+l.title); } }
+  else if(a==="link-open"){ const l=find(state.links,id); if(l){ l.opens=(l.opens||0)+1; l.lastOpened=nowMs(); saveState(); openTarget(l.url,"url"); log("info","Opened link: "+l.title); } }
   else if(a==="folder-open"){ const f=find(state.folders,id); if(f){ const p=f.path||f.name||""; if(p){ openTarget(p,"app"); recordFolderVisit(p); } } }
 }
 document.addEventListener("dblclick",(ev)=>{ const t=ev.target.closest("[data-action]"); if(!t)return; const a=t.dataset.action; if((a==="vault-open"||a==="link-open"||a==="folder-open")&&(state.openMode||'double')==='double'){ openByAction(a,t.dataset.id); } });
@@ -727,6 +829,9 @@ document.addEventListener("click",async(ev)=>{
     case "link-fav-toggle": { const l=find(state.links,id); if(l){ l.favorite=!l.favorite; log("info",(l.favorite?"Favorited":"Unfavorited")+" link: "+l.title); saveState(); renderView(); } break; }
     case "link-cat-set": { const l=find(state.links,id); if(l){ l.category=(t.dataset.cat==="__none__")?"":t.dataset.cat; log("info","Tagged link "+l.title+" → "+(l.category||"none")); saveState(); renderView(); } break; }
     case "link-open": openByAction("link-open",id); break;
+    case 'link-drill': linkDrill=t.dataset.coll||null; renderView(); break;
+    case 'link-drill-back': linkDrill=null; renderView(); break;
+    case 'link-openall': { var cn=t.dataset.coll; var list=state.links.filter(function(l){return (l.coll||'')===cn;}); if(list.length>8 && !(await confirmModal('Open '+list.length+' tabs from '+cn+'?'))) break; list.forEach(function(l){ if(E&&E.shellOpen)E.shellOpen(l.url); else try{window.open(l.url,'_blank');}catch(_){} }); log('info','opened '+list.length+' links from '+cn); break; }
     case "link-del": { const l=find(state.links,id); if(l&&await confirmModal("Delete "+l.title+"?")){ state.links=state.links.filter(x=>x.id!==id); log("warn","Deleted link: "+l.title); saveState(); renderView(); } break; }
     case "folder-add": doFolderAdd(); break;
     case "folder-open": openByAction("folder-open",id); break;
@@ -760,7 +865,7 @@ document.addEventListener("input",(ev)=>{ const s=ev.target.closest("[data-searc
 
 document.addEventListener("keydown",(ev)=>{
   if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==="f"){
-    const k={vault:"vault",links:"links",folders:"folders",console:"console"}[currentView];
+    const k={vault:"vault",links:"links",folders:"folders",console:"console",lot:"lot"}[currentView];
     if(!k)return; ev.preventDefault();
     if(currentView==="console"){ const i=document.querySelector('[data-search="console"]'); if(i){i.focus();i.select();} return; }
     $("#content").classList.add("searching"); const i=document.querySelector('[data-search="'+k+'"]'); if(i){i.focus();i.select();}
@@ -787,7 +892,61 @@ function setFloating(f){ if(f){ $("#norma").classList.add("hidden"); if(E&&E.pet
   const bdot=$("#bubbleDot"); if(bdot){ bdot.addEventListener("pointerdown",e=>e.stopPropagation()); bdot.addEventListener("click",e=>{e.stopPropagation();setFloating(false);}); }
 })();
 
-function handleCommand(line){
+var _lastParked=null;
+if(E&&E.onHotkeyPark) E.onHotkeyPark(function(txt){ var p=_parkParseClip(txt); if(!p){ try{toast("clipboard has no link","warn");}catch(_){} return; } var r=_parkOne(p.title,p.url); var l=r.id?find(state.links,r.id):null; if(r.dup){ log("info","hotkey: already parked "+(l?l.title:"")); } else { log("ok","hotkey parked "+(l?l.title:"")); celebrate(); } renderView(); });
+if(E&&E.hotkeyStatus) E.hotkeyStatus(function(mm){ log(mm&&mm.ok?'ok':'warn', 'hotkey '+(mm&&mm.ok?'ready':'FAILED — combo may be in use by another app')+' ('+(mm&&mm.combo||'')+')'); });
+if(E&&E.dataPath) E.dataPath(function(pp){ log('info','data file: '+pp); });
+var lotSelLinks={}, lotSelColls={};
+function _lotCountSel(){ var t=Object.keys(lotSelLinks).length; Object.keys(lotSelColls).forEach(function(c){ state.links.forEach(function(l){ if((l.coll||"")===c) t++; }); }); return t; }
+function _lotDeleteSel(){ var ids=Object.keys(lotSelLinks), colls=Object.keys(lotSelColls); var total=_lotCountSel(); if(!total) return; function go(){ var kill={}; ids.forEach(function(x){kill[x]=1;}); colls.forEach(function(c){ state.links.forEach(function(l){ if((l.coll||"")===c) kill[l.id]=1; }); }); var n=Object.keys(kill).length; state.links=state.links.filter(function(l){ return !kill[l.id]; }); saveState(); lotSelLinks={}; lotSelColls={}; renderView(); log("warn","deleted "+n+" parked link(s)"); } if(total>4){ confirmModal("Delete "+total+" parked link(s)?").then(function(y){ if(y) go(); }); } else { go(); } }
+function _lotClearSel(){ lotSelLinks={}; lotSelColls={}; renderView(); }
+document.addEventListener("click", function(ev){
+  var rb=ev.target.closest&&ev.target.closest(".lr-rename"); if(rb){ ev.stopPropagation(); ev.preventDefault(); var rr=rb.closest(".lot-row"); if(rr) renameStack(rr.dataset.coll); return; }
+  var sb=ev.target.closest&&ev.target.closest(".lr-send, .lb-send"); if(sb){ ev.stopPropagation(); ev.preventDefault(); if(sb.classList.contains("lb-send")){ _lotSendSel(); } else { var r2=sb.closest(".lot-row"); if(r2) _sendCollToLinks(r2.dataset.coll); } return; }
+  var ma=ev.target.closest&&ev.target.closest("#ctxmenu [data-action]"); if(ma){ var act=ma.getAttribute("data-action"); if(act==="link-send"||act==="link-unsend"){ ev.stopPropagation(); ev.preventDefault(); var lid=ma.getAttribute("data-id"); var ll=lid?find(state.links,lid):null; if(ll){ ll.inLinks=(act==="link-send"); saveState(); hideMenu(); renderView(); log("info",(act==="link-send"?"sent to Links: ":"removed from Links: ")+(ll.title||ll.url)); } return; } }
+  var t=ev.target.closest&&ev.target.closest(".lot-bar .lb-del, .lot-bar .lb-clear, .lot-item, .lot-row");
+  if(!t) return;
+  if(t.classList.contains("lb-del")){ ev.stopPropagation(); ev.preventDefault(); _lotDeleteSel(); return; }
+  if(t.classList.contains("lb-clear")){ ev.stopPropagation(); ev.preventDefault(); _lotClearSel(); return; }
+  if(!(ev.ctrlKey||ev.metaKey)) return;
+  ev.stopPropagation(); ev.preventDefault();
+  if(t.classList.contains("lot-item")){ var lid=t.dataset.id; if(lotSelLinks[lid]) delete lotSelLinks[lid]; else lotSelLinks[lid]=1; }
+  else { var cc=t.dataset.coll; if(lotSelColls[cc]) delete lotSelColls[cc]; else lotSelColls[cc]=1; }
+  renderView();
+}, true);
+document.addEventListener("keydown", function(ev){
+  if(currentView!=="lot") return;
+  if(ev.key!=="Delete" && ev.key!=="Backspace") return;
+  var ae=document.activeElement; if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable)) return;
+  if(!_lotCountSel()) return;
+  ev.preventDefault(); _lotDeleteSel();
+});
+
+function _parkIsUrl(s){ s=(s||'').trim(); return s.indexOf('://')>0 || s.indexOf('www.')===0; }
+function _parkHost(u){ var i=u.indexOf('://'); var s=i>=0?u.slice(i+3):u; var j=s.indexOf('/'); if(j>=0)s=s.slice(0,j); var k=s.indexOf('?'); if(k>=0)s=s.slice(0,k); if(s.indexOf('www.')===0)s=s.slice(4); return s||u; }
+function _parkParseClip(raw){ raw=(raw||'').trim(); if(!raw)return null; var sep=raw.indexOf(' ||| '); if(sep>=0){ var t=raw.slice(0,sep).trim(); var u=raw.slice(sep+5).trim(); if(!_parkIsUrl(u)){ if(_parkIsUrl(t)){ var tmp=t;t=u;u=tmp; } else return null; } if(u.indexOf('www.')===0)u='https://'+u; return {title:t||_parkHost(u),url:u}; } if(_parkIsUrl(raw)){ var v=raw; if(v.indexOf('www.')===0)v='https://'+v; return {title:_parkHost(v),url:v}; } return null; }
+function _parkOne(title,url){ url=(url||'').trim(); if(url.indexOf('www.')===0)url='https://'+url; var nu=normUrl(url); if(!nu)return {bad:true}; var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ _lastParked=ex.id; return {dup:true,id:ex.id}; } var cat=(linkCat&&linkCat!=='all')?linkCat:''; var link={id:uid(),title:title||_parkHost(url),url:url,category:cat,coll:_parkHost(url),note:'',src:'park',opens:0,lastOpened:0,created:nowMs()}; state.links.unshift(link); saveState(); _lastParked=link.id; return {id:link.id}; }
+function _extractUrl(s){ var i=String(s).indexOf('http://'); var j=String(s).indexOf('https://'); var k=(i>=0&&j>=0)?Math.min(i,j):(i>=0?i:j); if(k<0) return ''; var rest=String(s).slice(k); var m=rest.match(/^[^\s<>"']+/); return m?m[0].replace(/[),.;]+$/,''):''; }
+function _parkBulk(text){
+  var lines=String(text||'').split(/\r?\n/);
+  var added=0, dup=0, colls={};
+  for(var i=0;i<lines.length;i++){
+    var ln=lines[i].trim(); if(!ln) continue;
+    var t=null, u=null;
+    if(ln.indexOf(' ||| ')>=0){ var a=ln.split(' ||| '); t=a[0].trim(); u=a[1].trim(); }
+    else if(ln.indexOf('\t')>=0){ var a=ln.split('\t'); var x=a[0].trim(), y=(a[1]||'').trim(); if(_parkIsUrl(y)){u=y;t=x;} else if(_parkIsUrl(x)){u=x;t=y;} else continue; }
+    else if(ln.indexOf(' | ')>=0){ var a=ln.split(' | '); var x=a[0].trim(), y=a.slice(1).join(' | ').trim(); if(_parkIsUrl(y)){u=y;t=x;} else if(_parkIsUrl(x)){u=x;t=y;} else { u=_extractUrl(ln); t=ln; } }
+    else if(ln.indexOf(' - ')>=0){ var a=ln.split(' - '); var x=a[0].trim(), y=a.slice(1).join(' - ').trim(); if(_parkIsUrl(y)){u=y;t=x;} else if(_parkIsUrl(x)){u=x;t=y;} else { u=_extractUrl(ln); t=ln; } }
+    else if(_parkIsUrl(ln)){ u=ln; t=null; }
+    else { u=_extractUrl(ln); t=ln; }
+    if(!u) continue;
+    if(!_parkIsUrl(u)){ var eu=_extractUrl(u); if(eu){ if(t===u)t=u; u=eu; } else continue; }
+    var r=_parkOne(t,u); if(r.bad) continue; if(r.dup){ dup++; } else { added++; var lk=find(state.links,r.id); if(lk&&lk.coll) colls[lk.coll]=1; }
+  }
+  return {n:added+dup, added:added, dup:dup, stacks:Object.keys(colls).length};
+}
+
+async function handleCommand(line){
   if(!line.trim())return;
   const pc=parseCommand(line); const cmd=pc.cmd,arg=pc.arg;
   const out=[]; const push=(m,meta)=>out.push({message:m,meta:meta});
@@ -809,6 +968,14 @@ function handleCommand(line){
   else if(cmd==="depth"){ const n=parseInt(arg,10); if(arg&&!isNaN(n)&&n>=0){ state.scanDepth=n; saveState(); push("> scan depth set to: "+n); } else push("> scan depth: "+(state.scanDepth||4)+"   usage: depth <number>"); flush(); return; }
   else if(cmd==='set'||cmd==='settings'||cmd==='setting'){ push('> settings moved under  '+state.radCmd+' set  — try:  '+state.radCmd+' set   for the menu'); flush(); return; }
   else if(cmd==="help"){ push("> commands:"); push('>   '+state.radCmd+' "term"        search folders on your device by name'); push(">   stop                  cancel a running scan"); push(">   roots [add|rm|clear]  folders to scan (default: home)"); push(">   depth <n>             how deep to scan (default 4)"); push('>   '+state.radCmd+' set              settings menu (intro / music / hidden / click-mode)'); push('>   '+state.radCmd+' set single|double click   open with one or two clicks'); push(">   setrad <word>         rename the search command"); push(">   help                  show this list"); flush(); return; }
+  else if(cmd==='park'){ var p=null; if(arg){ if(_parkIsUrl(arg)){ var u=arg; if(u.indexOf('www.')===0)u='https://'+u; p={title:_parkHost(u),url:u}; } else { push('> not a URL — click the park bookmarklet then  park ,  or  park https://...'); flush(); return; } } else { var clip=(E&&E.clipRead)?await E.clipRead():''; p=_parkParseClip(clip); if(!p){ var bl=_parkBulk(clip); if(bl.added>0){ push('> imported '+bl.added+' links ('+bl.dup+' dupes skipped) into '+bl.stacks+' stack(s)'); celebrate(); renderView(); flush(); return; } push('> clipboard has no link — copy a URL (Ctrl+C) then  park ,  or copy many lines then  park / parklist'); flush(); return; } } var r=_parkOne(p.title,p.url); var lk=r.id?find(state.links,r.id):null; if(r.bad){ push('> could not parse that URL'); } else if(r.dup){ push('> already parked: '+(lk?lk.title:'')+'   (use  note / retag  to update)'); } else { push('> parked  '+(lk?lk.title:'')+(lk&&lk.category?'  ['+lk.category+']':'')+'   ·  note <text>  adds a note'); celebrate(); } renderView(); flush(); return; }
+  else if(cmd==='note'){ if(!_lastParked){ push('> nothing parked yet this session — use  park  first'); flush(); return; } var lk=find(state.links,_lastParked); if(!lk){ push('> last parked link gone'); flush(); return; } lk.note=arg||''; saveState(); push('> note set on  '+(lk.title||lk.url)); renderView(); flush(); return; }
+  else if(cmd==='retag'){ if(!_lastParked){ push('> nothing parked yet this session — use  park  first'); flush(); return; } var lk=find(state.links,_lastParked); if(!lk){ push('> last parked link gone'); flush(); return; } if(!arg){ push('> usage: retag <category>   (e.g.  retag Guides )'); flush(); return; } lk.category=arg; saveState(); push('> recategorised  '+(lk.title||lk.url)+'  ->  '+arg); renderView(); flush(); return; }
+  else if(cmd==='stack'){ if(!_lastParked){ push('> nothing parked yet — use  park  first'); flush(); return; } var lk=find(state.links,_lastParked); if(!lk){ push('> last parked link gone'); flush(); return; } if(!arg){ push('> usage: stack <collection>'); flush(); return; } lk.coll=arg; saveState(); push('> stacked  '+(lk.title||lk.url)+'  ->  '+arg); renderView(); flush(); return; }
+  else if(cmd==='parked'){ var q=(arg||'').trim().toLowerCase(); if(!q){ var gc={}; state.links.forEach(function(l){ var k=l.coll||''; if(k) gc[k]=(gc[k]||0)+1; }); var ks=Object.keys(gc).sort(function(a,b){return gc[b]-gc[a];}); if(!ks.length){ push('> no stacks yet —  park  some links and they auto-group by site'); } else { push('> stacks  ('+ks.length+')  —  parked <stack>  to list ·  openall <stack> !  to open all'); ks.forEach(function(k){ push('  · '+k+'   ('+gc[k]+')'); }); } } else { var list=state.links.filter(function(l){ var c=(l.coll||'').toLowerCase(); return c===q || c.indexOf(q)>=0; }); if(!list.length){ push('> no stack matches  '+arg); } else { push('> '+arg+'  ('+list.length+')'); list.forEach(function(l,i){ push('  '+(i+1)+'. '+(l.title||l.url)+(isTagPage(l.url)?'  [tag page]':'')); }); } } flush(); return; }
+  else if(cmd==='openall'){ var raw=arg||''; var force=/[!]/.test(raw); var q=raw.replace(/[!]/g,'').trim().toLowerCase(); var list=state.links.filter(function(l){ var c=(l.coll||'').toLowerCase(); return c===q || c.indexOf(q)>=0; }); if(!list.length){ push('> no stack matches  '+q); flush(); return; } if(list.length>8 && !force){ push('> '+list.length+' links in  '+q+'  —  type  openall '+q+' !  to open them all'); flush(); return; } list.forEach(function(l){ if(E&&E.shellOpen)E.shellOpen(l.url); else try{window.open(l.url,'_blank');}catch(_){} }); push('> opened '+list.length+' links from  '+q); flush(); return; }
+  else if(cmd==='parklist'){ var clip=(E&&E.clipRead)?await E.clipRead():''; var bl=_parkBulk(clip); if(bl.n===0){ push('> clipboard has no links to import — copy a OneTab export or a list of URLs first'); } else { push('> imported '+bl.added+' links ('+bl.dup+' dupes skipped) into '+bl.stacks+' stack(s)'); celebrate(); } renderView(); flush(); return; }
+  else if(cmd==='stackmin'){ var n=parseInt(arg,10); if(!arg||isNaN(n)||n<1){ push('> usage: stackmin <n>  (stacks form at n+ links; now '+((state.settings&&state.settings.stackMin)||3)+')'); } else { if(!state.settings)state.settings={}; state.settings.stackMin=n; saveState(); push('> stacks now form at '+n+'+ links'); renderView(); } flush(); return; }
   else { push("> unknown command: "+cmd+"  -  type  help"); flush(); return; }
 }
 function parseCommand(line){ const m=line.match(/^(\S+)\s*([\s\S]*)$/); if(!m)return {cmd:line.trim(),arg:""}; let arg=(m[2]||"").trim(); if(arg.length>=2&&arg[0]==='"'&&arg[arg.length-1]==='"')arg=arg.slice(1,-1); return {cmd:m[1],arg:arg}; }
