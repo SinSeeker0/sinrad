@@ -470,7 +470,7 @@ const E=window.electronAPI||null;
 const GH_REPO_URL = "https://github.com/SinSeeker0/sinrad";
 let updState = null;
 function openGithub(){ if(E&&E.shellOpen){ E.shellOpen(GH_REPO_URL); } else { try{ window.open(GH_REPO_URL,"_blank","noopener"); }catch(e){} } }
-function showUpdateModal(){ const m=$("#update-modal"); if(m){ hideSettings(); m.classList.add("show"); } }
+function showUpdateModal(){ const m=$("#update-modal"); if(m){ m.classList.add("show"); } }
 function hideUpdateModal(){ const m=$("#update-modal"); if(m) m.classList.remove("show"); updState=null; }
 function setUpdProgress(show, pct){ const box=$("#um-prog"); if(box) box.classList.toggle("show", !!show); const fill=$("#um-barfill"); if(fill) fill.style.width=(pct||0)+"%"; }
 function renderUpdateResult(r){
@@ -503,6 +503,7 @@ function updateGoClick(){
   setUpdProgress(true,0); setUpdateGif("updating"); const pctEl=$("#um-pct"); if(pctEl) pctEl.textContent="0%";
   if(E.onUpdateProgress){ E.onUpdateProgress(function(p){ const tot=p.total||0; const pct=tot?Math.min(100,Math.round((p.got/tot)*100)):0; const mb=function(b){return (b/1048576).toFixed(1);}; setUpdProgress(true,pct); if(pctEl) pctEl.textContent=pct+"%"+(tot?("  "+mb(p.got)+"/"+mb(tot)+" MB"):""); }); }
   Promise.resolve(E.updateDownload({url:r.asset.url,name:r.asset.name})).then(function(res){
+    if(res&&res.manual){ hideUpdateModal(); return; }
     setUpdProgress(true,100); if(pctEl) pctEl.textContent="100%";
     updState=Object.assign({},r,{temp:res&&res.temp});
     if(go){go.disabled=false; go.textContent="Install & relaunch";} if(lat)lat.disabled=false;
@@ -577,7 +578,7 @@ updateMusicUI();
 
 let STORE_MODE="Memory";
 const EDIT_COUNT = 67;
-const APP_VERSION="2.0.8";
+const APP_VERSION="2.0.9";
 
 const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6", "Guides":"#16c79a" };
 const FOLDER_CATS={ "Mods":"#964B00" };
