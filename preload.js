@@ -47,5 +47,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
   clipRead: () => ipcRenderer.invoke("clip-read"),
   onHotkeyPark: (cb) => ipcRenderer.on("hotkey-park", (_, t) => cb(t)),
   hotkeyStatus: (cb) => ipcRenderer.on("hotkey-status", (_, mm) => cb(mm)),
+  hotkeyToggle: (enabled) => ipcRenderer.invoke("hotkey-toggle", enabled),
+  onProtocolPark: (cb) => ipcRenderer.on("protocol-park", (_, data) => cb(data)),
+  setAutostart: (enabled) => ipcRenderer.invoke("set-autostart", enabled),
+  extDir: () => ipcRenderer.invoke("ext-dir"),
+  extOpen: () => ipcRenderer.invoke("ext-open"),
   dataPath: (cb) => ipcRenderer.on("data-path", (_, pp) => cb(pp))
 });

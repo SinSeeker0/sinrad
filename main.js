@@ -1,6 +1,8 @@
 // Sinrad — Electron main process (main window + floating desktop "pet" window)
 const { app, BrowserWindow, ipcMain, shell, screen } = require("electron");
 app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
+const PROTOCOL="sinrad"; app.setAsDefaultProtocolClient(PROTOCOL);
+app.setAppUserModelId("S.I.R — Personal Command Center");
 const path = require("path");
 const fs = require("fs");
 const scanFolders = require("./scan.js");
@@ -79,6 +81,54 @@ function createSplash(vid){ try{ splashWin=new BrowserWindow({ width:720, height
 let mainReady=false, bootFinished=false, hasSplash=false;
 function showMain(){ if(mainWin && !mainWin.isDestroyed()){ try{ mainWin.webContents.setAudioMuted(false); }catch(e){} mainWin.show(); try{ mainWin.focus(); }catch(e){} } }
 function finishBoot(){ if(bootFinished) return; bootFinished=true; try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(e){} splashWin=null; if(mainReady) showMain(); }
+// --- single instance + protocol URL handling ---
+const _gotLock=app.requestSingleInstanceLock();
+if(!_gotLock){ app.quit(); } else {
+  app.on('second-instance', function(ev, argv){
+    var url=argv.find(function(a){ return a.startsWith(PROTOCOL+'://'); });
+    if(url){ _handleProtocolUrl(url); if(mainWin){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.focus(); } }
+  });
+}
+function _handleProtocolUrl(url){
+  try{ var u=new URL(url); if(u.hostname==='park'||u.pathname==='/park'){ var linkUrl=u.searchParams.get('url')||''; var title=u.searchParams.get('title')||''; if(linkUrl&&mainWin&&!mainWin.isDestroyed()){ mainWin.webContents.send('protocol-park',{url:linkUrl,title:title}); } } }catch(_){}
+}
+
+// --- localhost HTTP server for bookmarklet (no browser dialog) ---
+const LOCAL_PORT = 47821;
+let _localServer = null;
+function _startLocalServer(){
+  if(_localServer) return;
+  try{
+    const http = require('http');
+    _localServer = http.createServer(function(req, res){
+      res.setHeader('Access-Control-Allow-Origin','*');
+      res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS');
+      if(req.method==='OPTIONS'){ res.writeHead(204); res.end(); return; }
+      try{
+        const u = new URL(req.url, 'http://localhost');
+        if(u.pathname==='/park'){
+          const linkUrl = u.searchParams.get('url')||'';
+          const title = u.searchParams.get('title')||'';
+          if(linkUrl && mainWin && !mainWin.isDestroyed()){
+            mainWin.webContents.send('protocol-park',{url:linkUrl, title:title});
+            // native OS notification (shows bottom-right, no window pop)
+            try{ const {Notification:nN}=require('electron'); const n=new nN({title:'Sinrad is informing you that （￣︶￣）↗', body:'Link saved \u2713  '+(title||linkUrl).slice(0,45), silent:true}); n.show(); }catch(e){ console.error('[sinrad] notification failed:', e&&e.message); }
+          }
+        }
+      }catch(_){}
+      res.writeHead(200,{'Content-Type':'image/gif'});
+      res.end(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64'));
+    });
+    _localServer.on('error', function(e){ console.error('[sinrad] local server port '+LOCAL_PORT+' unavailable:', e.message); _localServer=null; });
+    _localServer.listen(LOCAL_PORT, '127.0.0.1');
+  }catch(e){ console.error('[sinrad] local server failed:', e.message); }
+}
+// --- global hotkey (module scope so IPC handler can toggle at runtime) ---
+const {globalShortcut}=require('electron'); const HK_COMBO='CommandOrControl+Alt+P';
+function _hkCb(){ try{ const t=require('electron').clipboard.readText(); if(mainWin){ mainWin.webContents.send('hotkey-park', t); if(mainWin.isMinimized())mainWin.restore(); mainWin.show(); mainWin.focus(); } }catch(_){} }
+let _hkOk=false; let _hkEnabled=true;
+function _hkRegister(){ try{ if(_hkEnabled&&!_hkOk){ _hkOk=!!globalShortcut.register(HK_COMBO, _hkCb); } }catch(_){} }
+function _hkUnregister(){ try{ if(_hkOk){ globalShortcut.unregister(HK_COMBO); _hkOk=false; } }catch(_){} }
 app.whenReady().then(()=>{
   syncBoot();
   try{ if(autoUpdater){ autoUpdater.autoDownload=false; autoUpdater.autoInstallOnAppQuit=true; autoUpdater.allowDowngrade=false; autoUpdater.on("error", function(e){ try{ console.error("[sinrad] autoUpdater:", e&&e.message); }catch(_){} }); } }catch(_e){ try{ console.error("[sinrad] autoUpdater config failed:", _e&&_e.message); }catch(_){} }
@@ -86,8 +136,10 @@ app.whenReady().then(()=>{
   const _st=readStore(); const _introOn=!(_st&&_st.settings&&_st.settings.introEnabled===false);
   if(vid && _introOn){ hasSplash=true; createSplash(vid); }
   createWindow();
+  _startLocalServer();
+  var _protoArg=process.argv.find(function(a){return a.startsWith(PROTOCOL+"://");}); if(_protoArg){ mainWin.webContents.once("did-finish-load",function(){ _handleProtocolUrl(_protoArg); }); }
   try{ mainWin.webContents.once('did-finish-load', function(){ try{ mainWin.webContents.send('data-path', DATA_FILE); }catch(_){} }); }catch(_){}
-  let _hkOk=false; try{ const {globalShortcut}=require('electron'); _hkOk=!!globalShortcut.register('CommandOrControl+Alt+P', function(){ try{ const t=require('electron').clipboard.readText(); if(mainWin){ mainWin.webContents.send('hotkey-park', t); if(mainWin.isMinimized())mainWin.restore(); mainWin.show(); mainWin.focus(); } }catch(_){} }); try{ mainWin.webContents.once('did-finish-load', function(){ try{ mainWin.webContents.send('hotkey-status',{ok:_hkOk,combo:'Ctrl+Alt+P'}); }catch(_){} }); }catch(_){} }catch(_e){}
+  _hkEnabled=!(_st&&_st.settings&&_st.settings.hotkeyEnabled===false); if(_hkEnabled){ _hkRegister(); } try{ mainWin.webContents.once('did-finish-load', function(){ try{ mainWin.webContents.send('hotkey-status',{ok:_hkOk,combo:'Ctrl+Alt+P',enabled:_hkEnabled}); }catch(_){} }); }catch(_){}
   var _rgTries=0;
   function _closeSplash(){ try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(_){} splashWin=null; }
   setTimeout(function(){ _closeSplash(); try{ if(mainWin && !mainWin.isDestroyed()) mainWin.show(); }catch(_){} }, 6000);
@@ -129,6 +181,10 @@ ipcMain.on("music-request",(e)=>{ syncBundled(); const w=BrowserWindow.fromWebCo
 ipcMain.on("music-cmd",(e,c)=>{ if(mainWin) mainWin.webContents.send("music-cmd", c); });
 ipcMain.handle("music-read", async (e,p)=>{ try{ return await fs.promises.readFile(p); }catch(_){ return Buffer.alloc(0); } });
 ipcMain.handle("clip-read", async () => { try { return require("electron").clipboard.readText(); } catch(_){ return ""; } });
+ipcMain.handle("hotkey-toggle", (e, enabled)=>{ _hkEnabled=!!enabled; if(_hkEnabled){ _hkRegister(); } else { _hkUnregister(); } try{ if(mainWin) mainWin.webContents.send("hotkey-status",{ok:_hkOk,combo:"Ctrl+Alt+P",enabled:_hkEnabled}); }catch(_){} return {ok:_hkOk, enabled:_hkEnabled}; });
+ipcMain.handle("set-autostart", (e, enabled)=>{ try{ app.setLoginItemSettings({openAtLogin:!!enabled}); }catch(_){} try{ return app.getLoginItemSettings().openAtLogin; }catch(_){ return !!enabled; } });
+ipcMain.handle("ext-dir", ()=> path.join(__dirname, "extension"));
+ipcMain.handle("ext-open", ()=>{ try{ require("electron").shell.openPath(path.join(__dirname,"extension")); return true; }catch(_){ return false; } });
 
 const activeScans = new Map();
 ipcMain.handle("fs-home", ()=> app.getPath("home"));

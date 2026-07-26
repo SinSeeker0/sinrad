@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "S.I.R Quick Save",
+  "version": "1.0.0",
+  "description": "One-click save pages and links to S.I.R (Personal Command Center)",
+  "permissions": [
+    "activeTab",
+    "contextMenus",
+    "notifications"
+  ],
+  "host_permissions": [
+    "http://localhost:47821/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_title": "Save to S.I.R [Check out]"
+  },
+  "icons": {}
+}

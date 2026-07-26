@@ -1,25 +1,63 @@
 # S.I.R — Personal Command Center
 
-Was a password manger at first but kinda turned into something more idk i kept coming up with ideas i wanna add and  i still got ideas i need to add so lets see how far i can take this
+Was a password manager at first but kinda turned into something more idk i kept coming up with ideas i wanna add and i still got ideas i need to add so lets see how far i can take this.
 
-## Features
+## Modules
 
-**Modules**
-- **Vault** — store logins locally; show/hide and copy the password, copy the username, double-click opens the site, mark favorites and priority, search and filter.
-- **Link Saver** — save links with a title, URL, one category and a favorite toggle; filter by All / category / favorites; double-click to open.
-- **Quick Folders** — pin folder paths (double-click to open); mark favorites; search.
-- **Console (docked right panel)** — always-visible terminal log with a command box; the `rad "query"` command scans your files and folders for matches on Linux and returns clickable results. It auto-logs sites and folders you open, each with a one-click add chip for ones you missed (already-saved ones are skipped).
+- **Vault** — store logins locally; show/hide and copy password, copy username, open site, favorites, priority, search.
+- **Links** — save links with title, URL, category (Anime / Interesting / Check out / Artist / Guides), favorites; filter and search.
+- **Parking Lot** — temporary holding area for links; auto-stacks by site; send individual links or whole stacks to Links; search with Ctrl+F; rename stacks; multi-select + delete.
+- **Quick Folders** — pin folder paths; open with double-click; favorites; search.
+- **Console** — docked terminal with command input; logs activity; `rad "query"` scans your folders; `rad set` for app settings; one-click save chips for visited sites/folders.
 
-**Interface**
-- Custom frameless title bar with a glitching S.I.R wordmark and min / max / close buttons.
-- Live status bar: pulsing ready dot, version and edit count, an animated equalizer "thinkbar", store badge and clock.
-- Color-coded cards — gold left edge for favorites, right edge for category or priority; colored right-click menus; filter pills.
-- Cards open on double-click; a single click does nothing on them, and right-click opens the per-item menu.
-- Status bar now has a cyan Check Update button (auto-checks your GitHub Releases on launch; on Windows and Linux it downloads with a progress bar and installs in one click, on macOS it opens the release page) plus a GitHub icon that opens the project page.
-- A Settings panel (gear, bottom-right) holds preferences — currently a glowing Double Click / Single Click toggle for opening items (more options to come), and the UI uses clean line-icons instead of emoji.
-- Ctrl+F search inside every module (Esc closes and clears it).
-- Floating Norma — send the companion out as a transparent, always-on-top, click-through desktop window you can drag anywhere; right-click menu; docks back into the panel.
-- Celebration popup on every save — the image zooms through the screen over a glitching "COMPLETE" wordmark with scanlines, picking random art each time.
-- Swap the celebration art and the Norma face by dropping files in (animated .gifs work), no code editing.
-- Everything saves to a real file on disk, so it is still there next launch.
-- Ships as download-and-run apps for Windows, Linux and macOS, no install needed.
+## Quick Capture
+
+- **Bookmarklet** — one-click browser bookmark saves the current page (or selected URL) straight to Links [Check out]. Type `bookmarklet` in the console for the code. Uses a custom `sinrad://` protocol — no extension needed.
+- **Global Hotkey (Ctrl+Alt+P)** — copies clipboard URL and saves to Links [Check out]. Toggle with `rad set hk off` before gaming so it doesn't eat your keybinds.
+- **Park command** — type `park` in the console to grab whatever URL is in your clipboard into the Parking Lot. Paste a list of URLs to bulk-import.
+
+## App Features
+
+- **Auto-update** — checks GitHub Releases on launch; downloads and installs in one click (Windows/Linux); falls back to opening the release page if needed.
+- **Auto-start on boot** — `rad set autostart on` makes the app launch when you log in. Toggle off anytime.
+- **NSIS Installer** (Windows) — proper install/uninstall, Start Menu + Desktop shortcuts, pinned taskbar survives updates.
+- **Floating Norma** — transparent always-on-top desktop pet; drag anywhere; right-click menu; docks back into the app.
+- **Music player** — plays BGM from the `bgm/` folder; auto-play on boot if enabled (`rad set music on`).
+- **Boot intro** — drop a video in `boot/` and it plays on launch (`rad set intro off` to skip).
+- **Celebration** — random art zooms across the screen on every save; drop your own `.gif` or `.png` in to customize.
+- **Search** — Ctrl+F in every module; Esc to close.
+- **Square UI** — clean angular design, minimal border-radius, dark theme.
+
+## Terminal Commands
+
+| Command | What it does |
+|---------|-------------|
+| `rad "query"` | Search your folders |
+| `rad set` | Show all toggleable settings |
+| `rad set autostart` | Toggle launch on boot |
+| `rad set hk` | Toggle global hotkey (Ctrl+Alt+P) |
+| `rad set music` | Toggle BGM auto-play |
+| `rad set intro` | Toggle boot video |
+| `park` | Save clipboard URL to Parking Lot |
+| `park <url>` | Park a specific URL |
+| `parklist` | Bulk-import URLs from clipboard |
+| `bookmarklet` | Show the one-click browser bookmark code |
+| `help` | List all commands |
+
+## Settings (`rad set <name> on|off`)
+
+`autostart` · `hotkey` · `music` · `intro` · `hidden` · `autoscroll` · `click`
+
+## Install
+
+Grab the latest **Setup** from [Releases](https://github.com/SinSeeker0/sinrad/releases). Windows and Linux available. Download, run the installer, done.
+
+## Dev / Build
+
+```bash
+npm install
+npm start          # run in dev
+npm run dist       # build installer
+```
+
+Ships as a proper installer (NSIS on Windows, AppImage/deb on Linux).
