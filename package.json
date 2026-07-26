@@ -1,7 +1,7 @@
 {
   "name": "sinrad",
   "productName": "Sinrad",
-  "version": "2.0.12",
+  "version": "2.0.13",
   "description": "S.I.R — Personal Command Center (Vault, Links, Quick Folders, device folder search, Console).",
   "main": "main.js",
   "author": {
@@ -25,6 +25,9 @@
   "build": {
     "appId": "com.sinrad.commandcenter",
     "productName": "Sinrad",
+    "asarUnpack": [
+      "extension/**"
+    ],
     "files": [
       "main.js",
       "preload.js",

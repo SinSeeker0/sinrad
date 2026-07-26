@@ -183,8 +183,8 @@ ipcMain.handle("music-read", async (e,p)=>{ try{ return await fs.promises.readFi
 ipcMain.handle("clip-read", async () => { try { return require("electron").clipboard.readText(); } catch(_){ return ""; } });
 ipcMain.handle("hotkey-toggle", (e, enabled)=>{ _hkEnabled=!!enabled; if(_hkEnabled){ _hkRegister(); } else { _hkUnregister(); } try{ if(mainWin) mainWin.webContents.send("hotkey-status",{ok:_hkOk,combo:"Ctrl+Alt+P",enabled:_hkEnabled}); }catch(_){} return {ok:_hkOk, enabled:_hkEnabled}; });
 ipcMain.handle("set-autostart", (e, enabled)=>{ try{ app.setLoginItemSettings({openAtLogin:!!enabled}); }catch(_){} try{ return app.getLoginItemSettings().openAtLogin; }catch(_){ return !!enabled; } });
-ipcMain.handle("ext-dir", ()=> path.join(__dirname, "extension"));
-ipcMain.handle("ext-open", ()=>{ try{ require("electron").shell.openPath(path.join(__dirname,"extension")); return true; }catch(_){ return false; } });
+ipcMain.handle("ext-dir", ()=> path.join(__dirname, "extension").replace("app.asar","app.asar.unpacked"));
+ipcMain.handle("ext-open", ()=>{ try{ var p=path.join(__dirname,"extension").replace("app.asar","app.asar.unpacked"); require("electron").shell.openPath(p); return true; }catch(_){ return false; } });
 
 const activeScans = new Map();
 ipcMain.handle("fs-home", ()=> app.getPath("home"));
