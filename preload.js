@@ -52,5 +52,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
   setAutostart: (enabled) => ipcRenderer.invoke("set-autostart", enabled),
   extDir: () => ipcRenderer.invoke("ext-dir"),
   extOpen: () => ipcRenderer.invoke("ext-open"),
+  showNotif: (data) => ipcRenderer.send("show-notif", data),
   dataPath: (cb) => ipcRenderer.on("data-path", (_, pp) => cb(pp))
 });

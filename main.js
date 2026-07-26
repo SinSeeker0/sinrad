@@ -185,6 +185,7 @@ ipcMain.handle("hotkey-toggle", (e, enabled)=>{ _hkEnabled=!!enabled; if(_hkEnab
 ipcMain.handle("set-autostart", (e, enabled)=>{ try{ app.setLoginItemSettings({openAtLogin:!!enabled}); }catch(_){} try{ return app.getLoginItemSettings().openAtLogin; }catch(_){ return !!enabled; } });
 ipcMain.handle("ext-dir", ()=> path.join(__dirname, "extension").replace("app.asar","app.asar.unpacked"));
 ipcMain.handle("ext-open", ()=>{ try{ var p=path.join(__dirname,"extension").replace("app.asar","app.asar.unpacked"); require("electron").shell.openPath(p); return true; }catch(_){ return false; } });
+ipcMain.on("show-notif", (e, data)=>{ try{ const {Notification:nN}=require('electron'); const n=new nN({title:data&&data.title||'S.I.R', body:data&&data.body||'', silent:true}); n.show(); }catch(er){ try{console.error('[sinrad] notif:',er.message);}catch(_){} } });
 
 const activeScans = new Map();
 ipcMain.handle("fs-home", ()=> app.getPath("home"));
