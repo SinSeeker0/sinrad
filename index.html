@@ -583,7 +583,7 @@ updateMusicUI();
 
 let STORE_MODE="Memory";
 const EDIT_COUNT = 69;
-const APP_VERSION="2.0.13";
+const APP_VERSION="2.0.14";
 
 const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6", "Guides":"#16c79a" };
 const FOLDER_CATS={ "Mods":"#964B00" };
@@ -902,7 +902,7 @@ function setFloating(f){ if(f){ $("#norma").classList.add("hidden"); if(E&&E.pet
 var _lastParked=null;
 if(E&&E.onHotkeyPark) E.onHotkeyPark(function(txt){ var p=_parkParseClip(txt); if(!p){ try{toast("clipboard has no link","warn");}catch(_){} return; } var url=(p.url||"").trim(); if(url.indexOf("www.")===0) url="https://"+url; var nu=normUrl(url); if(!nu){ toast("could not parse URL","warn"); return; } var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ log("info","hotkey: already in Links — "+ex.title); toast("Already in Links","warn"); return; } var raw=p.title||_parkHost(url); var title=raw.length>45?raw.slice(0,42)+"...":raw; var link={id:uid(),title:title,url:url,category:"Check out",favorite:false,created:nowMs()}; state.links.unshift(link); saveState(); log("ok","hotkey → Links [Check out]: "+title); celebrate(); renderView(); toast("Added to Check out","ok"); });
 if(E&&E.hotkeyStatus) E.hotkeyStatus(function(mm){ if(mm&&mm.enabled===false){ log('info','hotkey disabled — use  rad set hk  to enable'); } else { log(mm&&mm.ok?'ok':'warn', 'hotkey '+(mm&&mm.ok?'ready':'FAILED')+' ('+(mm&&mm.combo||'')+')'); } });
-if(E&&E.onProtocolPark) E.onProtocolPark(function(d){ if(!d||!d.url) return; var url=d.url.trim(); if(url.indexOf("www.")===0) url="https://"+url; var nu=normUrl(url); if(!nu) return; var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ toast("Already in Links","warn"); return; } var raw=d.title||_parkHost(url); var title=raw.length>45?raw.slice(0,42)+"...":raw; var link={id:uid(),title:title,url:url,category:"Check out",favorite:false,created:nowMs()}; state.links.unshift(link); saveState(); log("ok","extension \u2192 Links [Check out]: "+title); celebrate(); renderView(); toast("Saved to Check out","ok"); });
+if(E&&E.onProtocolPark) E.onProtocolPark(function(d){ if(!d||!d.url) return; var url=d.url.trim(); if(url.indexOf("www.")===0) url="https://"+url; var nu=normUrl(url); if(!nu) return; var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ toast("Already in Links","warn"); try{ new Notification("Homie you already saved this link (\u00b4\u3002\uff3f\u3002\u0060)",{body:ex.title||url,silent:true,icon:"icon.png"}); }catch(_){} return; } var raw=d.title||_parkHost(url); var title=raw.length>45?raw.slice(0,42)+"...":raw; var link={id:uid(),title:title,url:url,category:"Check out",favorite:false,created:nowMs()}; state.links.unshift(link); saveState(); log("ok","extension \u2192 Links [Check out]: "+title); celebrate(); renderView(); toast("Saved to Check out","ok"); try{ new Notification("Sinrad is informing you that \uff08\uffe3\ufe36\uffe3\uff09\u2197",{body:"Link saved \u2713  "+title,silent:true,icon:"icon.png"}); }catch(_){} });
 if(E&&E.dataPath) E.dataPath(function(pp){ log('info','data file: '+pp); });
 var lotSelLinks={}, lotSelColls={};
 function _lotCountSel(){ var t=Object.keys(lotSelLinks).length; Object.keys(lotSelColls).forEach(function(c){ state.links.forEach(function(l){ if((l.coll||"")===c) t++; }); }); return t; }

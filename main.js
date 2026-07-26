@@ -112,7 +112,7 @@ function _startLocalServer(){
           if(linkUrl && mainWin && !mainWin.isDestroyed()){
             mainWin.webContents.send('protocol-park',{url:linkUrl, title:title});
             // native OS notification (shows bottom-right, no window pop)
-            try{ const {Notification:nN}=require('electron'); const n=new nN({title:'Sinrad is informing you that （￣︶￣）↗', body:'Link saved \u2713  '+(title||linkUrl).slice(0,45), silent:true}); n.show(); }catch(e){ console.error('[sinrad] notification failed:', e&&e.message); }
+            
           }
         }
       }catch(_){}
