@@ -21,10 +21,11 @@
   #pet .emo{font-size:62px;line-height:1}
 
   #menu .mi svg{width:15px;height:15px;flex:0 0 auto}
+  #menuPin{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:4px;border:1px solid #2a2a35;background:#1b1b24;color:#cfd3dc;display:grid;place-items:center;cursor:pointer;z-index:2}
+  #menuPin:hover{background:#262630;color:#fff;border-color:#ff4d8d}
+  #menuPin svg{width:14px;height:14px}
 
-  #pinDot{position:absolute;top:4px;left:4px;width:9px;height:9px;border-radius:2px;background:transparent;border:1.5px solid #ff79a6;box-shadow:0 0 3px rgba(255,77,141,.5);cursor:pointer;z-index:12;opacity:.9}
-  #pinDot:hover{opacity:1;transform:scale(1.25);border-color:#fff;background:rgba(255,77,141,.12);box-shadow:0 0 8px rgba(255,77,141,.9),inset 0 0 3px rgba(255,77,141,.6)}
-
+  
   .music-row{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 6px}
   .mr-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:28px;border-radius:4px;border:1px solid #2a2a35;background:#1b1b24;color:#cfd3dc;cursor:pointer}
   .mr-btn:hover{background:#262630;color:#fff;border-color:#ff4d8d}
@@ -34,14 +35,14 @@
 </head>
 <body>
   <div id="stage">
-    <div id="menu" data-hit>
+    <div id="menu" data-hit><div id="menuPin" data-pin="1" title="Pin to app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg></div>
       <div class="mi" data-nav="vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Vault</div>
       <div class="mi" data-nav="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg> Links</div>
       <div class="mi" data-nav="folders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Folders</div>
       <div class="dv"></div>
       <div class="music-row"><button type="button" class="mr-btn" data-music="prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M6 6h2v12H6zM20 6v12l-9-6z"/></svg></button><button type="button" class="mr-btn mr-play" data-music="toggle" title="Play / Pause"><svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M8 5v14l11-7z"/></svg></button><button type="button" class="mr-btn" data-music="next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button></div>
     </div>
-    <div id="pet" data-hit><span class="emo">🤖</span><div id="pinDot" title="Pin to panel"></div></div>
+    <div id="pet" data-hit><span class="emo">🤖</span></div>
   </div>
 <script>
 const E = window.electronAPI || {};
@@ -77,7 +78,7 @@ function buildMask(img){
   (function next(){
     if(i>=names.length) return;
     const im=new Image();
-    im.onload=()=>{ Array.from(pet.children).forEach(c=>{if(c.id!=="pinDot")c.remove();}); const img=document.createElement("img"); img.src=names[i]; img.alt="Norma"; img.draggable=false; pet.appendChild(img); buildMask(img); };
+    im.onload=()=>{ Array.from(pet.children).forEach(c=>{c.remove();}); const img=document.createElement("img"); img.src=names[i]; img.alt="Norma"; img.draggable=false; pet.appendChild(img); buildMask(img); };
     im.onerror=()=>{ i++; next(); };
     im.src=names[i];
   })();
@@ -87,8 +88,7 @@ E.setMouseIgnore && E.setMouseIgnore(true, { forward:true });
 document.addEventListener("mousemove",(e)=>{
   if(menuOpen){ setIgnoreFalse(); return; }              // whole window interactive while the menu is open
   const el=document.elementFromPoint(e.clientX,e.clientY);
-  const inDot = el && el.closest("#pinDot"); if(inDot){ setIgnoreFalse(); return; }
-  const inPet = el && el.closest("#pet");
+    const inPet = el && el.closest("#pet");
   if(inPet){
     if(MASK){
       const rect=pet.getBoundingClientRect(); const cx=e.clientX-rect.left, cy=e.clientY-rect.top;
@@ -112,9 +112,7 @@ menu.addEventListener("contextmenu",(e)=>e.preventDefault());
 menu.addEventListener("click",doMenuAct);
 menu.addEventListener("pointerup",(e)=>{ if(e.button===0) doMenuAct(e); });
 function doMenuAct(e){ const mus=e.target.closest("[data-music]"); const nav=e.target.closest("[data-nav]"); const pin=e.target.closest("[data-pin]"); if(!mus&&!nav&&!pin) return; const now=Date.now(); if(now-(doMenuAct._t||0)<250) return; doMenuAct._t=now; if(mus){ E.musicCmd && E.musicCmd(mus.getAttribute("data-music")); return; } if(nav){ E.petNav && E.petNav(nav.dataset.nav); } else { E.petPin && E.petPin(); } closeMenu(); }
-const pinDot=document.getElementById("pinDot");
-function pinBack(){ const n=Date.now(); if(n-(pinBack._t||0)<250)return; pinBack._t=n; E.petPin && E.petPin(); }
-if(pinDot){ pinDot.addEventListener("pointerdown",(e)=>e.stopPropagation()); pinDot.addEventListener("click",pinBack); pinDot.addEventListener("pointerup",(e)=>{if(e.button===0)pinBack();}); pinDot.addEventListener("contextmenu",(e)=>{e.preventDefault();pinBack();}); }
+
 </script>
 </body>
 </html>

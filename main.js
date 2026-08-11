@@ -30,6 +30,17 @@ function createWindow(){
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false }
   });
   mainWin.loadFile(path.join(__dirname,"index.html"));
+  // Auto-undock pet if setting is enabled
+  mainWin.webContents.on("did-finish-load", function(){
+    try{
+      var dataFile=path.join(__dirname,"sinrad-data.json");
+      if(!fs.existsSync(dataFile)) dataFile=path.join(app.getPath("userData"),"sinrad-data.json");
+      if(fs.existsSync(dataFile)){
+        var st=JSON.parse(fs.readFileSync(dataFile,"utf8"));
+        if(st&&st.settings&&st.settings.petAutoUndock){ showPet(); }
+      }
+    }catch(e){}
+  });
   try{ mainWin.webContents.setAudioMuted(true); }catch(e){}   // keep the app silent during the intro video; showMain() un-mutes it
   mainWin.on("closed", ()=>{ mainWin=null; if(petWin){ try{petWin.close();}catch(e){} petWin=null; } });
 }
@@ -90,7 +101,7 @@ if(!_gotLock){ app.quit(); } else {
   });
 }
 function _handleProtocolUrl(url){
-  try{ var u=new URL(url); if(u.hostname==='park'||u.pathname==='/park'){ var linkUrl=u.searchParams.get('url')||''; var title=u.searchParams.get('title')||''; if(linkUrl&&mainWin&&!mainWin.isDestroyed()){ mainWin.webContents.send('protocol-park',{url:linkUrl,title:title}); } } }catch(_){}
+  try{ var u=new URL(url); if(u.hostname==='park'||u.pathname==='/park'){ var linkUrl=u.searchParams.get('url')||''; var title=u.searchParams.get('title')||''; var lot=u.searchParams.get('lot')==='1'; if(linkUrl&&mainWin&&!mainWin.isDestroyed()){ mainWin.webContents.send('protocol-park',{url:linkUrl,title:title,lot:lot}); } } }catch(_){}
 }
 
 // --- localhost HTTP server for bookmarklet (no browser dialog) ---
@@ -110,7 +121,7 @@ function _startLocalServer(){
           const linkUrl = u.searchParams.get('url')||'';
           const title = u.searchParams.get('title')||'';
           if(linkUrl && mainWin && !mainWin.isDestroyed()){
-            mainWin.webContents.send('protocol-park',{url:linkUrl, title:title});
+            mainWin.webContents.send('protocol-park',{url:linkUrl, title:title, lot:lot});
             // native OS notification (shows bottom-right, no window pop)
             
           }

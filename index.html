@@ -18,9 +18,9 @@
   }
   *{box-sizing:border-box}
   html,body{height:100%}
-  body{margin:0;background:var(--page);color:var(--txt);font-family:var(--font);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;}
+  body{margin:0;background:var(--page);color:var(--txt);font-family:var(--font);font-size:14px;line-height:1.45;-webkit-font-smoothing:antialiased;display:flex;align-items:center;justify-content:center;padding:0;overflow:hidden;-webkit-user-select:none;user-select:none}
   button{font-family:inherit;cursor:pointer;color:inherit}
-  input,textarea,select{font-family:inherit;color:inherit}
+  input,textarea,select{font-family:inherit;color:inherit;-webkit-user-select:text;user-select:text}
   ::selection{background:rgba(39,180,255,.3)}
   ::-webkit-scrollbar{width:10px;height:10px}
   ::-webkit-scrollbar-thumb{background:#23232e;border-radius:8px;border:2px solid transparent;background-clip:padding-box}
@@ -161,6 +161,7 @@
   .lot-bar .lb-send{border-color:var(--cyan);color:#7fd0ff}
   .lot-bar .lb-send:hover{background:rgba(39,180,255,.14)}
   .lot-item.sel{background:rgba(255,77,141,.16);box-shadow:inset 0 0 0 1px var(--red,#ff4d6a)}
+  .link-card.sel{background:rgba(39,180,255,.12);box-shadow:inset 0 0 0 1.5px var(--cyan,#27b4ff)}
   .lot-row.sel{border-color:var(--red,#ff4d6a);box-shadow:0 0 0 1px var(--red,#ff4d6a) inset;background:#1a0e14}
   .lot-bar{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);z-index:160;display:flex;gap:10px;align-items:center;background:#1a1014;border:1px solid rgba(255,77,141,.55);border-radius:4px;padding:9px 12px;box-shadow:0 12px 34px rgba(0,0,0,.55)}
   .lot-bar .lb-n{font:700 12px/1 ui-monospace,Menlo,Consolas,monospace;color:#ff79c6}
@@ -242,6 +243,7 @@
   #ctxmenu.show{display:block}
   #ctxmenu .ci{padding:8px 11px;border-radius:3px;font-size:12.5px;display:flex;align-items:center;gap:9px;color:var(--muted);cursor:pointer}
   #ctxmenu .ci:hover{background:rgba(255,255,255,.06)}
+  #ctxmenu .ci.danger{color:var(--red)}
   #ctxmenu .ci.danger:hover{background:rgba(255,84,112,.16)}
   #ctxmenu .cm-head{padding:7px 11px 2px;font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--dim)}
   #ctxmenu .cdiv{height:1px;background:var(--border-soft);margin:5px 4px}
@@ -268,6 +270,9 @@
   @keyframes celcard{0%{opacity:0;transform:scale(.82)}9%{opacity:1;transform:scale(1)}34%{opacity:1;transform:scale(1.3)}100%{opacity:0;transform:scale(1.65)}}
 
   .hidden{display:none !important}
+  #norma.floating-placeholder{display:block !important;background:transparent;border:1px dashed rgba(255,77,141,.3);cursor:context-menu;min-height:200px;padding:12px 13px;margin:10px;border-radius:6px}
+  #norma.floating-placeholder .norma-head,#norma.floating-placeholder .norma-hint,#norma.floating-placeholder .norma-music{display:none}
+  #norma.floating-placeholder .norma-float-msg{display:flex}
 
   .console-dock{flex:0 0 380px;display:flex;flex-direction:column;border-left:1px solid var(--border-soft);background:var(--panel,#0b0b11);min-height:0}
   .console-dock .dock-head{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid var(--border-soft)}
@@ -341,6 +346,10 @@
   .lin-input svg{width:16px;height:16px;color:var(--muted);flex:0 0 auto}
   .ci svg{width:14px;height:14px;vertical-align:-3px;margin-right:7px}
 
+  .cat-add-btn{width:24px;height:24px;border:2px dashed var(--green);border-radius:4px;background:transparent;color:var(--green);font-size:16px;font-weight:700;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;justify-content:center;margin-left:8px;opacity:.7}
+  .pill .cat-del{transition:.13s} .pill .cat-del:hover{opacity:1!important;color:var(--red)}
+  .cat-del-x{display:inline-block;margin-left:6px;color:var(--red);cursor:pointer;font-weight:700;opacity:.6;transition:.15s}.cat-del-x:hover{opacity:1;transform:scale(1.2)}
+  .cat-add-btn:hover{background:rgba(51,209,122,.12);border-style:solid;box-shadow:0 0 8px rgba(51,209,122,.3)}
   .pill{display:inline-flex;align-items:center;gap:6px;font-size:11px;padding:5px 11px}
   .pill svg{width:13px;height:13px;flex:0 0 auto}
   .norma-eye{display:inline-flex;align-items:center}
@@ -372,9 +381,7 @@
   .um-head::before{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(12,12,22,.12),rgba(12,12,22,.58));z-index:1;pointer-events:none}
   .um-head h2{position:relative;z-index:2;text-shadow:0 2px 12px rgba(0,0,0,.7)}
 
-  .ndot{position:absolute;top:2px;left:2px;width:9px;height:9px;border-radius:2px;background:transparent;border:1.5px solid #ff79a6;box-shadow:0 0 3px rgba(255,77,141,.5);cursor:pointer;z-index:5;opacity:.9;pointer-events:auto}
-  .ndot:hover{opacity:1;transform:scale(1.25);border-color:#fff;background:rgba(255,77,141,.12);box-shadow:0 0 8px rgba(255,77,141,.9),inset 0 0 3px rgba(255,77,141,.6)}
-
+    
   .norma-music{margin-top:10px;padding-top:10px;border-top:1px solid rgba(255,77,141,.18)}
   .nm-track{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:8px}
   .nm-controls{display:flex;align-items:center;justify-content:center;gap:10px}
@@ -418,7 +425,7 @@
             <span class="norma-think"><i></i><i></i><i></i></span>
             <button class="norma-min" data-action="norma-min" title="Send floating">–</button>
           </div>
-          <div class="norma-hint">Minimize (–) to send her floating on your desktop.<br>Right-click her (or the floating pet) for quick access · Pin to dock.</div>
+          <div class="norma-float-msg" style="display:none;align-items:center;justify-content:center;gap:8px;padding:8px;color:var(--pink);font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg> Norma is floating — right-click to dock</div><div class="norma-hint">Minimize (–) to send her floating on your desktop.<br>Right-click her (or the floating pet) for quick access · Pin to dock.</div>
           <div class="norma-music"><div class="nm-trackrow"><div class="nm-disc" id="nm-disc"></div><div class="nm-track" id="nm-track">No tracks</div><button class="nm-btn nm-folder" data-action="music-open-folder" title="Open music folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></div><div class="nm-controls"><button class="nm-btn" data-action="music-prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 6h2v12H6zM20 6v12l-9-6z"/></svg></button><button class="nm-btn nm-play" data-action="music-toggle" title="Play / Pause" id="nm-play"></button><button class="nm-btn" data-action="music-next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button></div></div>
         </div>
       </aside>
@@ -442,7 +449,7 @@
     </div>
   </div>
 
-  <div id="norma-bubble" title="Norma (preview) — click/right-click for menu"><img id="normaGif" src="" alt="Norma" draggable="false" /><span id="bubbleDot" class="ndot" title="Pin to panel"></span></div>
+  <div id="norma-bubble" title="Norma (preview) — click/right-click for menu"><img id="normaGif" src="" alt="Norma" draggable="false" /></div>
   <div id="ctxmenu"></div>
 
   <div id="celebrate">
@@ -466,6 +473,7 @@
   <div id="toasts"></div>
 
 <script>
+
 "use strict";
 const KEY="sinrad.data.v3";
 const E=window.electronAPI||null;
@@ -538,7 +546,9 @@ function settingsMenu(push){
   L.push(p('  boot intro video',22)+p(st(introOn),5)+state.radCmd+' set intro');
   L.push(p('  skip hidden folders',22)+p(st(hiddenOn),5)+state.radCmd+' set hidden');
   L.push(p('  auto-scroll console',22)+p(st(scrollOn),5)+state.radCmd+' set autoscroll');
+  var petOn=!!(state.settings&&state.settings.petAutoUndock);
   L.push(p('  open with',22)+p(click,5)+state.radCmd+' set click');
+  L.push(p('  pet auto-undock',22)+p(st(petOn),5)+state.radCmd+' set pet');
   push(L.join('\n'));
 }
 function handleSet(inner,push){
@@ -556,7 +566,8 @@ function handleSet(inner,push){
   if(k==='autoscroll'||k==='scroll'){ if(!state.settings)state.settings={}; var cs=!(state.settings.autoScroll===false); var ns=(v==='on')?true:(v==='off')?false:!cs; state.settings.autoScroll=ns; saveState(); push('> auto-scroll console: '+onoff(ns)); updateAutoScrollBtn(); renderTermBody(); return; }
   if(k==='autostart'||k==='startup'||k==='autorun'||k==='login'){ if(!state.settings)state.settings={}; var ca=!!state.settings.autoStart; var na=(v==='on')?true:(v==='off')?false:!ca; state.settings.autoStart=na; saveState(); if(E&&E.setAutostart){ E.setAutostart(na).then(function(r){ push('> auto-start on boot: '+onoff(!!r)); }).catch(function(){ push('> auto-start on boot: '+onoff(na)); }); } else { push('> auto-start on boot: '+onoff(na)+' (desktop only)'); } return; }
   if(k==='hotkey'||k==='hotkeys'||k==='hk'){ if(!state.settings)state.settings={}; var ch=!(state.settings.hotkeyEnabled===false); var nh=(v==='on')?true:(v==='off')?false:!ch; state.settings.hotkeyEnabled=nh; saveState(); push('> hotkey (Ctrl+Alt+P): '+onoff(nh)); if(E&&E.hotkeyToggle){ E.hotkeyToggle(nh).catch(function(){}); } return; }
-  push('> usage: '+state.radCmd+' set <name>  toggles · names: autostart, hotkey, intro, music, hidden, autoscroll, click   (add on|off to force)');
+  if(k==="pet"||k==="norma"||k==="petundock"){ if(!state.settings)state.settings={}; var cp=!!state.settings.petAutoUndock; var np=(v==="on")?true:(v==="off")?false:!cp; state.settings.petAutoUndock=np; saveState(); push("> pet auto-undock on boot: "+onoff(np)); return; }
+  push('> usage: '+state.radCmd+' set <name>  toggles · names: autostart, hotkey, intro, music, hidden, autoscroll, click, pet   (add on|off to force)');
 }
 const NM_PLAY=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M8 5v14l11-7z"/></svg>`;
 const NM_PAUSE=`<svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><rect x="6" y="5" width="4" height="14" rx="1"/><rect x="14" y="5" width="4" height="14" rx="1"/></svg>`;
@@ -582,10 +593,16 @@ updateMusicUI();
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 69;
-const APP_VERSION="2.0.16";
+const EDIT_COUNT = 85;
+const APP_VERSION="2.0.17";
 
-const CAT_COLORS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6", "Guides":"#16c79a" };
+var DEFAULT_CATS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6", "Guides":"#16c79a" };
+function getCatColors(){ var base=Object.assign({},DEFAULT_CATS); try{ if(state&&state.categories){ for(var k in state.categories){ base[k]=state.categories[k]; } } }catch(e){} return base; }
+var CAT_COLORS=Object.assign({},DEFAULT_CATS);
+function refreshCatColors(){ CAT_COLORS=getCatColors(); }
+function addCategory(name,color){ if(!state.categories) state.categories={}; state.categories[name]=color; saveState(); refreshCatColors(); renderView(); log("info","added category: "+name); }
+function deleteCategory(name){ if(!state.categories || !state.categories[name]) return; delete state.categories[name]; state.links.forEach(function(l){ if(l.category===name) l.category=""; }); saveState(); refreshCatColors(); renderView(); log("warn","deleted category: "+name); }
+function randomColor(){ var h=Math.floor(Math.random()*360); return "hsl("+h+",65%,55%)"; }
 const FOLDER_CATS={ "Mods":"#964B00" };
 const FAV_COLOR="#f5a623", PRI_COLOR="#ff4d8d", ALL_COLOR="#27b4ff";
 
@@ -593,7 +610,7 @@ const revealed=new Set();
 let currentView="vault";
 let searchTerms={};
 let vaultFilter="all", folderFilter="all";
-let linkCat="all", linkFav=false, linkDrill=null, folderCat="all";
+let linkCats=[], linkFav=false, linkDrill=null, folderCats=[];
 let modalOnConfirm=null, modalOnCancel=null;
 
 const CELEBRATE_FILES=[["complete.gif","complete.png","complete.webp"]];
@@ -625,7 +642,7 @@ async function loadState(){
   if(E&&E.storeLoad){ try{ const d=await E.storeLoad(); if(d&&typeof d==="object"){ state=Object.assign(defaultState(),d); STORE_MODE="Local Storage"; } }catch(e){} }
   if(STORE_MODE==="Memory"){ try{ const raw=localStorage.getItem(KEY); if(raw){ state=Object.assign(defaultState(),JSON.parse(raw)); STORE_MODE="Local Storage"; } }catch(e){ STORE_MODE="Memory"; } }
   const d=defaultState(); for(const k in d){ if(state[k]===undefined) state[k]=d[k]; }
-  document.getElementById("store-mode").textContent=STORE_MODE;
+  document.getElementById("store-mode").textContent=STORE_MODE; refreshCatColors();
 }
 function saveState(){ const s=JSON.parse(JSON.stringify(state)); if(E&&E.storeSave){ try{ E.storeSave(s); }catch(e){} } try{ localStorage.setItem(KEY,JSON.stringify(s)); }catch(e){} }
 
@@ -691,10 +708,11 @@ function renameStack(coll){
   setTimeout(function(){ var i=document.getElementById("rs_name"); if(i){ i.focus(); i.select(); } },30);
 }
 
-function renderView(){ if(currentView!=="lot"){ lotSelLinks={}; lotSelColls={}; } const c=$("#content"); try{ c.parentElement.classList.toggle("lot-active", currentView==="lot"); }catch(_){} switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "lot":c.innerHTML=viewLot();break; case "folders":c.innerHTML=viewFolders();break; default:c.innerHTML=viewVault(); } renderTermBody(); }
+function renderView(){ if(currentView!=="lot"){ lotSelLinks={}; lotSelColls={}; } if(currentView!=="links"){ linkSelLinks={}; } const c=$("#content"); try{ c.parentElement.classList.toggle("lot-active", currentView==="lot"); }catch(_){} switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "lot":c.innerHTML=viewLot();break; case "folders":c.innerHTML=viewFolders();break; default:c.innerHTML=viewVault(); } renderTermBody(); }
 function head(t,d,a){ return `<div class="mod-head"><div><h1>${esc(t)}</h1><p>${esc(d)}</p></div><div class="spacer"></div>${a||""}</div>`; }
 function emptyState(i,m){ return `<div class="empty"><div class="e-ico">${i}</div><p>${esc(m)}</p></div>`; }
 
+function fmtDate(ts){ if(!ts) return ''; var d=new Date(ts); var t=d.toLocaleTimeString([],{hour12:false,hour:'2-digit',minute:'2-digit'}); var now=new Date(); var sameDay=d.toDateString()===now.toDateString(); if(sameDay) return '['+t+'] Today'; var yesterday=new Date(now); yesterday.setDate(now.getDate()-1); if(d.toDateString()===yesterday.toDateString()) return '['+t+'] Yesterday'; return '['+t+'] '+d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
 function viewVault(){
   const term=searchTerms.vault||"";
   let items=state.vault.filter(v=>{ const passF=vaultFilter==="all"?true:vaultFilter==="fav"?!!v.favorite:!!v.priority; return passF&&match(term,v.name,v.url,v.username); });
@@ -702,23 +720,29 @@ function viewVault(){
   let body;
   if(!state.vault.length) body=emptyState(ICO_LOCK,"No entries yet. Add your first password above.");
   else if(!items.length) body=emptyState(ICO_SEARCH,"Nothing matches your search or filter.");
-  else body=`<div class="grid">`+items.map(v=>{ const show=revealed.has(v.id); const pw=show?esc(v.password):"•".repeat(Math.min(14,Math.max(6,(v.password||"").length))); return `<div class="card" style="${edgeShadow(v)}" data-ctx="vault" data-id="${v.id}" data-action="vault-open"><div class="row"><div style="flex:1;min-width:0"><h3>${esc(v.name)}</h3><div class="sub">${esc(v.url||"—")}</div></div></div><div class="meta">User: <span class="mono">${esc(v.username||"—")}</span></div><div class="meta">Pass: <span class="mono">${pw}</span></div></div>`; }).join("")+`</div>`;
+  else body=`<div class="grid">`+items.map(v=>{ const show=revealed.has(v.id); const pw=show?esc(v.password):"•".repeat(Math.min(14,Math.max(6,(v.password||"").length))); return `<div class="card" style="${edgeShadow(v)}" data-ctx="vault" data-id="${v.id}" data-action="vault-open"><div class="row"><div style="flex:1;min-width:0"><h3>${esc(v.name)}</h3><div class="sub">${esc(v.url||"—")}</div></div></div><div class="meta">User: <span class="mono">${esc(v.username||"—")}</span></div><div class="meta" style="opacity:.6">${fmtDate(v.created)}</div><div class="meta">Pass: <span class="mono">${pw}</span></div></div>`; }).join("")+`</div>`;
   const addbar=`<div class="toolbar linkbar"><div class="lin-input" style="cursor:default;color:var(--muted);opacity:.85;display:flex;align-items:center;gap:8px">${ICO_LOCK}Entries are saved locally on this device</div><button class="btn primary" data-action="vault-new">＋ Add entry</button></div>`;
   return head("Secure Vault",""+openVerb()+" · right-click for more · Ctrl+F to search")+addbar+searchRow("vault","Search vault...")+pills+body;
 }
 
 function collColor(name){ var h=0; name=String(name||''); for(var i=0;i<name.length;i++){ h=(h*31+name.charCodeAt(i))%360; } return 'hsl('+h+',55%,55%)'; }
 function isTagPage(u){ var s=String(u||''); return s.indexOf('/tags/')>=0 || s.indexOf('/tag/')>=0; }
+function _linkSelCount(){ return Object.keys(linkSelLinks).length; }
+function _linkDeleteSel(){ var ids=Object.keys(linkSelLinks); var n=ids.length; if(!n) return; function go(){ var kill={}; ids.forEach(function(x){kill[x]=1;}); state.links=state.links.filter(function(l){ return !kill[l.id]; }); saveState(); linkSelLinks={}; renderView(); log("warn","deleted "+n+" link(s)"); } if(n>4){ confirmModal("Delete "+n+" link(s)?").then(function(y){ if(y) go(); }); } else { go(); } }
+function _linkClearSel(){ linkSelLinks={}; renderView(); }
 function viewLinks(){
+  if(currentView!=="links"){ linkSelLinks={}; }
   const term=searchTerms.links||"";
-  const card=(l)=>`<div class="link-card" style="${edgeShadow(l)}" data-ctx="link" data-id="${l.id}" data-action="link-open"><h3 class="lc-title">${esc(l.title)}</h3><div class="lc-url" title="${esc(l.url)}">${esc(l.url)}</div>${l.note?`<div class="lc-note">${esc(l.note)}</div>`:""}${isTagPage(l.url)?`<span class="lc-tag">tag page</span>`:""}</div>`;
+  const selN=_linkSelCount();
+  const selBar=selN?`<div class="lot-bar" style="border-color:rgba(39,180,255,.55);background:#0e1420"><span class="lb-n" style="color:var(--cyan)">${selN} selected</span><button type="button" class="lb-del" data-action="link-sel-del">Delete</button><button type="button" class="lb-clear" data-action="link-sel-clear"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> Clear</button></div>`:"";
+  const card=(l)=>`<div class="link-card${linkSelLinks[l.id]?" sel":""}" style="${edgeShadow(l)}" data-ctx="link" data-id="${l.id}" data-action="link-open"><h3 class="lc-title">${esc(l.title)}</h3><div class="lc-url" title="${esc(l.url)}">${esc(l.url)}</div><div style="font-size:10px;color:var(--dim);margin-top:2px">${fmtDate(l.created)}</div>${l.note?`<div class="lc-note">${esc(l.note)}</div>`:""}${isTagPage(l.url)?`<span class="lc-tag">tag page</span>`:""}</div>`;
   const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="lk_title" placeholder="Title"><input class="lin-input lk-url" id="lk_url" placeholder="https://..."><button class="btn primary" data-action="link-add">＋ Add</button></div>`;
-  const pills=`<div class="toolbar linkfilter"><div class="lf-left">${pill("All",linkCat==="all",ALL_COLOR,'data-action="link-cat" data-cat="all"')}${Object.keys(CAT_COLORS).map(c=>pill(c,linkCat===c,CAT_COLORS[c],'data-action="link-cat" data-cat="'+esc(c)+'"')).join("")}</div><div class="lf-right">${pill(ICO_STAR+" Favorites",linkFav,FAV_COLOR,'data-action="link-fav"')}</div></div>`;
-  const items=state.links.filter(l=>{ if(_inLot(l)) return false; const catOk=linkCat==="all"||normCat(l)===linkCat; const favOk=!linkFav||!!l.favorite; return catOk&&favOk&&match(term,l.title,l.url,l.note||""); });
+  const pills=`<div class="toolbar linkfilter"><div class="lf-left">${Object.keys(CAT_COLORS).map(c=>pill(c,linkCats.indexOf(c)>=0,CAT_COLORS[c],'data-action="link-cat" data-cat="'+esc(c)+'"')).join("")}</div><div class="lf-right">${pill(ICO_STAR+" Favorites",linkFav,FAV_COLOR,'data-action="link-fav"')}<button class="cat-add-btn" data-action="cat-add" title="Add category">+</button></div></div>`;
+  const items=state.links.filter(l=>{ if(_inLot(l)) return false; const catOk=!linkCats.length||linkCats.indexOf(normCat(l))>=0||(!normCat(l)&&linkCats.indexOf("")>=0); const favOk=!linkFav||!!l.favorite; return catOk&&favOk&&match(term,l.title,l.url,l.note||""); });
   let body;
   if(!items.length) body=emptyState(ICO_LINK,"No saved links yet — add one above. Parked / imported links live in the Parking Lot.");
   else body=`<div class="grid linkgrid">`+items.map(card).join("")+`</div>`;
-  return head("Link Saver",""+openVerb()+" · your saved links · parked stacks live in the Parking Lot")+addbar+pills+searchRow("links","Search links...")+body;
+  return head("Link Saver",""+openVerb()+" · click multiple categories · ctrl-click cards to select")+addbar+pills+searchRow("links","Search links...")+body+selBar;
 }
 function viewLot(){
   const term=searchTerms.lot||"";
@@ -760,17 +784,17 @@ function doLinkAdd(){ const t=$("#lk_title"),u=$("#lk_url"); const title=t?t.val
 
 function viewFolders(){
   const term=searchTerms.folders||"";
-  let items=state.folders.filter(f=>{ const catOk=folderCat==="all"||normCat(f)===folderCat; const passF=folderFilter==="all"?true:!!f.favorite; return catOk&&passF&&match(term,f.name,f.path); });
+  let items=state.folders.filter(f=>{ const catOk=!folderCats.length||folderCats.indexOf(normCat(f))>=0; const passF=folderFilter==="all"?true:!!f.favorite; return catOk&&passF&&match(term,f.name,f.path); });
   const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="fd_name" placeholder="Name (optional)"><input class="lin-input lk-url" id="fd_path" placeholder="Folder path  e.g. C:\\Users\\you\\Documents"><button class="btn primary" data-action="folder-add">＋ Add</button></div>`;
-  const pills=`<div class="toolbar linkfilter"><div class="lf-left">${pill("All",folderCat==="all",ALL_COLOR,'data-action="folder-cat" data-cat="all"')}${Object.keys(FOLDER_CATS).map(c=>pill(c,folderCat===c,FOLDER_CATS[c],'data-action="folder-cat" data-cat="'+esc(c)+'"')).join("")}</div><div class="lf-right">${pill(ICO_STAR+" Favorites",folderFilter==="fav",FAV_COLOR,'data-action="folder-filter" data-filter="'+(folderFilter==="fav"?"all":"fav")+'"')}</div></div>`;
+  const pills=`<div class="toolbar linkfilter"><div class="lf-left">${Object.keys(FOLDER_CATS).map(c=>pill(c,folderCats.indexOf(c)>=0,FOLDER_CATS[c],'data-action="folder-cat" data-cat="'+esc(c)+'"')).join("")+'<button class="cat-add-btn" data-action="cat-add" data-type="folder" title="Add category">+</button>'}</div><div class="lf-right">${pill(ICO_STAR+" Favorites",folderFilter==="fav",FAV_COLOR,'data-action="folder-filter" data-filter="'+(folderFilter==="fav"?"all":"fav")+'"')}</div></div>`;
   let body;
   if(!state.folders.length) body=emptyState(ICO_FOLDER,"No quick folders yet — paste a path above. "+openVerb()+" · right-click for more.");
   else if(!items.length) body=emptyState(ICO_SEARCH,"Nothing matches. Try a different tab or Ctrl+F.");
-  else body=`<div class="folder-list">`+items.map(f=>{ const p=f.path||f.name||""; const label=(f.name&&f.path)?f.name:baseName(p); return `<div class="folder-row" style="${edgeShadow(f)}" data-ctx="folder" data-id="${f.id}" data-action="folder-open"><span class="fr-ico">${ICO_FOLDER}</span><div class="fr-main"><div class="fr-name">${esc(label||"Untitled")}</div><div class="fr-path" title="${esc(p)}">${esc(p)}</div></div></div>`; }).join("")+`</div>`;
+  else body=`<div class="folder-list">`+items.map(f=>{ const p=f.path||f.name||""; const label=(f.name&&f.path)?f.name:baseName(p); return `<div class="folder-row" style="${edgeShadow(f)}" data-ctx="folder" data-id="${f.id}" data-action="folder-open"><span class="fr-ico">${ICO_FOLDER}</span><div class="fr-main"><div class="fr-name">${esc(label||"Untitled")}</div><div class="fr-path" title="${esc(p)}">${esc(p)}</div></div><div style="font-size:10px;color:var(--dim);flex:0 0 auto">${fmtDate(f.created)}</div></div>`; }).join("")+`</div>`;
   return head("Quick Folders",""+openVerb()+" · right-click for more · Ctrl+F to search")+addbar+searchRow("folders","Search folders...")+pills+body;
 }
 function doFolderAdd(){ const n=$("#fd_name"),p=$("#fd_path"); const name=n?n.value.trim():"",path=p?p.value.trim():""; if(!path){ toast("Paste a folder path","warn"); return; } state.folders.unshift({id:uid(),name,path,category:folderCat!=="all"?folderCat:"",favorite:false,created:nowMs()}); log("ok","Added quick folder: "+(name||baseName(path))+(folderCat!=="all"?" ["+folderCat+"]":"")); saveState(); celebrate(); renderView(); toast("Folder saved","ok"); }
-function folderEditModal(id){ const f=find(state.folders,id); if(!f)return; const p=f.path||f.name||""; openModal("✏️ Edit Quick Folder",`<div class="field"><label>Name (optional)</label><input id="fe_name" value="${esc(f.name||"")}"></div><div class="field"><label>Folder path</label><input id="fe_path" value="${esc(p)}"></div>`,"Save",()=>{ const path=$("#fe_path").value.trim(); if(!path){ toast("Path required","warn"); return; } f.name=$("#fe_name").value.trim(); f.path=path; log("info","Updated quick folder: "+(f.name||baseName(path))); saveState(); closeModal(); renderView(); toast("Folder updated","ok"); }); }
+function folderEditModal(id){ const f=find(state.folders,id); if(!f)return; const p=f.path||f.name||""; openModal("Edit Quick Folder",`<div class="field"><label>Name (optional)</label><input id="fe_name" value="${esc(f.name||"")}"></div><div class="field"><label>Folder path</label><input id="fe_path" value="${esc(p)}"></div>`,"Save",()=>{ const path=$("#fe_path").value.trim(); if(!path){ toast("Path required","warn"); return; } f.name=$("#fe_name").value.trim(); f.path=path; log("info","Updated quick folder: "+(f.name||baseName(path))); saveState(); closeModal(); renderView(); toast("Folder updated","ok"); }); }
 
 function viewConsole(){
   const term=searchTerms.console||"";
@@ -786,7 +810,7 @@ function closeModal(){ $("#overlay").classList.remove("show"); modalOnConfirm=nu
 function cancelModal(){ const c=modalOnCancel; closeModal(); if(typeof c==="function")c(); }
 function confirmModal(m){ return new Promise(res=>{ openModal("⚠️ Confirm",`<p style="margin:0;color:var(--muted)">${esc(m)}</p>`,"Yes, do it",()=>{closeModal();res(true);},()=>res(false)); setTimeout(()=>{const b=$("#modal-confirm");if(b)b.focus();},30); }); }
 function val(id){ const e=$("#"+id); return e?e.value.trim():""; }
-function vaultModal(e){ e=e||{}; openModal(`${e.id?"✏️ Edit":"🔐 New"} Vault Entry`,`<div class="field"><label>Site / service name</label><input id="v_name" value="${esc(e.name||"")}" placeholder="e.g. Gmail"></div><div class="field"><label>Website URL</label><input id="v_url" value="${esc(e.url||"")}" placeholder="https://..."></div><div class="field"><label>Username / email</label><input id="v_user" value="${esc(e.username||"")}" placeholder="you@example.com"></div><div class="field"><label>Password</label><input id="v_pass" type="text" value="${esc(e.password||"")}" placeholder="••••••••"></div><div class="checkrow" style="gap:18px"><label class="checkrow"><input type="checkbox" id="v_fav" ${e.favorite?"checked":""}> Favorite</label><label class="checkrow"><input type="checkbox" id="v_pri" ${e.priority?"checked":""}> Priority</label></div>`,"Save",()=>{ const name=val("v_name"); if(!name){ toast("Name is required","warn"); return; } const d={name,url:val("v_url"),username:val("v_user"),password:$("#v_pass").value,favorite:$("#v_fav").checked,priority:$("#v_pri").checked}; if(e.id){ Object.assign(find(state.vault,e.id),d); log("info","Updated vault entry: "+name); toast("Entry updated","ok"); } else { state.vault.unshift(Object.assign({id:uid(),created:nowMs()},d)); log("ok","Added vault entry: "+name); toast("Entry saved","ok"); } saveState(); closeModal(); celebrate(); renderView(); }); }
+function vaultModal(e){ e=e||{}; openModal(`${e.id?"Edit":"New"} Vault Entry`,`<div class="field"><label>Site / service name</label><input id="v_name" value="${esc(e.name||"")}" placeholder="e.g. Gmail"></div><div class="field"><label>Website URL</label><input id="v_url" value="${esc(e.url||"")}" placeholder="https://..."></div><div class="field"><label>Username / email</label><input id="v_user" value="${esc(e.username||"")}" placeholder="you@example.com"></div><div class="field"><label>Password</label><input id="v_pass" type="text" value="${esc(e.password||"")}" placeholder="••••••••"></div><div class="checkrow" style="gap:18px"><label class="checkrow"><input type="checkbox" id="v_fav" ${e.favorite?"checked":""}> Favorite</label><label class="checkrow"><input type="checkbox" id="v_pri" ${e.priority?"checked":""}> Priority</label></div>`,"Save",()=>{ const name=val("v_name"); if(!name){ toast("Name is required","warn"); return; } const d={name,url:val("v_url"),username:val("v_user"),password:$("#v_pass").value,favorite:$("#v_fav").checked,priority:$("#v_pri").checked}; if(e.id){ Object.assign(find(state.vault,e.id),d); log("info","Updated vault entry: "+name); toast("Entry updated","ok"); } else { state.vault.unshift(Object.assign({id:uid(),created:nowMs()},d)); log("ok","Added vault entry: "+name); toast("Entry saved","ok"); } saveState(); closeModal(); celebrate(); renderView(); }); }
 
 /* context menu — text coloured per item */
 function mi(a,id,label,color,danger){ const st=color?` style="color:${color}"`:``; return `<div class="ci${danger?" danger":""}" data-action="${a}" data-id="${id}"${st}>${esc(label)}</div>`; }
@@ -831,7 +855,7 @@ document.addEventListener("click",async(ev)=>{
     case "vault-copy-p": { const v=find(state.vault,id); if(v)copy(v.password||"","Password"); break; }
     case "vault-filter": vaultFilter=t.dataset.filter; renderView(); break;
     case "link-add": doLinkAdd(); break;
-    case "link-cat": linkCat=t.dataset.cat; renderView(); break;
+    case "link-cat": { const cat=t.dataset.cat; if(cat==="all"){linkCats=["all"];}else{const idx=linkCats.indexOf(cat);if(linkCats.includes("all")){linkCats=[cat];}else if(idx>=0){linkCats.splice(idx,1);}else{linkCats.push(cat);}} renderView(); break; }
     case "link-fav": linkFav=!linkFav; renderView(); break;
     case "link-fav-toggle": { const l=find(state.links,id); if(l){ l.favorite=!l.favorite; log("info",(l.favorite?"Favorited":"Unfavorited")+" link: "+l.title); saveState(); renderView(); } break; }
     case "link-cat-set": { const l=find(state.links,id); if(l){ l.category=(t.dataset.cat==="__none__")?"":t.dataset.cat; log("info","Tagged link "+l.title+" → "+(l.category||"none")); saveState(); renderView(); } break; }
@@ -839,19 +863,25 @@ document.addEventListener("click",async(ev)=>{
     case 'link-drill': linkDrill=t.dataset.coll||null; renderView(); break;
     case 'link-drill-back': linkDrill=null; renderView(); break;
     case 'link-openall': { var cn=t.dataset.coll; var list=state.links.filter(function(l){return (l.coll||'')===cn;}); if(list.length>8 && !(await confirmModal('Open '+list.length+' tabs from '+cn+'?'))) break; list.forEach(function(l){ if(E&&E.shellOpen)E.shellOpen(l.url); else try{window.open(l.url,'_blank');}catch(_){} }); log('info','opened '+list.length+' links from '+cn); break; }
+        case "cat-del-ctx": { var cn3=(t.dataset.cat||"").trim(); if(cn3){ confirmModal("Delete category \""+cn3+"\"? Links will become uncategorized.").then(function(y){ if(y){ deleteCategory(cn3); toast("Category deleted","ok"); } }); } break; }
+    case "cat-del": { const cat=t.dataset.cat; if(cat&&state.customCategories&&state.customCategories[cat]){if(confirm(`Delete category "${cat}"? Links will be uncategorized.`)){deleteCategory(cat);renderView();}} break; }
+    case "cat-add": { const catType=t.dataset.type||"link"; openModal("New Category", '<div class="field"><label>Category name</label><input id="cat_name" placeholder="e.g. Tutorials"></div><div class="field"><label>Color</label><div style="display:flex;gap:8px;align-items:center"><input type="color" id="cat_color" value="#27b4ff" style="width:60px;height:40px;border:none;border-radius:4px;background:var(--input);cursor:pointer;padding:0"></div></div>', "Create", function(){ var name=($("#cat_name")||{}).value||""; name=name.trim(); if(!name){ toast("Name required","warn"); return; } var cc=CAT_COLORS[name]; if(cc&&(!state.categories||!state.categories[name])&&DEFAULT_CATS[name]){ toast("Category already exists","warn"); return; } if(state.categories&&state.categories[name]){ toast("Category already exists","warn"); return; } var color=($("#cat_color")||{}).value||"#27b4ff"; if(catType==="folder"){if(!state.folderCategories)state.folderCategories={};state.folderCategories[name]=color;saveState();FOLDER_CATS=Object.assign({},FOLDER_CATS,state.folderCategories);}else{addCategory(name,color);}closeModal(); toast("Category created: "+name,"ok"); }); setTimeout(function(){ var i=document.getElementById("cat_name"); if(i) i.focus(); },30); break; }
+    case "cat-del-pill": { var cn2=(t.dataset.cat||"").trim(); if(cn2){ confirmModal("Delete category \""+cn2+"\"? Links will become uncategorized.").then(function(y){ if(y){ deleteCategory(cn2); toast("Category deleted","ok"); } }); } break; }
+    case "cat-delete": { var cn=id; confirmModal("Delete category \""+cn+"\"? Links will become uncategorized.").then(function(y){ if(y){ deleteCategory(cn); toast("Category deleted","ok"); } }); break; }
     case "link-del": { const l=find(state.links,id); if(l&&await confirmModal("Delete "+l.title+"?")){ state.links=state.links.filter(x=>x.id!==id); log("warn","Deleted link: "+l.title); saveState(); renderView(); } break; }
     case "folder-add": doFolderAdd(); break;
     case "folder-open": openByAction("folder-open",id); break;
     case "folder-edit": folderEditModal(id); break;
     case "folder-fav": { const f=find(state.folders,id); if(f){ f.favorite=!f.favorite; log("info",(f.favorite?"Favorited":"Unfavorited")+" folder: "+(f.name||"")); saveState(); renderView(); } break; }
     case "folder-del": { const f=find(state.folders,id); if(f&&await confirmModal("Remove "+(f.name||baseName(f.path||f.name))+"?")){ state.folders=state.folders.filter(x=>x.id!==id); log("warn","Removed quick folder"); saveState(); renderView(); } break; }
-    case "folder-cat": folderCat=t.dataset.cat; renderView(); break;
+    case "folder-cat": { const cat=t.dataset.cat; const idx=folderCats.indexOf(cat); if(idx>=0){folderCats.splice(idx,1);}else{folderCats.push(cat);} renderView(); break; }
     case "folder-cat-set": { const f=find(state.folders,id); if(f){ f.category=(t.dataset.cat==="__none__")?"":t.dataset.cat; log("info","Tagged folder "+(f.name||baseName(f.path||f.name))+" → "+(f.category||"none")); saveState(); renderView(); } break; }
     case "folder-filter": folderFilter=t.dataset.filter; renderView(); break;
     case "console-clear": if(await confirmModal("Clear the entire activity log?")){ state.console=[]; log("warn","Activity log cleared"); saveState(); renderView(); } break;
     case "console-add-link": { const c=find(state.console,id); if(c&&c.meta&&c.meta.url){ const u=c.meta.url; state.links.unshift({id:uid(),title:hostOf(u),url:u,category:"",favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved visited site to Links: "+u); saveState(); renderView(); toast("Added to Links","ok"); } break; }
     case "console-add-folder": { const c=find(state.console,id); if(c&&c.meta&&c.meta.path){ const p=c.meta.path; state.folders.unshift({id:uid(),name:baseName(p),path:p,category:"",favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved opened folder to Quick Folders: "+p); saveState(); renderView(); toast("Added to Folders","ok"); } break; }
     case "norma-min": setFloating(true); break;
+    case "norma-dock": setFloating(false); break;
     case "norma-pin": setFloating(!isFloating()); break;
     case "music-toggle": musicToggle(); break;
     case "music-next": musicNext(); break;
@@ -882,12 +912,29 @@ document.addEventListener("keydown",(ev)=>{
   if(ev.key==="Escape"){ if($("#overlay").classList.contains("show")){cancelModal();return;} if($("#ctxmenu").classList.contains("show")){hideMenu();return;} const ct=$("#content"); if(ct.classList.contains("searching")){ ct.classList.remove("searching"); searchTerms[currentView]=""; renderView(); } return; }
   if(ev.key==="Enter"&&!$("#overlay").classList.contains("show")&&ev.target&&ev.target.id){ if(ev.target.id.indexOf("lk_")===0){ ev.preventDefault(); doLinkAdd(); } else if(ev.target.id.indexOf("fd_")===0){ ev.preventDefault(); doFolderAdd(); } else if(ev.target.id==="termInput"){ ev.preventDefault(); const v=ev.target.value; ev.target.value=""; handleCommand(v); } }
 });
+
+document.addEventListener("contextmenu", function(ev){
+  var pill=ev.target.closest('[data-action="link-cat"]');
+  if(pill && pill.dataset.cat && pill.dataset.cat!=="all"){
+    var cat=pill.dataset.cat;
+    if(state.categories && state.categories[cat]){
+      ev.preventDefault();
+      showMenu(ev.clientX, ev.clientY, '<div class="ci danger" data-action="cat-del-ctx" data-cat="'+esc(cat)+'">Delete category "'+esc(cat)+'"</div>');
+    }
+  }
+});
+
+document.getElementById("norma").addEventListener("contextmenu", function(ev){
+  if(!this.classList.contains("floating-placeholder")) return;
+  ev.preventDefault();
+  showMenu(ev.clientX, ev.clientY, '<div class="ci" data-action="norma-dock"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg>Dock Norma</div>');
+});
 document.addEventListener("contextmenu",(e)=>{ const c=e.target.closest("[data-ctx]"); if(c){ e.preventDefault(); showCardMenu(c.dataset.ctx,c.dataset.id,e.clientX,e.clientY); } });
 $("#ctxmenu").addEventListener("click",hideMenu);
 document.addEventListener("click",(e)=>{ const m=$("#ctxmenu"); if(m.classList.contains("show")&&!m.contains(e.target)&&!e.target.closest("#norma-bubble")&&!e.target.closest("#norma"))hideMenu(); });
 
-function isFloating(){ return $("#norma").classList.contains("hidden"); }
-function setFloating(f){ if(f){ $("#norma").classList.add("hidden"); if(E&&E.petShow){E.petShow();} else { $("#norma-bubble").classList.add("show"); } log("info","Norma sent floating"); } else { $("#norma").classList.remove("hidden"); try{ $("#norma").scrollIntoView({block:"nearest"}); }catch(_){} $("#norma-bubble").classList.remove("show"); if(E&&E.petHide)E.petHide(); log("info","Norma pinned to panel"); } }
+function isFloating(){ return $("#norma").classList.contains("floating-placeholder"); }
+function setFloating(f){ if(f){ $("#norma").classList.add("floating-placeholder"); if(E&&E.petShow){E.petShow();} else { $("#norma-bubble").classList.add("show"); } log("info","Norma sent floating"); } else { $("#norma").classList.remove("floating-placeholder"); try{ $("#norma").scrollIntoView({block:"nearest"}); }catch(_){} $("#norma-bubble").classList.remove("show"); if(E&&E.petHide)E.petHide(); log("info","Norma pinned to panel"); } }
 (function(){ const card=$("#norma"),bubble=$("#norma-bubble"); let moved=false;
   function menu(x,y){ showMenu(x,y,`<div class="ci" data-action="nav" data-nav="vault">${ICO_LOCK} Vault</div><div class="ci" data-action="nav" data-nav="links">${ICO_LINK} Links</div><div class="ci" data-action="nav" data-nav="folders">${ICO_FOLDER} Folders</div>`); }
 
@@ -902,9 +949,29 @@ function setFloating(f){ if(f){ $("#norma").classList.add("hidden"); if(E&&E.pet
 var _lastParked=null;
 if(E&&E.onHotkeyPark) E.onHotkeyPark(function(txt){ var p=_parkParseClip(txt); if(!p){ try{toast("clipboard has no link","warn");}catch(_){} return; } var url=(p.url||"").trim(); if(url.indexOf("www.")===0) url="https://"+url; var nu=normUrl(url); if(!nu){ toast("could not parse URL","warn"); return; } var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ log("info","hotkey: already in Links — "+ex.title); toast("Already in Links","warn"); return; } var raw=p.title||_parkHost(url); var title=raw.length>45?raw.slice(0,42)+"...":raw; var link={id:uid(),title:title,url:url,category:"Check out",favorite:false,created:nowMs()}; state.links.unshift(link); saveState(); log("ok","hotkey → Links [Check out]: "+title); celebrate(); renderView(); toast("Added to Check out","ok"); });
 if(E&&E.hotkeyStatus) E.hotkeyStatus(function(mm){ if(mm&&mm.enabled===false){ log('info','hotkey disabled — use  rad set hk  to enable'); } else { log(mm&&mm.ok?'ok':'warn', 'hotkey '+(mm&&mm.ok?'ready':'FAILED')+' ('+(mm&&mm.combo||'')+')'); } });
-if(E&&E.onProtocolPark) E.onProtocolPark(function(d){ if(!d||!d.url) return; var url=d.url.trim(); if(url.indexOf("www.")===0) url="https://"+url; var nu=normUrl(url); if(!nu) return; var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ toast("Already in Links","warn"); if(E&&E.showNotif) E.showNotif({title:"Homie you already saved this link (\u00b4\u3002\uff3f\u3002\u0060)",body:ex.title||url}); return; } var raw=d.title||_parkHost(url); var title=raw.length>45?raw.slice(0,42)+"...":raw; var link={id:uid(),title:title,url:url,category:"Check out",favorite:false,created:nowMs()}; state.links.unshift(link); saveState(); log("ok","extension \u2192 Links [Check out]: "+title); celebrate(); renderView(); toast("Saved to Check out","ok"); if(E&&E.showNotif) E.showNotif({title:"Sinrad is informing you that \uff08\uffe3\ufe36\uffe3\uff09\u2197",body:"Link saved \u2713  "+title}); });
+var _batchParkQueue=[], _batchParkTimer=null;
+if(E&&E.onProtocolPark) E.onProtocolPark(function(d){ if(!d||!d.url) return; var url=d.url.trim(); if(url.indexOf("www.")===0) url="https://"+url; var nu=normUrl(url); if(!nu) return;
+  if(d.lot){
+    _batchParkQueue.push({url:url,title:d.title||_parkHost(url)});
+    if(!_batchParkTimer){
+      _batchParkTimer=setTimeout(function(){
+        _batchParkTimer=null;
+        var q=_batchParkQueue; _batchParkQueue=[];
+        var added=0, dup=0;
+        for(var i=0;i<q.length;i++){
+          var r=_parkOne(q[i].title,q[i].url);
+          if(r.dup) dup++; else if(!r.bad) added++;
+        }
+        if(added>0){ saveState(); renderView(); celebrate(); log("ok","extension \u2192 Parking Lot: "+added+" link(s) parked"+(dup?" ("+dup+" dupes skipped)":"")); toast("Parked "+added+" tab"+(added===1?"":"s")+" to Parking Lot","ok"); if(E&&E.showNotif) E.showNotif({title:"Sinrad is informing you that \uff08\uffe3\ufe36\uffe3\uff09\u2197",body:added+" tab"+(added===1?"":"s")+" parked \u2713"}); }
+        else if(dup>0){ toast(dup+" tab"+(dup===1?" was":"s were")+" already parked","warn"); }
+      }, 600);
+    }
+    return;
+  }
+  var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ toast("Already in Links","warn"); if(E&&E.showNotif) E.showNotif({title:"Homie you already saved this link (\u00b4\u3002\uff3f\u3002\u0060)",body:ex.title||url}); return; } var raw=d.title||_parkHost(url); var title=raw.length>45?raw.slice(0,42)+"...":raw; var link={id:uid(),title:title,url:url,category:"Check out",favorite:false,created:nowMs()}; state.links.unshift(link); saveState(); log("ok","extension \u2192 Links [Check out]: "+title); celebrate(); renderView(); toast("Saved to Check out","ok"); if(E&&E.showNotif) E.showNotif({title:"Sinrad is informing you that \uff08\uffe3\ufe36\uffe3\uff09\u2197",body:"Link saved \u2713  "+title}); });
 if(E&&E.dataPath) E.dataPath(function(pp){ log('info','data file: '+pp); });
 var lotSelLinks={}, lotSelColls={};
+var linkSelLinks={};
 function _lotCountSel(){ var t=Object.keys(lotSelLinks).length; Object.keys(lotSelColls).forEach(function(c){ state.links.forEach(function(l){ if((l.coll||"")===c) t++; }); }); return t; }
 function _lotDeleteSel(){ var ids=Object.keys(lotSelLinks), colls=Object.keys(lotSelColls); var total=_lotCountSel(); if(!total) return; function go(){ var kill={}; ids.forEach(function(x){kill[x]=1;}); colls.forEach(function(c){ state.links.forEach(function(l){ if((l.coll||"")===c) kill[l.id]=1; }); }); var n=Object.keys(kill).length; state.links=state.links.filter(function(l){ return !kill[l.id]; }); saveState(); lotSelLinks={}; lotSelColls={}; renderView(); log("warn","deleted "+n+" parked link(s)"); } if(total>4){ confirmModal("Delete "+total+" parked link(s)?").then(function(y){ if(y) go(); }); } else { go(); } }
 function _lotClearSel(){ lotSelLinks={}; lotSelColls={}; renderView(); }
@@ -922,7 +989,23 @@ document.addEventListener("click", function(ev){
   else { var cc=t.dataset.coll; if(lotSelColls[cc]) delete lotSelColls[cc]; else lotSelColls[cc]=1; }
   renderView();
 }, true);
+document.addEventListener("click", function(ev){
+  if(currentView!=="links") return;
+  var sb=ev.target.closest&&ev.target.closest("[data-action=\"link-sel-del\"]"); if(sb){ ev.stopPropagation(); ev.preventDefault(); _linkDeleteSel(); return; }
+  var cb=ev.target.closest&&ev.target.closest("[data-action=\"link-sel-clear\"]"); if(cb){ ev.stopPropagation(); ev.preventDefault(); _linkClearSel(); return; }
+  var t=ev.target.closest&&ev.target.closest(".link-card");
+  if(!t) return;
+  if(!(ev.ctrlKey||ev.metaKey)) return;
+  ev.stopPropagation(); ev.preventDefault();
+  var lid=t.dataset.id; if(linkSelLinks[lid]) delete linkSelLinks[lid]; else linkSelLinks[lid]=1;
+  renderView();
+}, true);
 document.addEventListener("keydown", function(ev){
+  if(currentView==="links" && (ev.key==="Delete"||ev.key==="Backspace")){
+    var ae=document.activeElement; if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable)) return;
+    if(!_linkSelCount()) return;
+    ev.preventDefault(); _linkDeleteSel(); return;
+  }
   if(currentView!=="lot") return;
   if(ev.key!=="Delete" && ev.key!=="Backspace") return;
   var ae=document.activeElement; if(ae && (ae.tagName==="INPUT"||ae.tagName==="TEXTAREA"||ae.isContentEditable)) return;
@@ -997,6 +1080,7 @@ setInterval(tickClock,1000);
 function buildThinkBar(){ const w=$("#tbWave"); if(w){ let h=""; for(let i=0;i<64;i++){ h+='<i style="animation-delay:'+(Math.random()*1.2).toFixed(2)+'s;animation-duration:'+(0.8+Math.random()*0.9).toFixed(2)+'s"></i>'; } w.innerHTML=h; } const tb=$("#thinkbar"); if(tb){ const cols=["#27b4ff","#b14bff","#ff4d8d","#33d17a"]; let ci=0; tb.style.setProperty("--acc",cols[0]); setInterval(()=>{ ci=(ci+1)%cols.length; tb.style.setProperty("--acc",cols[ci]); },4200); } }
 (async function boot(){
   await loadState();
+  if(state.settings&&state.settings.petAutoUndock){ setFloating(true); }
   try{ if(state.music&&state.music.volume!=null) bgmAudio.volume=state.music.volume; if(state.music&&typeof state.music.idx==='number'&&state.music.idx) bgmIdx=state.music.idx; }catch(_){}
   if(E&&E.musicRequest) E.musicRequest();
   const av=$('#appver'); if(av)av.textContent='v'+APP_VERSION;
