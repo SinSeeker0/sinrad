@@ -30,16 +30,13 @@ function createWindow(){
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false }
   });
   mainWin.loadFile(path.join(__dirname,"index.html"));
-  // Auto-undock pet if setting is enabled
+  // Auto-undock pet if setting is enabled; also flush parks queued during boot
   mainWin.webContents.on("did-finish-load", function(){
     try{
-      var dataFile=path.join(__dirname,"sinrad-data.json");
-      if(!fs.existsSync(dataFile)) dataFile=path.join(app.getPath("userData"),"sinrad-data.json");
-      if(fs.existsSync(dataFile)){
-        var st=JSON.parse(fs.readFileSync(dataFile,"utf8"));
-        if(st&&st.settings&&st.settings.petAutoUndock){ showPet(); }
-      }
+      var st=readStore();
+      if(st&&st.settings&&st.settings.petAutoUndock){ showPet(); }
     }catch(e){}
+    _flushPendingParks();
   });
   try{ mainWin.webContents.setAudioMuted(true); }catch(e){}   // keep the app silent during the intro video; showMain() un-mutes it
   mainWin.on("closed", ()=>{ mainWin=null; if(petWin){ try{petWin.close();}catch(e){} petWin=null; } });
@@ -94,14 +91,37 @@ function showMain(){ if(mainWin && !mainWin.isDestroyed()){ try{ mainWin.webCont
 function finishBoot(){ if(bootFinished) return; bootFinished=true; try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(e){} splashWin=null; if(mainReady) showMain(); }
 // --- single instance + protocol URL handling ---
 const _gotLock=app.requestSingleInstanceLock();
-if(!_gotLock){ app.quit(); } else {
+if(!_gotLock){ app.quit(); }
+if(_gotLock) {
   app.on('second-instance', function(ev, argv){
     var url=argv.find(function(a){ return a.startsWith(PROTOCOL+'://'); });
-    if(url){ _handleProtocolUrl(url); if(mainWin){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.focus(); } }
+    if(url) _handleProtocolUrl(url);
+    if(mainWin && !mainWin.isDestroyed()){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.focus(); }
   });
 }
+let _pendingParks=[];
+function _sendPark(data){
+  try{
+    if(mainWin && !mainWin.isDestroyed()){ mainWin.webContents.send('protocol-park', data); return true; }
+  }catch(_){}
+  _pendingParks.push(data);
+  return false;
+}
+function _flushPendingParks(){
+  if(!mainWin || mainWin.isDestroyed() || !_pendingParks.length) return;
+  var q=_pendingParks; _pendingParks=[];
+  for(var i=0;i<q.length;i++){ try{ mainWin.webContents.send('protocol-park', q[i]); }catch(_){} }
+}
 function _handleProtocolUrl(url){
-  try{ var u=new URL(url); if(u.hostname==='park'||u.pathname==='/park'){ var linkUrl=u.searchParams.get('url')||''; var title=u.searchParams.get('title')||''; var lot=u.searchParams.get('lot')==='1'; if(linkUrl&&mainWin&&!mainWin.isDestroyed()){ mainWin.webContents.send('protocol-park',{url:linkUrl,title:title,lot:lot}); } } }catch(_){}
+  try{
+    var u=new URL(url);
+    if(u.hostname==='park'||u.pathname==='/park'){
+      var linkUrl=u.searchParams.get('url')||'';
+      var title=u.searchParams.get('title')||'';
+      var lot=u.searchParams.get('lot')==='1';
+      if(linkUrl) _sendPark({url:linkUrl,title:title,lot:lot});
+    }
+  }catch(_){}
 }
 
 // --- localhost HTTP server for bookmarklet (no browser dialog) ---
@@ -120,11 +140,8 @@ function _startLocalServer(){
         if(u.pathname==='/park'){
           const linkUrl = u.searchParams.get('url')||'';
           const title = u.searchParams.get('title')||'';
-          if(linkUrl && mainWin && !mainWin.isDestroyed()){
-            mainWin.webContents.send('protocol-park',{url:linkUrl, title:title, lot:lot});
-            // native OS notification (shows bottom-right, no window pop)
-            
-          }
+          const lot = u.searchParams.get('lot')==='1';
+          if(linkUrl) _sendPark({url:linkUrl, title:title, lot:lot});
         }
       }catch(_){}
       res.writeHead(200,{'Content-Type':'image/gif'});
@@ -141,11 +158,12 @@ let _hkOk=false; let _hkEnabled=true;
 function _hkRegister(){ try{ if(_hkEnabled&&!_hkOk){ _hkOk=!!globalShortcut.register(HK_COMBO, _hkCb); } }catch(_){} }
 function _hkUnregister(){ try{ if(_hkOk){ globalShortcut.unregister(HK_COMBO); _hkOk=false; } }catch(_){} }
 app.whenReady().then(()=>{
+  if(!_gotLock) return;
   syncBoot();
   try{ if(autoUpdater){ autoUpdater.autoDownload=false; autoUpdater.autoInstallOnAppQuit=true; autoUpdater.allowDowngrade=false; autoUpdater.on("error", function(e){ try{ console.error("[sinrad] autoUpdater:", e&&e.message); }catch(_){} }); } }catch(_e){ try{ console.error("[sinrad] autoUpdater config failed:", _e&&_e.message); }catch(_){} }
   const vid=pickBootVideo();
   const _st=readStore(); const _introOn=!(_st&&_st.settings&&_st.settings.introEnabled===false);
-  if(vid && _introOn){ hasSplash=true; createSplash(vid); }
+  if(vid && _introOn){ hasSplash=true; createSplash(vid); if(!splashWin) hasSplash=false; }
   createWindow();
   _startLocalServer();
   var _protoArg=process.argv.find(function(a){return a.startsWith(PROTOCOL+"://");}); if(_protoArg){ mainWin.webContents.once("did-finish-load",function(){ _handleProtocolUrl(_protoArg); }); }
@@ -153,7 +171,6 @@ app.whenReady().then(()=>{
   _hkEnabled=!(_st&&_st.settings&&_st.settings.hotkeyEnabled===false); if(_hkEnabled){ _hkRegister(); } try{ mainWin.webContents.once('did-finish-load', function(){ try{ mainWin.webContents.send('hotkey-status',{ok:_hkOk,combo:'Ctrl+Alt+P',enabled:_hkEnabled}); }catch(_){} }); }catch(_){}
   var _rgTries=0;
   function _closeSplash(){ try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(_){} splashWin=null; }
-  setTimeout(function(){ _closeSplash(); try{ if(mainWin && !mainWin.isDestroyed()) mainWin.show(); }catch(_){} }, 6000);
   if(mainWin&&mainWin.webContents) mainWin.webContents.on("render-process-gone", function(_e, details){ try{ console.error("[sinrad] renderer gone:", details&&details.reason); _closeSplash(); if(_rgTries++ < 3){ setTimeout(function(){ try{ if(mainWin&&!mainWin.isDestroyed()){ mainWin.reload(); mainWin.show(); } }catch(_){} }, 1500); } else { try{ mainWin.show(); }catch(_){} } }catch(_){} });
   mainWin.once("ready-to-show",()=>{ mainReady=true; if(!hasSplash || bootFinished){ bootFinished=true; showMain(); } });
   // pure anti-brick guard: never stay stuck on the splash forever (10 min cap)
@@ -190,7 +207,7 @@ function syncBundled(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){}
 function scanBgm(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){} const exts=[".mp3",".ogg",".wav",".m4a",".flac",".webm",".opus"]; let out=[]; try{ out=fs.readdirSync(BGM_DIR).filter(function(f){ return exts.indexOf(path.extname(f).toLowerCase())>=0; }).map(function(f){ return {name:f, path:path.join(BGM_DIR,f)}; }); }catch(_){} return out; }
 ipcMain.on("music-request",(e)=>{ syncBundled(); const w=BrowserWindow.fromWebContents(e.sender); if(w) w.webContents.send("music-list", {files:scanBgm(), dir:BGM_DIR}); });
 ipcMain.on("music-cmd",(e,c)=>{ if(mainWin) mainWin.webContents.send("music-cmd", c); });
-ipcMain.handle("music-read", async (e,p)=>{ try{ return await fs.promises.readFile(p); }catch(_){ return Buffer.alloc(0); } });
+ipcMain.handle("music-read", async (e,p)=>{ try{ if(typeof p!=="string"||!p) return Buffer.alloc(0); const resolved=path.resolve(p); const root=path.resolve(BGM_DIR)+path.sep; if(resolved!==path.resolve(BGM_DIR) && resolved.indexOf(root)!==0) return Buffer.alloc(0); return await fs.promises.readFile(resolved); }catch(_){ return Buffer.alloc(0); } });
 ipcMain.handle("clip-read", async () => { try { return require("electron").clipboard.readText(); } catch(_){ return ""; } });
 ipcMain.handle("hotkey-toggle", (e, enabled)=>{ _hkEnabled=!!enabled; if(_hkEnabled){ _hkRegister(); } else { _hkUnregister(); } try{ if(mainWin) mainWin.webContents.send("hotkey-status",{ok:_hkOk,combo:"Ctrl+Alt+P",enabled:_hkEnabled}); }catch(_){} return {ok:_hkOk, enabled:_hkEnabled}; });
 ipcMain.handle("set-autostart", (e, enabled)=>{ try{ app.setLoginItemSettings({openAtLogin:!!enabled}); }catch(_){} try{ return app.getLoginItemSettings().openAtLogin; }catch(_){ return !!enabled; } });

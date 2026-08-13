@@ -95,7 +95,7 @@ document.addEventListener("mousemove",(e)=>{
       if(cx<0||cy<0||cx>=rect.width||cy>=rect.height){ setIgnoreTrue(); return; }
       const gx=Math.min(MASK.GW-1,Math.max(0,Math.floor(cx/rect.width*MASK.GW)));
       const gy=Math.min(MASK.GH-1,Math.max(0,Math.floor(cy/rect.height*MASK.GH)));
-      const b=MASK.bbox; if(b&&gx>=b[0]&&gx<=b[1]&&gy>=b[2]&&gy<=b[3]) setIgnoreFalse(); else setIgnoreTrue();   // only the character is "solid"
+      if(MASK.solid[gy*MASK.GW+gx]) setIgnoreFalse(); else setIgnoreTrue();   // only the character pixels are "solid"
     } else setIgnoreFalse();
   } else {
     setIgnoreTrue();

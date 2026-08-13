@@ -16,7 +16,10 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Save to S.I.R [Check out]"
+    "default_title": "Save to S.I.R [Check out]",
+    "default_icon": "icon.png"
   },
-  "icons": {}
+  "icons": {
+    "128": "icon.png"
+  }
 }
