@@ -7,40 +7,66 @@
   html,body{margin:0;height:100%;background:transparent;overflow:hidden;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none;}
   #stage{position:relative;width:100%;height:100%}
-  #menu{position:absolute;right:10px;bottom:10px;top:auto;transform:none;width:152px;left:auto;background:#15151d;border:1px solid #272733;border-radius:6px;
-    padding:6px;box-shadow:0 12px 34px rgba(0,0,0,.65);display:none;z-index:10}
+  #menu{position:absolute;right:10px;bottom:10px;top:auto;transform:none;width:176px;left:auto;background:#15151d;border:1px solid #272733;border-radius:6px;
+    padding:6px;box-shadow:none;display:none;z-index:10}
   #menu.show{display:block}
   #menu .mi{padding:8px 10px;border-radius:4px;font-size:12.5px;font-weight:600;color:#cfd3dc;display:flex;gap:9px;align-items:center;cursor:pointer}
   #menu .mi:hover{background:#1e1e27;color:#fff}
+  #menu .mi[data-nav="vault"]{padding-right:10px}
   #menu .dv{height:1px;background:#1a1a23;margin:5px 4px}
   /* NO box / outline — just the gif; size is set to the image aspect at runtime */
   #pet{position:absolute;left:10px;bottom:10px;top:auto;transform:none;width:120px;height:120px;
-    background:rgba(18,12,18,.35);display:grid;place-items:center;cursor:grab;z-index:1;border:1px solid #ff4d8d;border-radius:0;overflow:hidden;box-shadow:0 6px 20px rgba(0,0,0,.45)}
+    background:transparent;display:grid;place-items:center;cursor:grab;z-index:1;border:none;border-radius:0;overflow:visible;box-shadow:none}
   #pet:active{cursor:grabbing}
   #pet img{width:100%;height:100%;object-fit:fill;display:block;pointer-events:none;-webkit-user-drag:none}
   #pet .emo{font-size:62px;line-height:1}
 
   #menu .mi svg{width:15px;height:15px;flex:0 0 auto}
-  #menuPin{position:absolute;top:6px;right:6px;width:24px;height:24px;border-radius:4px;border:1px solid #2a2a35;background:#1b1b24;color:#cfd3dc;display:grid;place-items:center;cursor:pointer;z-index:2}
+  #slogan{
+    padding:7px 30px 7px 8px;
+    font-size:8.5px;
+    letter-spacing:.65px;
+    font-weight:800;
+    text-transform:uppercase;
+    line-height:1.35;
+    background:linear-gradient(90deg,#ff4d8d 0%,#ffb020 16%,#fff6a8 30%,#33d17a 45%,#27b4ff 62%,#b14bff 78%,#ff4d8d 100%);
+    background-size:240% 100%;
+    -webkit-background-clip:text;
+    background-clip:text;
+    color:transparent;
+    -webkit-text-fill-color:transparent;
+    animation:sloganShift 3.6s linear infinite;
+    filter:drop-shadow(0 0 6px rgba(255,77,141,.35));
+  }
+  @keyframes sloganShift{
+    0%{background-position:0% 50%}
+    100%{background-position:240% 50%}
+  }
+  #menuPin{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:4px;border:1px solid #2a2a35;background:#1b1b24;color:#cfd3dc;display:grid;place-items:center;cursor:pointer;z-index:2}
   #menuPin:hover{background:#262630;color:#fff;border-color:#ff4d8d}
   #menuPin svg{width:14px;height:14px}
 
-  
-  .music-row{display:flex;align-items:center;justify-content:center;gap:8px;padding:8px 6px}
-  .mr-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:28px;border-radius:4px;border:1px solid #2a2a35;background:#1b1b24;color:#cfd3dc;cursor:pointer}
-  .mr-btn:hover{background:#262630;color:#fff;border-color:#ff4d8d}
-  .mr-btn svg{width:15px;height:15px}
-  .mr-play{color:#ff79a6;border-color:rgba(255,77,141,.45)}
+  .rf-head{padding:6px 10px 2px;font-size:9px;letter-spacing:.7px;font-weight:700;color:#ff79c6;text-transform:uppercase}
+  .rf-list{display:flex;flex-direction:column;gap:1px;padding:0 4px 4px}
+  .rf-empty{padding:4px 8px 6px;font-size:11px;color:#5c6070}
+  .rf-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:4px;font-size:12px;font-weight:600;color:#cfd3dc;cursor:pointer;min-width:0}
+  .rf-item:hover{background:#1e1e27;color:#fff}
+  .rf-item .rf-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .rf-pin{flex:0 0 auto;display:inline-flex;color:#ff79c6}
+  .rf-pin svg{width:12px;height:12px}
 </style>
 </head>
 <body>
   <div id="stage">
     <div id="menu" data-hit><div id="menuPin" data-pin="1" title="Pin to app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg></div>
+      <div id="slogan">Sinners save the world</div>
+      <div class="dv"></div>
       <div class="mi" data-nav="vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Vault</div>
       <div class="mi" data-nav="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg> Links</div>
       <div class="mi" data-nav="folders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Folders</div>
       <div class="dv"></div>
-      <div class="music-row"><button type="button" class="mr-btn" data-music="prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M6 6h2v12H6zM20 6v12l-9-6z"/></svg></button><button type="button" class="mr-btn mr-play" data-music="toggle" title="Play / Pause"><svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M8 5v14l11-7z"/></svg></button><button type="button" class="mr-btn" data-music="next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor" width="15" height="15"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button></div>
+      <div class="rf-head">Recent Folders</div>
+      <div id="rfList" class="rf-list"><div class="rf-empty">no recents yet</div></div>
     </div>
     <div id="pet" data-hit><span class="emo">🤖</span></div>
   </div>
@@ -52,6 +78,10 @@ let ignored = true;       // current setIgnoreMouseEvents state
 let menuOpen = false;
 let MASK = null;          // {GW,GH,solid:Uint8Array} when the image has transparency
 let petW = 120, petH = 120;
+
+const PIN_SVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c-3.6 0-6.5 2.8-6.5 6.3 0 4.7 5.6 11.2 6.1 11.8.2.2.6.2.8 0 .5-.6 6.1-7.1 6.1-11.8C18.5 4.8 15.6 2 12 2zm0 8.6a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6z"/></svg>';
+
+function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g, function(c){ return ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]); }); }
 
 function setIgnoreFalse(){ if(ignored){ E.setMouseIgnore && E.setMouseIgnore(false); ignored=false; } }
 function setIgnoreTrue(){ if(!ignored){ E.setMouseIgnore && E.setMouseIgnore(true,{forward:true}); ignored=true; } }
@@ -110,8 +140,38 @@ function closeMenu(){ menu.classList.remove("show"); menuOpen=false; }
 pet.addEventListener("contextmenu",(e)=>{ e.preventDefault(); menuOpen?closeMenu():openMenu(); });
 menu.addEventListener("contextmenu",(e)=>e.preventDefault());
 menu.addEventListener("click",doMenuAct);
-menu.addEventListener("pointerup",(e)=>{ if(e.button===0) doMenuAct(e); });
-function doMenuAct(e){ const mus=e.target.closest("[data-music]"); const nav=e.target.closest("[data-nav]"); const pin=e.target.closest("[data-pin]"); if(!mus&&!nav&&!pin) return; const now=Date.now(); if(now-(doMenuAct._t||0)<250) return; doMenuAct._t=now; if(mus){ E.musicCmd && E.musicCmd(mus.getAttribute("data-music")); return; } if(nav){ E.petNav && E.petNav(nav.dataset.nav); } else { E.petPin && E.petPin(); } closeMenu(); }
+function doMenuAct(e){
+  const nav=e.target.closest("[data-nav]");
+  const pin=e.target.closest("[data-pin]");
+  const fold=e.target.closest("[data-folder]");
+  if(!nav&&!pin&&!fold) return;
+  const now=Date.now();
+  if(now-(doMenuAct._t||0)<400) return;   // debounce: click must never open a folder twice
+  doMenuAct._t=now;
+  if(fold){
+    const p=fold.getAttribute("data-folder");
+    if(p && E.openPath) E.openPath(p);
+    closeMenu();
+    return;
+  }
+  if(nav){ E.petNav && E.petNav(nav.dataset.nav); } else { E.petPin && E.petPin(); }
+  closeMenu();
+}
+
+function renderRecents(list){
+  const box=document.getElementById("rfList");
+  if(!box) return;
+  list=Array.isArray(list)?list.slice(0,3):[];
+  if(!list.length){ box.innerHTML='<div class="rf-empty">no recents yet</div>'; return; }
+  box.innerHTML=list.map(function(f){
+    const pin=f.pinned?'<span class="rf-pin" title="Pinned">'+PIN_SVG+'</span>':'';
+    const name=f.name||f.path||"";
+    return '<div class="rf-item" data-folder="'+esc(f.path||'')+'" title="'+esc(f.path||'')+'">'+pin+'<span class="rf-name">'+esc(name)+'</span></div>';
+  }).join("");
+}
+
+if(E.onRecentFolders) E.onRecentFolders(renderRecents);
+if(E.petRecents){ try{ Promise.resolve(E.petRecents()).then(renderRecents).catch(function(){}); }catch(_){} }
 
 </script>
 </body>

@@ -121,6 +121,10 @@
   .folder-row .fr-main{flex:1;min-width:0}
   .folder-row .fr-name{font-weight:700;color:#fff;font-size:13.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .folder-row .fr-path{color:var(--dim);font-size:11.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .folder-row .fr-meta{display:flex;align-items:center;gap:8px;flex:0 0 auto;min-width:0;max-width:46%}
+  .folder-row .fr-date{font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right}
+  .folder-row .fr-pin{display:inline-flex;color:#ff79c6;flex:0 0 auto}
+  .folder-row .fr-pin svg,.pin-mark{width:13px;height:13px;display:block}
 
   .term{background:#05080b;border:1px solid var(--border-soft);border-radius:4px;overflow:hidden;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace}
   .term-line .ms{flex-basis:100%;margin-top:2px}
@@ -186,6 +190,7 @@
   .lot-item:hover{background:rgba(255,121,198,.08)}
   .lot-item .li-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
   .lot-item .li-main{flex:1;min-width:0;display:flex;flex-direction:column}
+  .lot-item .li-date{flex:0 1 auto;max-width:42%;margin-left:auto;font-size:10px;color:var(--dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:right;line-height:1.2}
   .lot-item .li-title{font-size:13px;color:var(--txt);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .lot-item .li-url{font-size:11px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .lot-item .li-tag{font-size:10px;color:var(--cyan);border:1px solid var(--border);border-radius:6px;padding:0 6px}
@@ -598,7 +603,7 @@ updateMusicUI();
 
 let STORE_MODE="Memory";
 const EDIT_COUNT = 86;
-const APP_VERSION="2.0.18";
+const APP_VERSION="2.0.19";
 
 var DEFAULT_CATS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6", "Guides":"#16c79a" };
 function getCatColors(){ var base=Object.assign({},DEFAULT_CATS); try{ if(state&&state.categories){ for(var k in state.categories){ base[k]=state.categories[k]; } } }catch(e){} return base; }
@@ -633,6 +638,7 @@ const ICO_SEARCH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" str
 const ICO_STAR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l2.6 5.3 5.9.9-4.3 4.1 1 5.8L12 16.9 6.8 19.2l1-5.8L3.5 9.2l5.9-.9z"/></svg>';
 const ICO_WARN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4l9 16H3z"/><line x1="12" y1="10" x2="12" y2="14"/><circle cx="12" cy="17" r=".7" fill="currentColor" stroke="none"/></svg>';
 const ICO_PIN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg>';
+const ICO_PIN_DIAG='<svg class="pin-mark" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2c-3.6 0-6.5 2.8-6.5 6.3 0 4.7 5.6 11.2 6.1 11.8.2.2.6.2.8 0 .5-.6 6.1-7.1 6.1-11.8C18.5 4.8 15.6 2 12 2zm0 8.6a2.3 2.3 0 1 1 0-4.6 2.3 2.3 0 0 1 0 4.6z"/></svg>';
 const ICO_EYE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg>';
 const MODULES=[
   {id:"vault",ico:ICO_LOCK,name:"Vault",sub:"Passwords"},
@@ -641,7 +647,7 @@ const MODULES=[
   {id:"folders",ico:ICO_FOLDER,name:"Folders",sub:"Quick access"},
 ];
 
-function defaultState(){ return { vault:[], links:[], folders:[], console:[], radCmd:"rad", scanRoots:[], scanDepth:4, scanSkipHidden:true }; }
+function defaultState(){ return { vault:[], links:[], folders:[], console:[], radCmd:"rad", scanRoots:[], scanDepth:4, scanSkipHidden:true, petRecents:[], petPins:[] }; }
 let state=defaultState();
 
 async function loadState(){
@@ -670,6 +676,52 @@ function log(level,message,meta){ const e={id:uid(),ts:nowMs(),level:level||"inf
 function normUrl(u){ let x=String(u==null?"":u).trim().toLowerCase(); while(x.length&&x.charAt(x.length-1)==="/")x=x.slice(0,-1); return x; }
 function recordVisit(url){ const saved=state.links.some(l=>normUrl(l.url)===normUrl(url)); log("info","VISIT  "+url, saved?null:{url:url}); }
 function recordFolderVisit(p){ const saved=state.folders.some(f=>normUrl(f.path||"")===normUrl(p)); log("info","OPEN   "+p, saved?null:{path:p}); }
+function normFolderPath(p){ return String(p||"").replace(/[\\/]+$/,"").replace(/\\/g,"/").toLowerCase(); }
+function folderDisplayName(p){
+  const k=normFolderPath(p);
+  const f=(state.folders||[]).find(function(x){ return normFolderPath(x.path||"")===k; });
+  if(f){ if(f.name&&f.path) return f.name; return f.name||baseName(f.path||p); }
+  return baseName(p);
+}
+function isPetPinned(p){ return (state.petPins||[]).some(function(x){ return normFolderPath(x.path)===normFolderPath(p); }); }
+function petFolderSlots(){
+  const pins=state.petPins||[], recents=state.petRecents||[], slots=[], seen=new Set();
+  function push(item, pinned){
+    if(slots.length>=3 || !item || !item.path) return;
+    const k=normFolderPath(item.path); if(!k||seen.has(k)) return;
+    seen.add(k); slots.push({path:item.path, name:folderDisplayName(item.path), pinned:!!pinned});
+  }
+  pins.forEach(function(x){ push(x,true); });
+  recents.forEach(function(x){ push(x,false); });
+  return slots;
+}
+function syncPetRecents(){ if(E&&E.syncPetRecents) E.syncPetRecents(petFolderSlots()); }
+function rememberFolder(p, name){
+  if(!p) return;
+  const item={path:p, name:folderDisplayName(p)||name||baseName(p), ts:nowMs()};
+  state.petRecents=(state.petRecents||[]).filter(function(r){ return normFolderPath(r.path)!==normFolderPath(p); });
+  state.petRecents.unshift(item);
+  if(state.petRecents.length>20) state.petRecents.length=20;
+  saveState(); syncPetRecents();
+}
+function petPinCount(){ return (state.petPins||[]).length; }
+function enforcePetPinCap(){
+  state.petPins=state.petPins||[];
+  if(state.petPins.length<=3) return false;
+  state.petPins=state.petPins.slice(0,3);
+  saveState(); syncPetRecents();
+  return true;
+}
+function togglePetPin(p, name){
+  if(!p) return false;
+  state.petPins=state.petPins||[];
+  const k=normFolderPath(p);
+  const idx=state.petPins.findIndex(function(x){ return normFolderPath(x.path)===k; });
+  if(idx>=0){ state.petPins.splice(idx,1); saveState(); syncPetRecents(); return false; }
+  if(state.petPins.length>=3){ toast("Pet recents only holds 3 pins — unpin one first","warn"); return null; }
+  state.petPins.push({path:p, name:folderDisplayName(p)||name||baseName(p)});
+  saveState(); syncPetRecents(); return true;
+}
 function openTarget(target,type){ if(!target)return; if(type==="url"){ recordVisit(target,true); } if(type==="app"){ if(E&&E.openPath){ E.openPath(target).then(ok=>{ if(ok===false)toast("Could not open path: "+target,"err"); }); } else { toast("Opening local apps requires the desktop build.","warn"); } return; } if(E&&E.shellOpen){ E.shellOpen(target); } else { try{ window.open(target,"_blank","noopener"); }catch(e){ toast("Blocked popup: "+target,"warn"); } } }
 async function copy(text,label){ try{ if(navigator.clipboard&&navigator.clipboard.writeText){ await navigator.clipboard.writeText(text); } else { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); } toast((label||"Value")+" copied","ok"); log("ok","Copied "+(label||"value")+" to clipboard"); }catch(e){ toast("Copy failed","err"); } }
 
@@ -702,7 +754,7 @@ function renderTermBody(){
   const autoScroll=!(state.settings&&state.settings.autoScroll===false); const savedTop=tb.scrollTop;
   const term=searchTerms.console||"";
   const items=state.console.filter(c=>match(term,c.message,c.level)).slice().reverse();
-  const lines=items.length?items.map(c=>{ const ts=new Date(c.ts).toLocaleTimeString([],{hour12:false}); let addBtn=""; if(c.meta&&c.meta.url){ if(!state.links.some(l=>normUrl(l.url)===normUrl(c.meta.url))) addBtn=`<button class="term-add" data-action="console-add-link" data-id="${c.id}" title="Save this site to Links">＋ Link</button>`; } else if(c.meta&&c.meta.path){ if(!state.folders.some(f=>normUrl(f.path||"")===normUrl(c.meta.path))) addBtn=`<button class="term-add" data-action="console-add-folder" data-id="${c.id}" title="Save this folder to Quick Folders">＋ Folder</button>`; } return `<div class="term-line"><span class="tt">[${ts}]</span>&nbsp;<span class="lv ${c.level}">${esc(c.level.toUpperCase())}</span>&nbsp;<span class="ms">${linkify(c.message)}</span>${addBtn}</div>`; }).join(""):`<div class="term-empty">// no activity yet — open a site or folder, or type ${esc(state.radCmd)} "query"</div>`;
+  const lines=items.length?items.map(c=>{ const ts=new Date(c.ts).toLocaleTimeString([],{hour12:false}); let addBtn=""; const folderPath=(c.meta&&(c.meta.path||c.meta.openPath))||""; if(c.meta&&c.meta.url){ if(!state.links.some(l=>normUrl(l.url)===normUrl(c.meta.url))) addBtn=`<button class="term-add" data-action="console-add-link" data-id="${c.id}" title="Save this site to Links">＋ Link</button>`; } else if(folderPath){ if(!state.folders.some(f=>normUrl(f.path||"")===normUrl(folderPath))) addBtn=`<button class="term-add" data-action="console-add-folder" data-id="${c.id}" title="Save this folder to Quick Folders">＋ Folder</button>`; } return `<div class="term-line"${folderPath?` data-action="open-folder-path" data-path="${esc(folderPath)}" style="cursor:pointer"`:""}><span class="tt">[${ts}]</span>&nbsp;<span class="lv ${c.level}">${esc(c.level.toUpperCase())}</span>&nbsp;<span class="ms">${linkify(c.message)}</span>${addBtn}</div>`; }).join(""):`<div class="term-empty">// no activity yet — open a site or folder, or type ${esc(state.radCmd)} "query"</div>`;
   tb.innerHTML=lines;
   if(autoScroll){ tb.scrollTop=tb.scrollHeight; } else { tb.scrollTop=Math.min(savedTop, tb.scrollHeight); }
 }
@@ -755,7 +807,7 @@ function viewLot(){
   const THRESH=(state.settings&&state.settings.stackMin)||3;
   const selN=(typeof _lotCountSel==="function")?_lotCountSel():0;
   const bar=selN?`<div class="lot-bar"><span class="lb-n">${selN} selected</span><button type="button" class="lb-send">→ Links</button><button type="button" class="lb-del">Delete</button><button type="button" class="lb-clear"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> Clear</button></div>`:"";
-  const itemRow=(l,col)=>`<div class="lot-item${lotSelLinks[l.id]?" sel":""}" data-ctx="link" data-id="${l.id}" data-action="link-open"><span class="li-dot" style="background:var(--dim)"></span><span class="li-main"><span class="li-title">${esc(l.title)}</span><span class="li-url">${esc(l.url)}</span></span>${l.note?`<span class="li-note">${esc(l.note)}</span>`:""}${isTagPage(l.url)?`<span class="li-tag">tag</span>`:""}</div>`;
+  const itemRow=(l,col)=>`<div class="lot-item${lotSelLinks[l.id]?" sel":""}" data-ctx="link" data-id="${l.id}" data-action="link-open"><span class="li-dot" style="background:var(--dim)"></span><span class="li-main"><span class="li-title">${esc(l.title)}</span><span class="li-url">${esc(l.url)}</span></span>${l.note?`<span class="li-note">${esc(l.note)}</span>`:""}${isTagPage(l.url)?`<span class="li-tag">tag</span>`:""}<span class="li-date" title="${esc(fmtDate(l.created))}">${esc(fmtDate(l.created))}</span></div>`;
   if(linkDrill){
     let items=parked0().filter(l=>(l.coll||"")===linkDrill);
     items=items.slice().sort((a,b)=>(isTagPage(b.url)?1:0)-(isTagPage(a.url)?1:0));
@@ -796,7 +848,7 @@ function viewFolders(){
   let body;
   if(!state.folders.length) body=emptyState(ICO_FOLDER,"No quick folders yet — paste a path above. "+openVerb()+" · right-click for more.");
   else if(!items.length) body=emptyState(ICO_SEARCH,"Nothing matches. Try a different tab or Ctrl+F.");
-  else body=`<div class="folder-list">`+items.map(f=>{ const p=f.path||f.name||""; const label=(f.name&&f.path)?f.name:baseName(p); return `<div class="folder-row" style="${edgeShadow(f)}" data-ctx="folder" data-id="${f.id}" data-action="folder-open"><span class="fr-ico">${ICO_FOLDER}</span><div class="fr-main"><div class="fr-name">${esc(label||"Untitled")}</div><div class="fr-path" title="${esc(p)}">${esc(p)}</div></div><div style="font-size:10px;color:var(--dim);flex:0 0 auto">${fmtDate(f.created)}</div></div>`; }).join("")+`</div>`;
+  else body=`<div class="folder-list">`+items.map(f=>{ const p=f.path||f.name||""; const label=(f.name&&f.path)?f.name:baseName(p); const pinned=isPetPinned(p); return `<div class="folder-row" style="${edgeShadow(f)}" data-ctx="folder" data-id="${f.id}" data-action="folder-open"><span class="fr-ico">${ICO_FOLDER}</span><div class="fr-main"><div class="fr-name">${esc(label||"Untitled")}</div><div class="fr-path" title="${esc(p)}">${esc(p)}</div></div><div class="fr-meta">${pinned?`<span class="fr-pin" title="Pinned to Pet Recents">${ICO_PIN_DIAG}</span>`:""}<span class="fr-date">${esc(fmtDate(f.created))}</span></div></div>`; }).join("")+`</div>`;
   return head("Quick Folders",""+openVerb()+" · right-click for more · Ctrl+F to search")+addbar+searchRow("folders","Search folders...")+pills+body;
 }
 function doFolderAdd(){ const n=$("#fd_name"),p=$("#fd_path"); const name=n?n.value.trim():"",path=p?p.value.trim():""; if(!path){ toast("Paste a folder path","warn"); return; } state.folders.unshift({id:uid(),name,path,category:folderCat!=="all"?folderCat:"",favorite:false,created:nowMs()}); log("ok","Added quick folder: "+(name||baseName(path))+(folderCat!=="all"?" ["+folderCat+"]":"")); saveState(); celebrate(); renderView(); toast("Folder saved","ok"); }
@@ -831,7 +883,7 @@ function showCardMenu(type,id,x,y){
   let it="";
   if(type==="vault"){ const v=find(state.vault,id); if(!v)return; if(v.url)it+=mi("vault-open",id,"Open site"); it+=mi("vault-copy-u",id,"Copy username")+mi("vault-copy-p",id,"Copy password")+mi("vault-eye",id,revealed.has(id)?"Hide password":"Show password")+miT("vault-fav",id,"Favorite",v.favorite,FAV_COLOR)+miT("vault-pri",id,"Priority",v.priority,PRI_COLOR)+mi("vault-edit",id,"Edit")+`<div class="cdiv"></div>`+mi("vault-del",id,"Delete","#ff5470",true); }
   else if(type==="link"){ const l=find(state.links,id); if(!l)return; it+=mi("link-open",id,"Open")+miT("link-fav-toggle",id,"Favorite",l.favorite,FAV_COLOR)+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(CAT_COLORS).map(c=>miCat(id,c,normCat(l)===c)).join("")+miCat(id,"__none__",!normCat(l))+mi(l.inLinks?"link-unsend":"link-send", id, l.inLinks?"Remove from Links":"Send to Links")+`<div class="cdiv"></div>`+mi("link-del",id,"Delete","#ff5470",true); }
-  else if(type==="folder"){ const f=find(state.folders,id); if(!f)return; it+=mi("folder-open",id,"Open")+miT("folder-fav",id,"Favorite",f.favorite,FAV_COLOR)+mi("folder-edit",id,"Edit")+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(FOLDER_CATS).map(c=>miCatF(id,c,normCat(f)===c)).join("")+miCatF(id,"__none__",!normCat(f))+`<div class="cdiv"></div>`+mi("folder-del",id,"Remove","#ff5470",true); }
+  else if(type==="folder"){ const f=find(state.folders,id); if(!f)return; const fp=f.path||f.name||""; const pn=petPinCount(); const pinned=isPetPinned(fp); const pinLab=pinned?("Unpin from Pet Recents ("+pn+"/3)"):(pn>=3?"Pet recents full (3/3)":"Pin to Pet Recents ("+pn+"/3)"); it+=mi("folder-open",id,"Open")+miT("folder-fav",id,"Favorite",f.favorite,FAV_COLOR)+mi("folder-edit",id,"Edit")+miT("folder-pet-pin",id,pinLab,pinned,"#ff79c6")+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(FOLDER_CATS).map(c=>miCatF(id,c,normCat(f)===c)).join("")+miCatF(id,"__none__",!normCat(f))+`<div class="cdiv"></div>`+mi("folder-del",id,"Remove","#ff5470",true); }
   else return;
   showMenu(x,y,it);
 }
@@ -875,6 +927,8 @@ document.addEventListener("click",async(ev)=>{
     case "cat-del-pill": { var cn2=(t.dataset.cat||"").trim(); if(cn2){ confirmModal("Delete category \""+cn2+"\"? Links will become uncategorized.").then(function(y){ if(y){ deleteCategory(cn2); toast("Category deleted","ok"); } }); } break; }
     case "cat-delete": { var cn=id; confirmModal("Delete category \""+cn+"\"? Links will become uncategorized.").then(function(y){ if(y){ deleteCategory(cn); toast("Category deleted","ok"); } }); break; }
     case "link-del": { const l=find(state.links,id); if(l&&await confirmModal("Delete "+l.title+"?")){ state.links=state.links.filter(x=>x.id!==id); log("warn","Deleted link: "+l.title); saveState(); renderView(); } break; }
+    case "folder-pet-pin": { const f=find(state.folders,id); if(f){ const p=f.path||f.name||""; const on=togglePetPin(p, f.name||baseName(p)); log("info",(on?"Pinned":"Unpinned")+" folder to Pet Recents: "+(f.name||p)); toast(on?"Pinned to Pet Recents":"Unpinned from Pet Recents","ok"); renderView(); } break; }
+    case "open-folder-path": { const p=t.dataset.path; if(p) openTarget(p,"app"); break; }
     case "folder-add": doFolderAdd(); break;
     case "folder-open": openByAction("folder-open",id); break;
     case "folder-edit": folderEditModal(id); break;
@@ -885,7 +939,7 @@ document.addEventListener("click",async(ev)=>{
     case "folder-filter": folderFilter=t.dataset.filter; renderView(); break;
     case "console-clear": if(await confirmModal("Clear the entire activity log?")){ state.console=[]; log("warn","Activity log cleared"); saveState(); renderView(); } break;
     case "console-add-link": { const c=find(state.console,id); if(c&&c.meta&&c.meta.url){ const u=c.meta.url; state.links.unshift({id:uid(),title:hostOf(u),url:u,category:"",favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved visited site to Links: "+u); saveState(); renderView(); toast("Added to Links","ok"); } break; }
-    case "console-add-folder": { const c=find(state.console,id); if(c&&c.meta&&c.meta.path){ const p=c.meta.path; state.folders.unshift({id:uid(),name:baseName(p),path:p,category:"",favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved opened folder to Quick Folders: "+p); saveState(); renderView(); toast("Added to Folders","ok"); } break; }
+    case "console-add-folder": { const c=find(state.console,id); const p=c&&c.meta&&(c.meta.path||c.meta.openPath); if(p){ state.folders.unshift({id:uid(),name:baseName(p),path:p,category:"",favorite:false,created:nowMs()}); c.meta=null; log("ok","Saved opened folder to Quick Folders: "+p); saveState(); renderView(); toast("Added to Folders","ok"); } break; }
     case "norma-min": setFloating(true); break;
     case "norma-dock": setFloating(false); break;
     case "norma-pin": setFloating(!isFloating()); break;
@@ -1096,6 +1150,10 @@ function buildThinkBar(){ const w=$("#tbWave"); if(w){ let h=""; for(let i=0;i<6
   loadArt();
   if(E&&E.onNormaDock)E.onNormaDock(()=>setFloating(false));
   if(E&&E.onNormaNav)E.onNormaNav(m=>{ currentView=m; $("#content").classList.remove("searching"); searchTerms={}; renderNav(); renderView(); });
+  if(E&&E.onRecordRecentFolder) E.onRecordRecentFolder(function(info){ if(info&&info.path) rememberFolder(info.path, info.name); });
+  if(E&&E.onRecentFolders) E.onRecentFolders(function(){ if(currentView==="folders") renderView(); });
+  if(enforcePetPinCap()) toast("Pet recents only holds 3 pins — extra pins were released","warn");
+  try{ syncPetRecents(); }catch(_){}
   log("info","S.I.R booted — Personal Command Center ready (v"+APP_VERSION+", "+EDIT_COUNT+" edits).");
 })();
 </script>

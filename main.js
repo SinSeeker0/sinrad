@@ -47,22 +47,25 @@ function createPet(){
   if(petWin) return petWin;
   const wa = screen.getPrimaryDisplay().workArea;
   petWin = new BrowserWindow({
-    width:300, height:200, x:wa.x+24, y:wa.y+wa.height-240,
+    width:320, height:340, x:wa.x+24, y:wa.y+wa.height-380,
     transparent:true, frame:false, alwaysOnTop:true, resizable:false,
     skipTaskbar:true, hasShadow:false, focusable:true, fullscreenable:false,
+    backgroundColor:"#00000000",
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false }
   });
+  try{ petWin.setBackgroundColor("#00000000"); }catch(_){}
   petWin.setAlwaysOnTop(true, "screen-saver");           // float above everything
   petWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen:true });
   petWin.loadFile(path.join(__dirname,"pet.html"));
   // click-through on transparent areas (forward mouse so renderer can toggle)
   petWin.setIgnoreMouseEvents(true, { forward:true });
+  petWin.webContents.on("did-finish-load", function(){ try{ syncPetRecents(); }catch(_){} });
   petWin.on("closed", ()=>{ petWin=null; });
   return petWin;
 }
 let petTopTimer=null;
 function assertPetTop(){ if(petWin && !petWin.isDestroyed() && petWin.isVisible()){ try{ petWin.setAlwaysOnTop(true,"screen-saver"); petWin.moveTop(); }catch(e){} } }
-function showPet(){ const w=createPet(); w.show(); assertPetTop(); if(petTopTimer) clearInterval(petTopTimer); petTopTimer=setInterval(assertPetTop,2500); }
+function showPet(){ const w=createPet(); w.show(); assertPetTop(); if(petTopTimer) clearInterval(petTopTimer); petTopTimer=setInterval(assertPetTop,2500); try{ syncPetRecents(); }catch(_){} }
 function hidePet(){ if(petTopTimer){ clearInterval(petTopTimer); petTopTimer=null; } if(petWin) petWin.hide(); }
 
 /* whole-screen dragging: poll the cursor while the user holds the pet */
@@ -187,7 +190,7 @@ ipcMain.on("win-close",(e)=>{ const w=BrowserWindow.fromWebContents(e.sender); i
 
 /* ---------- IPC: open urls / local apps ---------- */
 ipcMain.on("shell-open", (e,url)=>{ if(typeof url==="string"&&url) shell.openExternal(url); });
-ipcMain.handle("open-path", async (e,p)=>{ if(typeof p!=="string"||!p) return false; try{ await shell.openPath(p); return true; }catch(err){ return false; } });
+ipcMain.handle("open-path", async (e,p)=>{ if(typeof p!=="string"||!p) return false; try{ const err=await shell.openPath(p); if(err) return false; try{ _recordRecentFolder(p); }catch(_){} return true; }catch(err){ return false; } });
 
 /* ---------- IPC: store ---------- */
 ipcMain.handle("store-load", ()=>readStore());
@@ -201,6 +204,73 @@ ipcMain.on("pet-drag-end",   ()=>stopDrag());
 ipcMain.on("set-mouse-ignore", (e,b,opts)=>{ const w=BrowserWindow.fromWebContents(e.sender); if(w) w.setIgnoreMouseEvents(!!b, opts||{}); });
 ipcMain.on("pet-nav", (e,mod)=>{ if(mainWin){ mainWin.webContents.send("norma-nav", mod); if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.focus(); } });
 ipcMain.on("pet-pin", ()=>{ hidePet(); if(mainWin){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.focus(); mainWin.webContents.send("norma-dock"); } });
+
+/* ---------- pet recent / pinned folders ---------- */
+let _petSlots=[];
+function _normFolderPath(p){ try{ return path.resolve(String(p||"")); }catch(_){ return String(p||""); } }
+function _folderInfo(p){
+  if(typeof p!=="string"||!p) return null;
+  try{
+    let resolved=_normFolderPath(p);
+    if(!resolved) return null;
+    if(fs.existsSync(resolved)){
+      const st=fs.statSync(resolved);
+      if(!st.isDirectory()) resolved=path.dirname(resolved);
+    }
+    return { path:resolved, name:path.basename(resolved)||resolved, ts:Date.now() };
+  }catch(_){ return null; }
+}
+function _slotsFromStore(){
+  const st=readStore()||{};
+  const pins=Array.isArray(st.petPins)?st.petPins:[];
+  const recents=Array.isArray(st.petRecents)?st.petRecents:[];
+  const slots=[]; const seen=new Set();
+  function push(item, pinned){
+    if(slots.length>=3 || !item || !item.path) return;
+    const k=_normFolderPath(item.path).toLowerCase();
+    if(!k || seen.has(k)) return;
+    seen.add(k);
+    let label=item.name||path.basename(item.path);
+    const folders=Array.isArray(st.folders)?st.folders:[];
+    for(let i=0;i<folders.length;i++){
+      const f=folders[i];
+      if(_normFolderPath(f.path||"").toLowerCase()===k){
+        label=(f.name&&f.path)?f.name:(f.name||path.basename(f.path||item.path));
+        break;
+      }
+    }
+    slots.push({ path:item.path, name:label, pinned:!!pinned });
+  }
+  pins.forEach(function(x){ push(x, true); });
+  recents.forEach(function(x){ push(x, false); });
+  return slots;
+}
+function syncPetRecents(slots){
+  if(Array.isArray(slots)) _petSlots=slots;
+  else if(!_petSlots.length) _petSlots=_slotsFromStore();
+  try{ if(petWin && !petWin.isDestroyed()) petWin.webContents.send("recent-folders-update", _petSlots); }catch(_){}
+}
+function _recordRecentFolder(p){
+  const info=_folderInfo(p);
+  if(!info) return;
+  try{
+    if(mainWin && !mainWin.isDestroyed()){ mainWin.webContents.send("record-recent-folder", info); }
+    else {
+      const st=readStore()||{};
+      let recents=Array.isArray(st.petRecents)?st.petRecents.slice():[];
+      const key=String(info.path).toLowerCase();
+      recents=recents.filter(function(r){ return String((r&&r.path)||"").toLowerCase()!==key; });
+      recents.unshift(info);
+      if(recents.length>20) recents.length=20;
+      st.petRecents=recents;
+      writeStore(st);
+      _petSlots=_slotsFromStore();
+    }
+  }catch(_){}
+}
+ipcMain.on("sync-pet-recents", (e, slots)=>{ syncPetRecents(slots); });
+ipcMain.handle("pet-recents", ()=> (_petSlots.length?_petSlots:_slotsFromStore()));
+
 const BGM_DIR = path.join(app.getPath("userData"),"bgm");
 const BUNDLED_BGM = path.join(__dirname,"bgm");
 function syncBundled(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){} const exts=[".mp3",".ogg",".wav",".m4a",".flac",".webm",".opus"]; try{ fs.readdirSync(BUNDLED_BGM).forEach(function(f){ if(exts.indexOf(path.extname(f).toLowerCase())<0) return; const dest=path.join(BGM_DIR,f); if(!fs.existsSync(dest)){ try{ fs.writeFileSync(dest, fs.readFileSync(path.join(BUNDLED_BGM,f))); }catch(_){} } }); }catch(_){} }

@@ -53,5 +53,11 @@ contextBridge.exposeInMainWorld("electronAPI", {
   extDir: () => ipcRenderer.invoke("ext-dir"),
   extOpen: () => ipcRenderer.invoke("ext-open"),
   showNotif: (data) => ipcRenderer.send("show-notif", data),
-  dataPath: (cb) => ipcRenderer.on("data-path", (_, pp) => cb(pp))
+  dataPath: (cb) => ipcRenderer.on("data-path", (_, pp) => cb(pp)),
+
+  // pet recent / pinned folders
+  syncPetRecents: (slots) => ipcRenderer.send("sync-pet-recents", slots),
+  petRecents: () => ipcRenderer.invoke("pet-recents"),
+  onRecentFolders: (cb) => ipcRenderer.on("recent-folders-update", (_, list) => cb(list)),
+  onRecordRecentFolder: (cb) => ipcRenderer.on("record-recent-folder", (_, info) => cb(info))
 });
