@@ -55,6 +55,9 @@
   .norma{margin:10px;padding:12px 13px;border-radius:6px;background:linear-gradient(160deg,#1a1018,#120d14);border:1px solid rgba(255,77,141,.22);position:relative}
   .norma-head{display:flex;align-items:center;gap:8px}
   .norma-name{color:var(--pink);font-weight:700;font-size:12.5px}
+  .norma-clock{display:none;margin-left:4px;border:1px solid #ff5470;color:#ff6b82;background:#1a0c10;border-radius:4px;padding:3px 12px;min-width:64px;justify-content:center;font-size:11px;font-weight:800;letter-spacing:.5px;font-variant-numeric:tabular-nums;line-height:1.2}
+  .norma-clock.show{display:inline-flex;align-items:center}
+  #nbKillClock{position:absolute;top:2px;left:50%;transform:translateX(-50%);margin:0;z-index:2}
   .norma-eye{font-size:12px}
   .norma-think{display:inline-flex;align-items:center;gap:2px;margin-left:2px}
   .norma-think i{width:3.5px;height:3.5px;border-radius:50%;background:var(--pink);animation:dotbounce 1.2s infinite ease-in-out}
@@ -250,6 +253,13 @@
   @keyframes blink{50%{opacity:0}}
   .term-empty{color:var(--dim);padding:2px 0}
 
+  .kill-btn{margin-left:8px;width:28px;height:28px;border:1px solid rgba(255,84,112,.55);border-radius:50%;background:#1a0c10;color:#ff5470;padding:0;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:3px}
+  .kill-btn svg{width:15px;height:15px;display:block}
+  .kill-btn .kill-min{display:none;font-size:10px;font-weight:700;line-height:1}
+  .kill-btn:hover{background:rgba(255,84,112,.16);color:#ff7a90}
+  .kill-btn.armed{width:auto;min-width:28px;padding:0 8px;border-radius:14px;background:#ff5470;color:#fff;border-color:#ff5470;animation:killPulse 1.6s ease-in-out infinite}
+  .kill-btn.armed .kill-min{display:inline}
+  @keyframes killPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,84,112,.55)}70%{box-shadow:0 0 0 8px rgba(255,84,112,0)}}
   .statusbar{height:38px;flex:0 0 38px;display:flex;align-items:center;gap:10px;padding:0 16px;background:var(--titlebar);border-top:1px solid var(--border-soft);font-size:11.5px;color:var(--muted);-webkit-user-select:none;user-select:none}
   .dot{width:8px;height:8px;border-radius:50%;background:var(--green);box-shadow:0 0 8px var(--green);transform:translateY(-1px);animation:dotpulse 1.6s ease-in-out infinite}
   @keyframes dotpulse{0%,100%{opacity:1;box-shadow:0 0 8px var(--green)}50%{opacity:.25;box-shadow:0 0 2px var(--green)}}
@@ -269,6 +279,13 @@
   .overlay{position:fixed;inset:0;background:rgba(3,3,6,.66);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
   .overlay.show{display:flex}
   .modal{width:min(460px,100%);background:var(--win);border:1px solid var(--win-border);border-radius:6px;box-shadow:0 30px 80px rgba(0,0,0,.6);overflow:hidden;animation:pop .14s ease}
+  .modal.danger{border-color:rgba(255,84,112,.75);background:linear-gradient(180deg,#1c0a0e 0%,#10080a 55%,#0b0b10 100%);box-shadow:0 0 0 1px rgba(255,84,112,.2),0 0 40px rgba(255,40,70,.18),0 30px 80px rgba(0,0,0,.7)}
+  .modal.danger .modal-h{color:#ff5470;border-bottom-color:rgba(255,84,112,.28);letter-spacing:.8px;text-transform:uppercase;font-size:13px}
+  .modal.danger .modal-h svg{width:18px;height:18px;flex:0 0 auto}
+  .modal.danger .modal-b{color:#f3cdd3}
+  .modal.danger .modal-b p{color:#e8b4bc!important;line-height:1.5}
+  .btn.kill-go{background:#ff5470;border-color:#ff5470;color:#fff}
+  .btn.kill-go:hover{background:#ff6d82;border-color:#ff6d82;color:#fff}
   @keyframes pop{from{transform:scale(.96);opacity:0}to{transform:scale(1);opacity:1}}
   .modal-h{padding:16px 18px;border-bottom:1px solid var(--border-soft);font-weight:700;font-size:15px;display:flex;align-items:center;gap:8px}
   .modal-b{padding:18px}
@@ -417,7 +434,7 @@
   .linkbar{padding:10px;gap:8px;margin-bottom:12px}
   .linkbar .btn{font-size:11px;padding:5px 11px}
   .lin-input{padding:7px 10px;font-size:12px}
-  #norma-bubble{border:1px solid var(--pink);border-radius:0;overflow:hidden;box-shadow:0 0 0 1px rgba(255,77,141,.2),0 8px 22px rgba(0,0,0,.4)}
+  #norma-bubble{border:1px solid var(--pink);border-radius:0;overflow:visible;box-shadow:0 0 0 1px rgba(255,77,141,.2),0 8px 22px rgba(0,0,0,.4)}
 
   .winctl{display:flex;align-items:center;gap:8px}
   .winctl .tsep{width:1px;height:18px;background:var(--border-soft)}
@@ -475,11 +492,12 @@
         <div class="norma" id="norma">
           <div class="norma-head">
             <span class="norma-name">Norma is watching</span>
+            <span class="norma-clock" id="normaKillClock"></span>
             <span class="norma-eye"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></span>
             <span class="norma-think"><i></i><i></i><i></i></span>
             <button class="norma-min" data-action="norma-min" title="Send floating">–</button>
           </div>
-          <div class="norma-float-msg" style="display:none;align-items:center;justify-content:center;gap:8px;padding:8px;color:var(--pink);font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg> Norma is floating — right-click to dock</div><div class="norma-hint">Minimize (–) to send her floating on your desktop.<br>Right-click her (or the floating pet) for quick access · Pin to dock.</div>
+          <div class="norma-float-msg" style="display:none;align-items:center;justify-content:center;gap:8px;padding:8px;color:var(--pink);font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg> Norma is floating — right-click to dock <span class="norma-clock" id="normaFloatClock"></span></div><div class="norma-hint">Minimize (–) to send her floating on your desktop.<br>Right-click her (or the floating pet) for quick access · Pin to dock.</div>
           <div class="norma-music"><div class="nm-trackrow"><div class="nm-disc" id="nm-disc"></div><div class="nm-track" id="nm-track">No tracks</div><button class="nm-btn nm-folder" data-action="music-open-folder" title="Open music folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></div><div class="nm-controls"><button class="nm-btn" data-action="music-prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 6h2v12H6zM20 6v12l-9-6z"/></svg></button><button class="nm-btn nm-play" data-action="music-toggle" title="Play / Pause" id="nm-play"></button><button class="nm-btn" data-action="music-next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button></div></div>
         </div>
       </aside>
@@ -499,11 +517,12 @@
 
       <span class="store-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><rect x="8" y="13" width="8" height="6"/></svg><span id="store-mode">Memory</span></span>
       <span id="clock">--:--:--</span>
+      <button type="button" class="kill-btn" id="killBtn" data-action="kill-toggle" title="Sleep timer — shut down this PC in 30 minutes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg><span class="kill-min"></span></button>
       
     </div>
   </div>
 
-  <div id="norma-bubble" title="Norma (preview) — click/right-click for menu"><img id="normaGif" src="" alt="Norma" draggable="false" /></div>
+  <div id="norma-bubble" title="Norma (preview) — click/right-click for menu"><span class="norma-clock" id="nbKillClock"></span><img id="normaGif" src="" alt="Norma" draggable="false" /></div>
   <div id="ctxmenu"></div>
 
   <div id="celebrate">
@@ -547,18 +566,18 @@ function openGithub(){ if(E&&E.shellOpen){ E.shellOpen(GH_REPO_URL); } else { tr
 function showUpdateModal(){ const m=$("#update-modal"); if(m){ m.classList.add("show"); } }
 function hideUpdateModal(){ const m=$("#update-modal"); if(m) m.classList.remove("show"); updState=null; }
 function setUpdProgress(show, pct){ const box=$("#um-prog"); if(box) box.classList.toggle("show", !!show); const fill=$("#um-barfill"); if(fill) fill.style.width=(pct||0)+"%"; }
-function renderUpdateResult(r){
+function renderUpdateResult(r, silent){
   const t=$("#um-title"), v=$("#um-ver"), d=$("#um-date"), n=$("#um-notes"), go=$("#um-go"), lat=$("#um-later");
-  try{ if(r&&r.ok&&r.available) toast("Update available: v"+(r.latest||""),"ok"); else if(r&&r.ok) toast("You're up to date","ok"); else if(r&&!r.ok) toast("Update check failed","err"); }catch(_){}
+  if(!silent){ try{ if(r&&r.ok&&r.available) toast("Update available: v"+(r.latest||""),"ok"); else if(r&&r.ok) toast("You're up to date","ok"); else if(r&&!r.ok) toast("Update check failed","err"); }catch(_){} }
   setUpdProgress(false);
   setUpdateGif((!r||!r.ok)?null:(!r.available?"complete":"checking"));
-  if(!r||!r.ok){ if(t)t.textContent="Update check failed"; if(v)v.textContent=""; if(d)d.textContent=""; if(n)n.textContent=(r&&r.error)||"Could not reach GitHub. Check your connection."; if(go){go.style.display="none";} if(lat){lat.style.display="";lat.textContent="Close";} showUpdateModal(); return; }
-  if(!r.available){ if(t)t.textContent="You are up to date"; if(v)v.textContent="v"+r.current; if(d)d.textContent=""; if(n)n.textContent="No newer release on GitHub yet - you are on the latest build."; if(go){go.style.display="none";} if(lat){lat.style.display="";lat.textContent="Close";} showUpdateModal(); return; }
+  if(!r||!r.ok){ if(t)t.textContent="Update check failed"; if(v)v.textContent=r&&r.current?("v"+r.current):""; if(d)d.textContent=""; if(n)n.textContent=(r&&r.error)||"Could not reach GitHub. Check your connection."; if(go){go.style.display="none";} if(lat){lat.style.display="";lat.textContent="Close";} showUpdateModal(); return; }
+  if(!r.available){ if(t)t.textContent="You are up to date"; if(v)v.textContent="v"+r.current; if(d)d.textContent=""; if(n)n.textContent="Latest on GitHub is v"+(r.latest||r.current)+" — you're on it."; if(go){go.style.display="none";} if(lat){lat.style.display="";lat.textContent="Close";} showUpdateModal(); return; }
   if(t)t.textContent="New Version Available";
   if(v)v.textContent="v"+r.latest;
   if(d)d.textContent=r.date||"";
   if(n)n.textContent=(r.notes||"").trim()||"(no release notes)";
-  if(go){ go.style.display=""; go.disabled=false; go.textContent=(r.platform==="darwin"||!r.asset)?"Download page":"Update now"; }
+  if(go){ go.style.display=""; go.disabled=false; go.textContent=r.canAuto?"Update now":(r.asset?"Download":"Open releases"); }
   if(lat){ lat.style.display=""; lat.disabled=false; lat.textContent="Not now"; }
   updState = r;
   showUpdateModal();
@@ -566,30 +585,30 @@ function renderUpdateResult(r){
 function updateCheckClick(silent){
   if(!E||!E.updateCheck){ if(!silent) toast("Update check works in the desktop build","warn"); return; }
   if(!silent){ const t=$("#um-title"); if(t)t.textContent="Checking…"; const n=$("#um-notes"); if(n)n.textContent="Contacting GitHub…"; setUpdateGif("checking"); showUpdateModal(); }
-  Promise.resolve(E.updateCheck(APP_VERSION)).then(renderUpdateResult).catch(function(e){ renderUpdateResult({ok:false,error:String(e&&e.message||e)}); });
+  Promise.resolve(E.updateCheck(APP_VERSION)).then(function(r){ renderUpdateResult(r, !!silent); }).catch(function(e){ renderUpdateResult({ok:false,error:String(e&&e.message||e)}, !!silent); });
 }
 function updateGoClick(){
   const r=updState; if(!r) return;
-  if(r.platform==="darwin" || (!r.asset && !r.temp)){ openGithub(); hideUpdateModal(); return; }
-  if(r.temp){ setUpdateGif("updating"); doInstall(r.temp); return; }
+  if(r.temp){ setUpdateGif("updating"); doInstall(); return; }
+  if(!r.canAuto){ if(E&&E.shellOpen) E.shellOpen((r.asset&&r.asset.url)||r.page||GH_REPO_URL+"/releases/latest"); else openGithub(); hideUpdateModal(); return; }
   const go=$("#um-go"), lat=$("#um-later"); if(go)go.disabled=true; if(lat)lat.disabled=true;
   if(!E||!E.updateDownload){ toast("Update download needs the desktop build","warn"); return; }
-  setUpdProgress(true,0); setUpdateGif("updating"); const pctEl=$("#um-pct"); if(pctEl) pctEl.textContent="0%";
-  if(E.onUpdateProgress){ E.onUpdateProgress(function(p){ const tot=p.total||0; const pct=tot?Math.min(100,Math.round((p.got/tot)*100)):0; const mb=function(b){return (b/1048576).toFixed(1);}; setUpdProgress(true,pct); if(pctEl) pctEl.textContent=pct+"%"+(tot?("  "+mb(p.got)+"/"+mb(tot)+" MB"):""); }); }
-  Promise.resolve(E.updateDownload({url:r.asset.url,name:r.asset.name})).then(function(res){
+  setUpdProgress(true,0); setUpdateGif("updating");
+  Promise.resolve(E.updateDownload({url:r.asset&&r.asset.url, name:r.asset&&r.asset.name})).then(function(res){
     if(res&&res.manual){ hideUpdateModal(); return; }
-    setUpdProgress(true,100); if(pctEl) pctEl.textContent="100%";
-    updState=Object.assign({},r,{temp:res&&res.temp});
+    setUpdProgress(true,100); const pctEl=$("#um-pct"); if(pctEl) pctEl.textContent="100%";
+    updState=Object.assign({},r,{temp:true});
     if(go){go.disabled=false; go.textContent="Install & relaunch";} if(lat)lat.disabled=false;
     toast("Download complete","ok");
   }).catch(function(e){ setUpdProgress(false); toast("Download failed: "+(e&&e.message||e),"err"); if(go)go.disabled=false; if(lat)lat.disabled=false; });
 }
-function doInstall(temp){
+function doInstall(){
   if(!E||!E.updateInstall){ toast("Install needs the desktop build","warn"); return; }
   const go=$("#um-go"); if(go){go.disabled=true; go.textContent="Installing…";}
-  Promise.resolve(E.updateInstall(temp)).then(function(res){ if(res&&res.manual){ openGithub(); } hideUpdateModal(); }).catch(function(e){ toast("Install failed: "+(e&&e.message||e),"err"); if(go){go.disabled=false; go.textContent="Install & relaunch";} });
+  Promise.resolve(E.updateInstall()).then(function(res){ if(res&&res.manual){ openGithub(); } hideUpdateModal(); }).catch(function(e){ toast("Install failed: "+(e&&e.message||e),"err"); if(go){go.disabled=false; go.textContent="Install & relaunch";} });
 }
-function autoCheckUpdate(){ if(!E||!E.updateCheck) return; Promise.resolve(E.updateCheck(APP_VERSION)).then(function(r){ if(r&&r.ok&&r.available){ renderUpdateResult(r); } }).catch(function(){}); }
+function autoCheckUpdate(){ if(!E||!E.updateCheck) return; Promise.resolve(E.updateCheck(APP_VERSION)).then(function(r){ if(r&&r.ok&&r.available) renderUpdateResult(r, true); }).catch(function(){}); }
+if(E&&E.onUpdateProgress){ E.onUpdateProgress(function(p){ const tot=p.total||0; const pct=p.percent!=null?Math.round(p.percent):(tot?Math.min(100,Math.round((p.got/tot)*100)):0); const mb=function(b){return (b/1048576).toFixed(1);}; const pctEl=$("#um-pct"); setUpdProgress(true,pct); if(pctEl) pctEl.textContent=pct+"%"+(tot?("  "+mb(p.got)+"/"+mb(tot)+" MB"):""); }); }
 (function(){ const m=$("#update-modal"); if(m) m.addEventListener("click",function(e){ if(e.target&&e.target.id==="update-modal") hideUpdateModal(); }); document.addEventListener("keydown",function(e){ if(e.key==="Escape"){ const m2=$("#update-modal"); if(m2&&m2.classList.contains("show")) hideUpdateModal(); } }); })();
 setTimeout(autoCheckUpdate, 1500);
 function openVerb(){ return (state.openMode==='single')?'Single-click':'Double-click'; }
@@ -660,8 +679,8 @@ updateMusicUI();
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 93;
-const APP_VERSION="2.0.20";
+const EDIT_COUNT = 113;
+let APP_VERSION="2.0.20";
 
 var DEFAULT_CATS={ "Anime":"#ff5470", "Interesting":"#4d9bff", "Check out":"#e8e8ef", "Artist":"#8b5cf6", "Guides":"#16c79a" };
 function getCatColors(){ var base=Object.assign({},DEFAULT_CATS); try{ if(state&&state.categories){ for(var k in state.categories){ base[k]=state.categories[k]; } } }catch(e){} return base; }
@@ -715,7 +734,9 @@ async function loadState(){
   const d=defaultState(); for(const k in d){ if(state[k]===undefined) state[k]=d[k]; }
   document.getElementById("store-mode").textContent=STORE_MODE; refreshCatColors(); refreshFolderCats();
 }
-function saveState(){ const s=JSON.parse(JSON.stringify(state)); if(E&&E.storeSave){ try{ E.storeSave(s); }catch(e){} } try{ localStorage.setItem(KEY,JSON.stringify(s)); }catch(e){} }
+let _saveT=null;
+function saveState(){ if(_saveT) clearTimeout(_saveT); _saveT=setTimeout(flushSave,400); }
+function flushSave(){ _saveT=null; if(E&&E.storeSave){ try{ E.storeSave(state); }catch(e){} } else { try{ localStorage.setItem(KEY,JSON.stringify(state)); }catch(e){} } }
 
 function uid(){ try{ return crypto.randomUUID(); }catch(e){ return "id-"+Date.now()+"-"+Math.random().toString(36).slice(2,8); } }
 function esc(s){ return String(s==null?"":s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
@@ -951,12 +972,33 @@ async function shotsRefresh(silent){
   }catch(e){ if(!silent) toast("Could not scan screenshot folders","warn"); }
 }
 const _shotThumbs={};
-function shotsHydrateThumbs(){
+const _shotThumbOrder=[];
+function shotCacheSet(p,url){
+  _shotThumbs[p]=url;
+  const i=_shotThumbOrder.indexOf(p); if(i>=0) _shotThumbOrder.splice(i,1);
+  _shotThumbOrder.push(p);
+  while(_shotThumbOrder.length>200){ const old=_shotThumbOrder.shift(); delete _shotThumbs[old]; }
+}
+function shotLoadThumb(img){
+  const p=img.getAttribute("data-spath"); if(!p) return;
+  if(_shotThumbs[p]){ img.src=_shotThumbs[p]; return; }
   if(!E||!E.shotsThumb) return;
-  document.querySelectorAll("img.shot-thumb[data-spath]").forEach(function(img){
-    const p=img.getAttribute("data-spath"); if(!p) return;
-    if(_shotThumbs[p]){ img.src=_shotThumbs[p]; return; }
-    E.shotsThumb(p).then(function(url){ if(url){ _shotThumbs[p]=url; if(img.isConnected) img.src=url; } });
+  E.shotsThumb(p).then(function(url){ if(url){ shotCacheSet(p,url); if(img.isConnected) img.src=url; } });
+}
+let _thumbObs=null;
+function shotsHydrateThumbs(){
+  if(_thumbObs){ try{ _thumbObs.disconnect(); }catch(_){} _thumbObs=null; }
+  const root=document.getElementById("content");
+  const imgs=document.querySelectorAll("img.shot-thumb[data-spath]");
+  if(!imgs.length) return;
+  if(typeof IntersectionObserver==="undefined"){ imgs.forEach(shotLoadThumb); return; }
+  _thumbObs=new IntersectionObserver(function(ents){
+    ents.forEach(function(ent){ if(!ent.isIntersecting) return; _thumbObs.unobserve(ent.target); shotLoadThumb(ent.target); });
+  },{ root:root||null, rootMargin:"240px", threshold:0.01 });
+  imgs.forEach(function(img){
+    const p=img.getAttribute("data-spath");
+    if(p&&_shotThumbs[p]){ img.src=_shotThumbs[p]; return; }
+    _thumbObs.observe(img);
   });
 }
 let _shotScanning=false;
@@ -1172,10 +1214,10 @@ function viewConsole(){
   return head("Console","Live log + commands · Ctrl+F to grep")+searchRow("console","Grep the log...")+toolbar+termHtml;
 }
 
-function openModal(t,b,l,onC,onX){ $("#modal-title").innerHTML=t; $("#modal-body").innerHTML=b; $("#modal-confirm").textContent=l||"Save"; $("#modal-confirm").classList.remove("hidden"); $("#modalCancelBtn").classList.remove("hidden"); modalOnConfirm=onC||null; modalOnCancel=onX||null; $("#overlay").classList.add("show"); const f=$("#modal-body input, #modal-body textarea, #modal-body select"); if(f)setTimeout(()=>f.focus(),30); }
-function closeModal(){ $("#overlay").classList.remove("show"); modalOnConfirm=null; modalOnCancel=null; }
+function openModal(t,b,l,onC,onX,danger){ $("#modal-title").innerHTML=t; $("#modal-body").innerHTML=b; const mc=$("#modal-confirm"); if(mc){ mc.textContent=l||"Save"; mc.classList.remove("hidden"); mc.classList.toggle("kill-go",!!danger); if(danger) mc.classList.remove("primary"); else mc.classList.add("primary"); } const xb=$("#modalCancelBtn"); if(xb){ xb.classList.remove("hidden"); xb.textContent="Cancel"; } const md=document.querySelector("#overlay .modal"); if(md) md.classList.toggle("danger",!!danger); modalOnConfirm=onC||null; modalOnCancel=onX||null; $("#overlay").classList.add("show"); const f=$("#modal-body input, #modal-body textarea, #modal-body select"); if(f)setTimeout(()=>f.focus(),30); }
+function closeModal(){ $("#overlay").classList.remove("show"); modalOnConfirm=null; modalOnCancel=null; const md=document.querySelector("#overlay .modal"); if(md) md.classList.remove("danger"); const mc=$("#modal-confirm"); if(mc){ mc.classList.remove("kill-go"); mc.classList.add("primary"); } const xb=$("#modalCancelBtn"); if(xb) xb.textContent="Cancel"; }
 function cancelModal(){ const c=modalOnCancel; closeModal(); if(typeof c==="function")c(); }
-function confirmModal(m){ return new Promise(res=>{ openModal("⚠️ Confirm",`<p style="margin:0;color:var(--muted)">${esc(m)}</p>`,"Yes, do it",()=>{closeModal();res(true);},()=>res(false)); setTimeout(()=>{const b=$("#modal-confirm");if(b)b.focus();},30); }); }
+function confirmModal(m,danger,spec){ return new Promise(res=>{ spec=spec||{}; const ico='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>'; const title=spec.title||(danger?ico+" Arm kill switch":"⚠️ Confirm"); const go=spec.go||(danger?"Arm it":"Yes, do it"); openModal(title,`<p style="margin:0;color:var(--muted)">${esc(m)}</p>`,go,()=>{closeModal();res(true);},()=>res(false),!!danger); const xb=$("#modalCancelBtn"); if(xb&&spec.cancel) xb.textContent=spec.cancel; setTimeout(()=>{const b=$("#modal-confirm");if(b)b.focus();},30); }); }
 function val(id){ const e=$("#"+id); return e?e.value.trim():""; }
 function vaultModal(e){ e=e||{}; openModal(`${e.id?"Edit":"New"} Vault Entry`,`<div class="field"><label>Site / service name</label><input id="v_name" value="${esc(e.name||"")}" placeholder="e.g. Gmail"></div><div class="field"><label>Website URL</label><input id="v_url" value="${esc(e.url||"")}" placeholder="https://..."></div><div class="field"><label>Username / email</label><input id="v_user" value="${esc(e.username||"")}" placeholder="you@example.com"></div><div class="field"><label>Password</label><input id="v_pass" type="text" value="${esc(e.password||"")}" placeholder="••••••••"></div><div class="checkrow" style="gap:18px"><label class="checkrow"><input type="checkbox" id="v_fav" ${e.favorite?"checked":""}> Favorite</label><label class="checkrow"><input type="checkbox" id="v_pri" ${e.priority?"checked":""}> Priority</label></div>`,"Save",()=>{ const name=val("v_name"); if(!name){ toast("Name is required","warn"); return; } const d={name,url:val("v_url"),username:val("v_user"),password:$("#v_pass").value,favorite:$("#v_fav").checked,priority:$("#v_pri").checked}; if(e.id){ Object.assign(find(state.vault,e.id),d); log("info","Updated vault entry: "+name); toast("Entry updated","ok"); } else { state.vault.unshift(Object.assign({id:uid(),created:nowMs()},d)); log("ok","Added vault entry: "+name); toast("Entry saved","ok"); } saveState(); closeModal(); celebrate(); renderView(); }); }
 
@@ -1245,6 +1287,7 @@ document.addEventListener("click",async(ev)=>{
     case "shot-size": shotSize=t.dataset.size||"m"; if(!state.settings)state.settings={}; state.settings.shotSize=shotSize; saveState(); renderView(); break;
     case "shot-page": shotPage+=(parseInt(t.dataset.dir,10)||0); if(shotPage<0)shotPage=0; renderView(); break;
     case "shot-slideshow": shotSlideshowStart(); break;
+    case "kill-toggle": killToggle(); break;
     case "shot-copy":
     case "shot-copy-open": shotCopy(shotOpenId||id); break;
     case "shot-watch": { if(E&&E.shotsPickFolder){ E.shotsPickFolder().then(function(dir){ if(!dir) return; state.shotWatch=state.shotWatch||[]; if(state.shotWatch.indexOf(dir)<0){ state.shotWatch.push(dir); saveState(); toast("Watching "+dir,"ok"); shotsRefresh(); } }); } break; }
@@ -1477,11 +1520,61 @@ if(E){ if(E.onFsChunk)E.onFsChunk(p=>{ const pend=pendingScans[p.id]; if(!pend)r
 function tickClock(){ $("#clock").textContent=new Date().toLocaleTimeString([],{hour12:false}); }
 setInterval(tickClock,1000);
 function buildThinkBar(){ const w=$("#tbWave"); if(w){ let h=""; for(let i=0;i<64;i++){ h+='<i style="animation-delay:'+(Math.random()*1.2).toFixed(2)+'s;animation-duration:'+(0.8+Math.random()*0.9).toFixed(2)+'s"></i>'; } w.innerHTML=h; } const tb=$("#thinkbar"); if(tb){ const cols=["#27b4ff","#b14bff","#ff4d8d","#33d17a"]; let ci=0; tb.style.setProperty("--acc",cols[0]); setInterval(()=>{ ci=(ci+1)%cols.length; tb.style.setProperty("--acc",cols[ci]); },4200); } }
+
+let _killAt=0, _killTick=null;
+const KILL_ICO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>';
+function killClock(){
+  const ms=Math.max(0, (_killAt||0)-Date.now());
+  const s=Math.ceil(ms/1000);
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
+function killPaint(){
+  const armed=!!(_killAt && _killAt>Date.now());
+  if(!armed) _killAt=0;
+  const clock=armed?killClock():"";
+  const btn=document.getElementById("killBtn");
+  if(btn){
+    if(!armed){
+      btn.classList.remove("armed");
+      btn.innerHTML=KILL_ICO+'<span class="kill-min"></span>';
+      btn.title="Sleep timer — shut down this PC in 30 minutes";
+    } else {
+      btn.classList.add("armed");
+      btn.innerHTML=KILL_ICO+'<span class="kill-min">'+clock+"</span>";
+      btn.title="Cancel shutdown — "+clock+" left";
+    }
+  }
+  ["normaKillClock","normaFloatClock","nbKillClock"].forEach(function(id){
+    const el=document.getElementById(id);
+    if(!el) return;
+    el.textContent=clock;
+    el.classList.toggle("show", armed);
+  });
+}
+async function killToggle(){
+  try{
+    if(!E||!(E.killToggle||E.killArm)){ toast("Sleep timer needs the desktop app","warn"); return; }
+    const was=!!(_killAt && _killAt>Date.now());
+    const r=E.killToggle? await E.killToggle(30) : (was? await E.killCancel() : await E.killArm(30));
+    _killAt=(r&&r.armed)?(r.at||0):0;
+    if(!state.settings) state.settings={};
+    state.settings.killAt=_killAt;
+    saveState();
+    killPaint();
+    if(_killAt){ toast("PC shuts down in 30 minutes","ok"); log("warn","sleep timer armed — shutdown in 30 minutes"); }
+    else { toast("Shutdown cancelled","ok"); }
+  }catch(err){ toast("Sleep timer failed: "+(err&&err.message||err),"err"); }
+}
+if(E&&E.onKillStatus) E.onKillStatus(function(s){ _killAt=(s&&s.armed)?(s.at||0):0; if(!state.settings) state.settings={}; if(state.settings.killAt!==_killAt){ state.settings.killAt=_killAt; saveState(); } killPaint(); });
+if(E&&E.onKillAsk) E.onKillAsk(function(){ killToggle(); });
+if(!_killTick) _killTick=setInterval(killPaint, 1000);
+
 (async function boot(){
   await loadState();
   if(state.settings&&state.settings.petAutoUndock){ setFloating(true); }
   try{ if(state.music&&state.music.volume!=null) bgmAudio.volume=state.music.volume; if(state.music&&typeof state.music.idx==='number'&&state.music.idx) bgmIdx=state.music.idx; }catch(_){}
   if(E&&E.musicRequest) E.musicRequest();
+  try{ if(E&&E.appVersion){ const v=await E.appVersion(); if(v) APP_VERSION=String(v).replace(/^v/i,""); } }catch(_){}
   const av=$('#appver'); if(av)av.textContent='v'+APP_VERSION;
   const ae=$("#appedits"); if(ae)ae.textContent="#"+EDIT_COUNT+" edits";
   buildThinkBar(); renderNav(); renderView(); tickClock();
@@ -1491,8 +1584,9 @@ function buildThinkBar(){ const w=$("#tbWave"); if(w){ let h=""; for(let i=0;i<6
   if(E&&E.onNormaNav)E.onNormaNav(m=>{ currentView=m; $("#content").classList.remove("searching"); searchTerms={}; renderNav(); renderView(); });
   if(E&&E.onRecordRecentFolder) E.onRecordRecentFolder(function(info){ if(info&&info.path) rememberFolder(info.path, info.name); });
   if(E&&E.onRecentFolders) E.onRecentFolders(function(){ if(currentView==="folders") renderView(); });
-  if(enforcePetPinCap()) toast("Pet recents only holds 3 pins — extra pins were released","warn");
-  shotsRefresh(true);
+if(enforcePetPinCap()) toast("Pet recents only holds 3 pins — extra pins were released","warn");
+  if(state.settings&&state.settings.killAt&&state.settings.killAt>Date.now()){ _killAt=state.settings.killAt; killPaint(); }
+  try{ if(E&&E.killStatus){ const ks=await E.killStatus(); if(ks){ _killAt=(ks.armed)?(ks.at||0):0; if(!state.settings) state.settings={}; state.settings.killAt=_killAt; saveState(); killPaint(); } } }catch(_){}
   ["mousemove","keydown","pointerdown","wheel","click"].forEach(function(ev){ document.addEventListener(ev, shotIdleKick, {passive:true}); });
   shotIdleKick();
   if(E&&E.onAppFocus) E.onAppFocus(function(){ shotSlideshowStop(); });

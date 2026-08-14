@@ -18,7 +18,7 @@ try{
   else if(!fs.existsSync(DATA_FILE) && fs.existsSync(_SEED_STORE) && path.resolve(DATA_FILE)!==path.resolve(_SEED_STORE)){ try{ fs.writeFileSync(DATA_FILE, fs.readFileSync(_SEED_STORE)); }catch(_){} }
 }catch(_){}
 function readStore(){ try{ if(fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE,"utf8")); }catch(e){ console.error("[sinrad] read store failed:", e.message); } return null; }
-function writeStore(data){ try{ fs.writeFileSync(DATA_FILE, JSON.stringify(data,null,2), "utf8"); return true; }catch(e){ console.error("[sinrad] write store failed:", e.message); return false; } }
+function writeStore(data){ try{ fs.writeFileSync(DATA_FILE, JSON.stringify(data), "utf8"); return true; }catch(e){ console.error("[sinrad] write store failed:", e.message); return false; } }
 
 let mainWin = null;
 let petWin = null;
@@ -37,6 +37,7 @@ function createWindow(){
       if(st&&st.settings&&st.settings.petAutoUndock){ showPet(); }
     }catch(e){}
     _flushPendingParks();
+    try{ _killBroadcast(); }catch(_){}
   });
   try{ mainWin.webContents.setAudioMuted(true); }catch(e){}   // keep the app silent during the intro video; showMain() un-mutes it
   mainWin.on("focus", function(){ try{ mainWin.webContents.send("app-focus"); }catch(_){} });
@@ -48,7 +49,7 @@ function createPet(){
   if(petWin) return petWin;
   const wa = screen.getPrimaryDisplay().workArea;
   petWin = new BrowserWindow({
-    width:320, height:340, x:wa.x+24, y:wa.y+wa.height-380,
+    width:320, height:390, x:wa.x+24, y:wa.y+wa.height-430,
     transparent:true, frame:false, alwaysOnTop:true, resizable:false,
     skipTaskbar:true, hasShadow:false, focusable:true, fullscreenable:false,
     backgroundColor:"#00000000",
@@ -60,13 +61,13 @@ function createPet(){
   petWin.loadFile(path.join(__dirname,"pet.html"));
   // click-through on transparent areas (forward mouse so renderer can toggle)
   petWin.setIgnoreMouseEvents(true, { forward:true });
-  petWin.webContents.on("did-finish-load", function(){ try{ syncPetRecents(); }catch(_){} });
+  petWin.webContents.on("did-finish-load", function(){ try{ syncPetRecents(); }catch(_){} try{ _killBroadcast(); }catch(_){} });
   petWin.on("closed", ()=>{ petWin=null; });
   return petWin;
 }
 let petTopTimer=null;
 function assertPetTop(){ if(petWin && !petWin.isDestroyed() && petWin.isVisible()){ try{ petWin.setAlwaysOnTop(true,"screen-saver"); petWin.moveTop(); }catch(e){} } }
-function showPet(){ const w=createPet(); w.show(); assertPetTop(); if(petTopTimer) clearInterval(petTopTimer); petTopTimer=setInterval(assertPetTop,2500); try{ syncPetRecents(); }catch(_){} }
+function showPet(){ const w=createPet(); w.show(); assertPetTop(); if(petTopTimer) clearInterval(petTopTimer); petTopTimer=setInterval(assertPetTop,10000); try{ syncPetRecents(); }catch(_){} }
 function hidePet(){ if(petTopTimer){ clearInterval(petTopTimer); petTopTimer=null; } if(petWin) petWin.hide(); }
 
 /* whole-screen dragging: poll the cursor while the user holds the pet */
@@ -91,7 +92,7 @@ function createSplash(vid){ try{ splashWin=new BrowserWindow({ width:720, height
    The main window loads hidden in the background and only appears once the
    video is done, so the user always gets to see the boot video. */
 let mainReady=false, bootFinished=false, hasSplash=false;
-function showMain(){ if(mainWin && !mainWin.isDestroyed()){ try{ mainWin.webContents.setAudioMuted(false); }catch(e){} mainWin.show(); try{ mainWin.focus(); }catch(e){} } }
+function showMain(){ if(mainWin && !mainWin.isDestroyed()){ try{ mainWin.webContents.setAudioMuted(false); }catch(e){} try{ if(!mainWin.isMaximized()) mainWin.maximize(); }catch(e){} mainWin.show(); try{ mainWin.focus(); }catch(e){} } }
 function finishBoot(){ if(bootFinished) return; bootFinished=true; try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(e){} splashWin=null; if(mainReady) showMain(); }
 // --- single instance + protocol URL handling ---
 const _gotLock=app.requestSingleInstanceLock();
@@ -163,8 +164,9 @@ function _hkRegister(){ try{ if(_hkEnabled&&!_hkOk){ _hkOk=!!globalShortcut.regi
 function _hkUnregister(){ try{ if(_hkOk){ globalShortcut.unregister(HK_COMBO); _hkOk=false; } }catch(_){} }
 app.whenReady().then(()=>{
   if(!_gotLock) return;
+  try{ _killRestore(); }catch(_){}
   syncBoot();
-  try{ if(autoUpdater){ autoUpdater.autoDownload=false; autoUpdater.autoInstallOnAppQuit=true; autoUpdater.allowDowngrade=false; autoUpdater.on("error", function(e){ try{ console.error("[sinrad] autoUpdater:", e&&e.message); }catch(_){} }); } }catch(_e){ try{ console.error("[sinrad] autoUpdater config failed:", _e&&_e.message); }catch(_){} }
+  try{ if(autoUpdater){ autoUpdater.autoDownload=false; autoUpdater.autoInstallOnAppQuit=true; autoUpdater.allowDowngrade=false; autoUpdater.allowPrerelease=false; try{ autoUpdater.setFeedURL({provider:"github",owner:"SinSeeker0",repo:"sinrad"}); }catch(_){} autoUpdater.on("error", function(e){ try{ console.error("[sinrad] autoUpdater:", e&&e.message); }catch(_){} }); } }catch(_e){ try{ console.error("[sinrad] autoUpdater config failed:", _e&&_e.message); }catch(_){} }
   const vid=pickBootVideo();
   const _st=readStore(); const _introOn=!(_st&&_st.settings&&_st.settings.introEnabled===false);
   if(vid && _introOn){ hasSplash=true; createSplash(vid); if(!splashWin) hasSplash=false; }
@@ -182,6 +184,7 @@ app.whenReady().then(()=>{
   app.on("activate", ()=>{ if(BrowserWindow.getAllWindows().length===0) createWindow(); });
 });
 ipcMain.on("boot-done", ()=>finishBoot());
+app.on("before-quit", ()=>{ try{ _killPersist(); }catch(_){} });
 app.on("window-all-closed", ()=>{ if(process.platform!=="darwin") app.quit(); });
 
 /* ---------- IPC: main window controls ---------- */
@@ -344,6 +347,119 @@ ipcMain.handle("shots-copy", async (e, p)=>{
   }catch(_){ return false; }
 });
 
+
+/* ---------- sleep kill switch (shut down PC after N minutes) ---------- */
+const { execFile } = require("child_process");
+function _killFiles(){
+  const out=[path.join(path.dirname(DATA_FILE), "sinrad-kill.json")];
+  try{ const u=path.join(app.getPath("userData"), "sinrad-kill.json"); if(out.indexOf(u)<0) out.push(u); }catch(_){}
+  return out;
+}
+let _killAt=0;
+function _killPayload(){
+  const armed=_killAt>Date.now();
+  const left=armed?Math.max(0,_killAt-Date.now()):0;
+  return { armed:armed, at:armed?_killAt:0, left:left };
+}
+function _killPersist(){
+  const payload=_killPayload();
+  _killFiles().forEach(function(f){
+    try{
+      if(payload.armed) fs.writeFileSync(f, JSON.stringify({at:payload.at, left:payload.left}), "utf8");
+      else if(fs.existsSync(f)) fs.unlinkSync(f);
+    }catch(_){}
+  });
+}
+function _killRestore(){
+  let at=0;
+  _killFiles().forEach(function(f){
+    if(at) return;
+    try{
+      if(!fs.existsSync(f)) return;
+      const j=JSON.parse(fs.readFileSync(f,"utf8"));
+      at=parseInt(j&&j.at,10)||0;
+    }catch(_){}
+  });
+  if(!at){
+    try{
+      const st=readStore();
+      at=parseInt(st&&st.settings&&st.settings.killAt,10)||0;
+    }catch(_){}
+  }
+  if(at>Date.now()) _killAt=at;
+  else { _killAt=0; }
+  _killPersist();
+}
+function _killBroadcast(){
+  if(_killAt && _killAt<=Date.now()){ _killAt=0; _killPersist(); }
+  const payload=_killPayload();
+  try{ if(mainWin&&!mainWin.isDestroyed()) mainWin.webContents.send("kill-status", payload); }catch(_){}
+  try{ if(petWin&&!petWin.isDestroyed()) petWin.webContents.send("kill-status", payload); }catch(_){}
+}
+function _killArm(mins){
+  if(_killAt>Date.now()){ _killBroadcast(); return { armed:true, at:_killAt }; }
+  mins=Math.max(1, parseInt(mins,10)||30);
+  const sec=mins*60;
+  _killAt=Date.now()+sec*1000;
+  _killPersist();
+  if(process.platform==="win32"){
+    execFile("shutdown.exe", ["/s","/t",String(sec),"/c","Your pc is going to be shutdown gang"], { windowsHide:true }, function(err){
+      if(err){
+        const msg=String(err&&err.message||err);
+        if(/already been scheduled|\b1190\b/i.test(msg)){
+          if(!_killAt || _killAt<=Date.now()) _killAt=Date.now()+sec*1000;
+        } else {
+          console.error("[sinrad] shutdown arm:", msg);
+          _killAt=0;
+        }
+        _killPersist();
+      }
+      _killBroadcast();
+    });
+  } else {
+    execFile("shutdown", ["-h","+"+String(mins)], function(err){
+      if(err){
+        _killTimer=setTimeout(function(){
+          execFile("systemctl", ["poweroff"], function(){ execFile("loginctl", ["poweroff"], function(){}); });
+        }, sec*1000);
+      }
+      _killBroadcast();
+    });
+  }
+  _killBroadcast();
+  return { armed:true, at:_killAt };
+}
+let _killTimer=null;
+function _killCancel(){
+  _killAt=0;
+  _killPersist();
+  if(_killTimer){ clearTimeout(_killTimer); _killTimer=null; }
+  if(process.platform==="win32"){
+    execFile("shutdown.exe", ["/a"], { windowsHide:true }, function(){ _killBroadcast(); });
+  } else {
+    execFile("shutdown", ["-c"], function(){ _killBroadcast(); });
+  }
+  _killBroadcast();
+  return { armed:false, at:0 };
+}
+function _killToggle(mins){
+  if(_killAt>Date.now()) return _killCancel();
+  return _killArm(mins);
+}
+ipcMain.handle("kill-arm", (e, mins)=> _killArm(mins));
+ipcMain.handle("kill-cancel", ()=> _killCancel());
+ipcMain.handle("kill-toggle", (e, mins)=> _killToggle(mins));
+ipcMain.handle("kill-status", ()=> _killPayload());
+ipcMain.on("kill-ask", ()=>{
+  try{
+    if(mainWin&&!mainWin.isDestroyed()){
+      if(mainWin.isMinimized()) mainWin.restore();
+      mainWin.show(); mainWin.focus();
+      mainWin.webContents.send("kill-ask");
+    }
+  }catch(_){}
+});
+
 const BGM_DIR = path.join(app.getPath("userData"),"bgm");
 const BUNDLED_BGM = path.join(__dirname,"bgm");
 function syncBundled(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){} const exts=[".mp3",".ogg",".wav",".m4a",".flac",".webm",".opus"]; try{ fs.readdirSync(BUNDLED_BGM).forEach(function(f){ if(exts.indexOf(path.extname(f).toLowerCase())<0) return; const dest=path.join(BGM_DIR,f); if(!fs.existsSync(dest)){ try{ fs.writeFileSync(dest, fs.readFileSync(path.join(BUNDLED_BGM,f))); }catch(_){} } }); }catch(_){} }
@@ -376,34 +492,72 @@ ipcMain.on("fs-scan", (e, payload)=>{
 });
 ipcMain.on("fs-scan-cancel", (e, payload)=>{ const c = activeScans.get(payload && payload.id); if(c){ c.abort(); activeScans.delete(payload && payload.id); } });
 
-/* ===================== auto-updater (GitHub Releases, no installer needed) ===================== */
+/* ===================== updater: GitHub latest for check, electron-updater for install ===================== */
 const https = require("https");
 const UPD_OWNER = "SinSeeker0";
 const UPD_REPO  = "sinrad";
 const UPD_API   = "https://api.github.com/repos/" + UPD_OWNER + "/" + UPD_REPO + "/releases/latest";
 const UPD_PAGE  = "https://github.com/" + UPD_OWNER + "/" + UPD_REPO + "/releases/latest";
-function updVerTuple(v){ const p=String(v==null?"":v).split("."); const o=[]; for(let i=0;i<3;i++){ o.push(parseInt(p[i],10)||0); } return o; }
+function updVerTuple(v){ const p=String(v==null?"":v).replace(/^v/i,"").split("."); const o=[]; for(let i=0;i<3;i++){ o.push(parseInt(p[i],10)||0); } return o; }
 function updCmp(a,b){ for(let i=0;i<3;i++){ if(a[i]>b[i])return 1; if(a[i]<b[i])return -1; } return 0; }
-function updGetJSON(url){ return new Promise(function(res,rej){ const u=new URL(url); const req=https.get({hostname:u.hostname,path:u.pathname+u.search,headers:{"User-Agent":"S.I.R-updater","Accept":"application/vnd.github+json"}},function(r){ let d=""; r.on("data",function(c){d+=c;}); r.on("end",function(){ try{res(JSON.parse(d));}catch(e){rej(e);} }); }); req.on("error",rej); req.setTimeout(15000,function(){req.destroy(new Error("timeout"));}); }); }
-function updGetFile(url,dest,onProg){ return new Promise(function(res,rej){ const u=new URL(url); const req=https.get({hostname:u.hostname,path:u.pathname+u.search,headers:{"User-Agent":"S.I.R-updater"}},function(r){ if(r.statusCode>=300&&r.statusCode<400&&r.headers.location){ r.resume(); updGetFile(r.headers.location,dest,onProg).then(res,rej); return; } if(r.statusCode!==200){ r.resume(); rej(new Error("HTTP "+r.statusCode)); return; } const total=parseInt(r.headers["content-length"]||"0",10)||0; let got=0; const out=fs.createWriteStream(dest); r.on("data",function(c){ got+=c.length; if(onProg)onProg(got,total); }); r.pipe(out); out.on("finish",function(){ out.close(function(){ res(dest); }); }); out.on("error",rej); }); req.on("error",rej); req.setTimeout(120000,function(){req.destroy(new Error("timeout"));}); }); }
-function updPickAsset(assets,latestVer){
-  const plat=process.platform; const cur=String(app.getVersion()||"");
-  if(plat==="darwin") return null;
+function updStrip(v){ return String(v==null?"":v).replace(/^v/i,""); }
+function updGetJSON(url){ return new Promise(function(res,rej){ const u=new URL(url); const req=https.get({hostname:u.hostname,path:u.pathname+u.search,headers:{"User-Agent":"S.I.R-updater","Accept":"application/vnd.github+json"}},function(r){ if(r.statusCode>=300&&r.statusCode<400&&r.headers.location){ r.resume(); updGetJSON(r.headers.location).then(res,rej); return; } if(r.statusCode!==200){ r.resume(); rej(new Error("GitHub HTTP "+r.statusCode)); return; } let d=""; r.on("data",function(c){d+=c;}); r.on("end",function(){ try{res(JSON.parse(d));}catch(e){rej(e);} }); }); req.on("error",rej); req.setTimeout(12000,function(){req.destroy(new Error("timeout"));}); }); }
+function updPickAsset(assets){
+  const plat=process.platform;
   const low=function(n){return String(n||"").toLowerCase();};
   if(plat==="win32"){
-    const base=path.basename(process.execPath);
-    if(cur && base.indexOf(cur)>=0){ const guess=base.split(cur).join(latestVer); for(const a of assets){ if(a.name===guess) return a; } }
-    for(const a of assets){ const n=low(a.name); if(n.slice(-4)===".exe" && n.indexOf("setup")<0 && n.indexOf("installer")<0 && n.indexOf("nsis")<0) return a; }
+    for(const a of assets){ const n=low(a.name); if(n.indexOf("setup")>=0 && n.slice(-4)===".exe") return a; }
     for(const a of assets){ if(low(a.name).slice(-4)===".exe") return a; }
     return null;
   }
-  const base=path.basename(process.env.APPIMAGE||process.execPath);
-  if(cur && base.indexOf(cur)>=0){ const guess=base.split(cur).join(latestVer); for(const a of assets){ if(a.name===guess) return a; } }
-  for(const a of assets){ if(low(a.name).indexOf(".appimage")>=0) return a; }
+  if(plat==="linux"){
+    for(const a of assets){ if(low(a.name).indexOf(".appimage")>=0) return a; }
+    return null;
+  }
   return null;
 }
-function _updNotes(info){ var rn=info&&info.releaseNotes; if(Array.isArray(rn)){ rn=rn.map(function(x){ return (x&&(x.note||x.body))||""; }).join(" "); } return String(rn||(info&&info.releaseName)||"").trim(); }
-ipcMain.handle("update-check", async function(){ if(autoUpdater){ var eu=await new Promise(function(resolve){ var done=false; var t=setTimeout(function(){ fin(null); },15000); function cleanup(){ try{ autoUpdater.removeListener("update-available",onA); autoUpdater.removeListener("update-not-available",onN); autoUpdater.removeListener("error",onE); }catch(_){} } function fin(info){ if(done)return; done=true; clearTimeout(t); cleanup(); resolve(info); } function onA(info){ fin(info); } function onN(){ fin(null); } function onE(e){ fin(null); try{ console.error("[sinrad] autoUpdater check error:", e&&e.message); }catch(_){} } autoUpdater.once("update-available",onA); autoUpdater.once("update-not-available",onN); autoUpdater.once("error",onE); try{ autoUpdater.checkForUpdates(); }catch(e){ fin(null); } }); if(eu){ return {ok:true, available:true, latest:eu.version, current:app.getVersion(), date:String(eu.releaseDate||"").slice(0,10), notes:_updNotes(eu), platform:process.platform, asset:{url:"electron-updater", name:"electron-updater"}, via:"electron-updater"}; } } try{ var rel=await updGetJSON(UPD_API); var tag=String(rel.tag_name||""); if(tag.charAt(0)==="v"||tag.charAt(0)==="V") tag=tag.slice(1); var cur=String(app.getVersion()||"0.0.0"); var available=updCmp(updVerTuple(tag),updVerTuple(cur))>0; var asset=updPickAsset(rel.assets||[], tag); return {ok:true, available:available, latest:tag, current:cur, notes:String(rel.body||""), date:String(rel.published_at||"").slice(0,10), platform:process.platform, asset: asset?{url:asset.browser_download_url, name:asset.name, size:asset.size||0}:null, via:"api"}; }catch(e){ return {ok:false, error:String(e&&e.message||e), platform:process.platform}; } });
-ipcMain.handle("update-download", async function(e, payload){ if(autoUpdater && payload && payload.url==="electron-updater"){ var onProg=function(p){ if(mainWin&&!mainWin.isDestroyed()){ mainWin.webContents.send("update-progress", {got:p.transferred||0, total:p.total||0, percent:p.percent||0}); } }; var onDone=function(){ try{ autoUpdater.removeListener("download-progress",onProg); }catch(_){} }; autoUpdater.on("download-progress",onProg); autoUpdater.once("update-downloaded",onDone); try{ await autoUpdater.downloadUpdate(); return {temp:true}; }catch(err){ try{ autoUpdater.removeListener("download-progress",onProg); }catch(_){} } } var url=payload&&payload.url; try{ if(url && url!=="electron-updater"){ shell.openExternal(url); } else { shell.openExternal(UPD_PAGE); } }catch(_){} return {manual:true}; });
-ipcMain.handle("update-install", async function(){ if(autoUpdater){ try{ autoUpdater.quitAndInstall(false,true); return {ok:true}; }catch(_){} } return {manual:true}; });
-
+ipcMain.handle("app-version", ()=> app.getVersion());
+ipcMain.handle("update-check", async function(e, rendererVer){
+  const cur=updStrip(app.getVersion()||rendererVer||"0.0.0");
+  try{
+    const rel=await updGetJSON(UPD_API);
+    const tag=updStrip(rel.tag_name||rel.name||"");
+    if(!tag) return {ok:false, error:"No release tag on GitHub", current:cur, platform:process.platform};
+    const available=updCmp(updVerTuple(tag),updVerTuple(cur))>0;
+    const asset=updPickAsset(rel.assets||[]);
+    return {
+      ok:true, available:available, latest:tag, current:cur,
+      notes:String(rel.body||"").trim(), date:String(rel.published_at||"").slice(0,10),
+      platform:process.platform,
+      asset: asset?{url:asset.browser_download_url, name:asset.name, size:asset.size||0}:null,
+      canAuto: !!(autoUpdater && app.isPackaged),
+      page: UPD_PAGE
+    };
+  }catch(err){
+    return {ok:false, error:String(err&&err.message||err), current:cur, platform:process.platform};
+  }
+});
+ipcMain.handle("update-download", async function(e, payload){
+  if(autoUpdater && app.isPackaged){
+    const onProg=function(p){ if(mainWin&&!mainWin.isDestroyed()){ mainWin.webContents.send("update-progress", {got:p.transferred||0, total:p.total||0, percent:p.percent||0}); } };
+    autoUpdater.on("download-progress", onProg);
+    try{
+      const info=await autoUpdater.checkForUpdates();
+      if(info && info.updateInfo){ await autoUpdater.downloadUpdate(); return {temp:true}; }
+    }catch(err){
+      try{ console.error("[sinrad] update download:", err&&err.message); }catch(_){}
+    }finally{
+      try{ autoUpdater.removeListener("download-progress", onProg); }catch(_){}
+    }
+  }
+  const url=(payload&&payload.url)||UPD_PAGE;
+  try{ shell.openExternal(url); }catch(_){}
+  return {manual:true};
+});
+ipcMain.handle("update-install", async function(){
+  if(autoUpdater && app.isPackaged){
+    try{ autoUpdater.quitAndInstall(false,true); return {ok:true}; }catch(err){ try{ console.error("[sinrad] update install:", err&&err.message); }catch(_){} }
+  }
+  try{ shell.openExternal(UPD_PAGE); }catch(_){}
+  return {manual:true};
+});

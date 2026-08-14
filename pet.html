@@ -23,7 +23,7 @@
 
   #menu .mi svg{width:15px;height:15px;flex:0 0 auto}
   #slogan{
-    padding:7px 30px 7px 8px;
+    padding:7px 8px;
     font-size:8.5px;
     letter-spacing:.65px;
     font-weight:800;
@@ -43,9 +43,8 @@
     from{background-position:0% 50%}
     to{background-position:200% 50%}
   }
-  #menuPin{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:4px;border:1px solid #2a2a35;background:#1b1b24;color:#cfd3dc;display:grid;place-items:center;cursor:pointer;z-index:2}
-  #menuPin:hover{background:#262630;color:#fff;border-color:#ff4d8d}
-  #menuPin svg{width:14px;height:14px}
+  #menu .mi[data-pin]{color:#ff79c6}
+  #menu .mi[data-pin]:hover{background:rgba(255,77,141,.12);color:#ff9ad4}
 
   .rf-head{padding:6px 10px 2px;font-size:9px;letter-spacing:.7px;font-weight:700;color:#ff79c6;text-transform:uppercase}
   .rf-list{display:flex;flex-direction:column;gap:1px;padding:0 4px 4px}
@@ -55,13 +54,23 @@
   .rf-item .rf-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
   .rf-pin{flex:0 0 auto;display:inline-flex;color:#ff79c6}
   .rf-pin svg{width:12px;height:12px}
+  .kill-wrap{padding:4px 0 0;margin:2px -6px -6px}
+  .pet-kill{width:100%;height:26px;border:1px solid #ff5470;border-left:none;border-right:none;border-bottom:none;border-radius:0 0 5px 5px;background:#1a0c10;color:#ff5470;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+  .pet-kill svg{width:13px;height:13px;flex:0 0 auto}
+  .pet-kill:hover{background:rgba(255,84,112,.16);color:#ff8a9c}
+  .pet-kill.armed{background:#ff5470;color:#fff;animation:killPulse 1.6s ease-in-out infinite}
+  @keyframes killPulse{0%,100%{box-shadow:0 0 0 0 rgba(255,84,112,.5)}70%{box-shadow:0 0 0 8px rgba(255,84,112,0)}}
+  #petTimer{position:absolute;left:50%;top:-6px;transform:translate(-50%,-100%);display:none;justify-content:center;pointer-events:none;z-index:6;width:auto;bottom:auto}
+  #petTimer.show{display:flex}
+  #petTimer span{background:#1a0c10;border:1px solid #ff5470;color:#ff6b82;font-size:11px;font-weight:800;letter-spacing:.5px;padding:3px 9px;min-width:0;text-align:center;border-radius:4px;font-variant-numeric:tabular-nums;line-height:1.2;box-shadow:none;white-space:nowrap}
 </style>
 </head>
 <body>
   <div id="stage">
-    <div id="menu" data-hit><div id="menuPin" data-pin="1" title="Pin to app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg></div>
+    <div id="menu" data-hit>
       <div id="slogan">Sinners save the world</div>
       <div class="dv"></div>
+      <div class="mi" data-pin="1" title="Pin Norma back to the app"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg> Dock</div>
       <div class="mi" data-nav="vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Vault</div>
       <div class="mi" data-nav="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg> Links</div>
       <div class="mi" data-nav="folders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Folders</div>
@@ -69,8 +78,10 @@
       <div class="dv"></div>
       <div class="rf-head">Recent Folders</div>
       <div id="rfList" class="rf-list"><div class="rf-empty">no recents yet</div></div>
+      <div class="dv"></div>
+      <div class="kill-wrap"><button type="button" class="pet-kill" id="petKill" data-kill="1" title="Kill Switch — shut this PC down in 30 minutes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg><span>Kill Switch</span></button></div>
     </div>
-    <div id="pet" data-hit><span class="emo">🤖</span></div>
+    <div id="pet" data-hit><div id="petTimer" aria-hidden="true"><span>30:00</span></div><span class="emo">🤖</span></div>
   </div>
 <script>
 const E = window.electronAPI || {};
@@ -110,7 +121,7 @@ function buildMask(img){
   (function next(){
     if(i>=names.length) return;
     const im=new Image();
-    im.onload=()=>{ Array.from(pet.children).forEach(c=>{c.remove();}); const img=document.createElement("img"); img.src=names[i]; img.alt="Norma"; img.draggable=false; pet.appendChild(img); buildMask(img); };
+    im.onload=()=>{ Array.from(pet.children).forEach(c=>{ if(c.id!=="petTimer") c.remove(); }); const img=document.createElement("img"); img.src=names[i]; img.alt="Norma"; img.draggable=false; pet.appendChild(img); if(!document.getElementById("petTimer")){ const t=document.createElement("div"); t.id="petTimer"; t.innerHTML="<span>30:00</span>"; pet.appendChild(t); } buildMask(img); paintKill(); };
     im.onerror=()=>{ i++; next(); };
     im.src=names[i];
   })();
@@ -137,8 +148,8 @@ document.addEventListener("mousemove",(e)=>{
 pet.addEventListener("pointerdown",(e)=>{ if(e.button!==0) return; E.petDragStart && E.petDragStart({x:e.clientX,y:e.clientY}); });
 window.addEventListener("pointerup",()=>{ E.petDragEnd && E.petDragEnd(); });
 
-function openMenu(){ menu.classList.add("show"); menuOpen=true; setIgnoreFalse(); }
-function closeMenu(){ menu.classList.remove("show"); menuOpen=false; }
+function openMenu(){ menu.classList.add("show"); menuOpen=true; setIgnoreFalse(); paintKill(); }
+function closeMenu(){ menu.classList.remove("show"); menuOpen=false; paintKill(); }
 pet.addEventListener("contextmenu",(e)=>{ e.preventDefault(); menuOpen?closeMenu():openMenu(); });
 menu.addEventListener("contextmenu",(e)=>e.preventDefault());
 menu.addEventListener("click",doMenuAct);
@@ -146,10 +157,18 @@ function doMenuAct(e){
   const nav=e.target.closest("[data-nav]");
   const pin=e.target.closest("[data-pin]");
   const fold=e.target.closest("[data-folder]");
-  if(!nav&&!pin&&!fold) return;
+  const kill=e.target.closest("[data-kill]");
+  if(!nav&&!pin&&!fold&&!kill) return;
   const now=Date.now();
-  if(now-(doMenuAct._t||0)<400) return;   // debounce: click must never open a folder twice
+  if(!kill && now-(doMenuAct._t||0)<400) return;
   doMenuAct._t=now;
+  if(kill){
+    const act=E.killToggle||null;
+    if(act){ Promise.resolve(act(30)).then(function(r){ _petKillAt=(r&&r.armed)?(r.at||0):0; paintKill(); }).catch(function(){}); }
+    else if(_petKillAt && _petKillAt>Date.now()){ if(E.killCancel) Promise.resolve(E.killCancel()).catch(function(){}); }
+    else if(E.killArm){ Promise.resolve(E.killArm(30)).then(function(r){ if(r&&r.at){ _petKillAt=r.at; paintKill(); } }).catch(function(){}); }
+    return;
+  }
   if(fold){
     const p=fold.getAttribute("data-folder");
     if(p && E.openPath) E.openPath(p);
@@ -174,6 +193,42 @@ function renderRecents(list){
 
 if(E.onRecentFolders) E.onRecentFolders(renderRecents);
 if(E.petRecents){ try{ Promise.resolve(E.petRecents()).then(renderRecents).catch(function(){}); }catch(_){} }
+
+let _petKillAt=0;
+function killClock(){
+  const ms=Math.max(0, (_petKillAt||0)-Date.now());
+  const s=Math.ceil(ms/1000);
+  return Math.floor(s/60)+":"+String(s%60).padStart(2,"0");
+}
+function paintKill(){
+  const b=document.getElementById("petKill");
+  const t=document.getElementById("petTimer");
+  const armed=!!(_petKillAt && _petKillAt>Date.now());
+  if(!armed){
+    _petKillAt=0;
+    if(b){
+      b.classList.remove("armed");
+      b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg><span>Arm</span>';
+      b.title="Arm kill switch — shut this PC down in 30 minutes";
+    }
+    if(t) t.classList.remove("show");
+    return;
+  }
+  const clock=killClock();
+  if(b){
+    b.classList.add("armed");
+    b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg><span>Armed · '+clock+"</span>";
+    b.title="Cancel shutdown — "+clock+" left";
+  }
+  if(t){
+    const sp=t.querySelector("span");
+    if(sp) sp.textContent=clock;
+    t.classList.toggle("show", !menuOpen);
+  }
+}
+if(E.onKillStatus) E.onKillStatus(function(s){ _petKillAt=(s&&s.armed)?(s.at||0):0; paintKill(); });
+if(E.killStatus){ try{ Promise.resolve(E.killStatus()).then(function(s){ _petKillAt=(s&&s.armed)?(s.at||0):0; paintKill(); }); }catch(_){} }
+setInterval(paintKill, 1000);
 
 </script>
 </body>

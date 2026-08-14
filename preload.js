@@ -35,6 +35,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onFsChunk: (cb) => ipcRenderer.on("fs-scan-chunk", (_, p) => cb(p)),
   onFsDone: (cb) => ipcRenderer.on("fs-scan-done", (_, p) => cb(p)),
   fsHome: () => ipcRenderer.invoke("fs-home"),
+  appVersion: () => ipcRenderer.invoke("app-version"),
   updateCheck: (v) => ipcRenderer.invoke("update-check", v),
   updateDownload: (o) => ipcRenderer.invoke("update-download", o),
   updateInstall: (t) => ipcRenderer.invoke("update-install", t),
@@ -70,5 +71,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   shotsReveal: (p) => ipcRenderer.invoke("shots-reveal", p),
   shotsLookup: (p) => ipcRenderer.invoke("shots-lookup", p),
   shotsOpen: (p) => ipcRenderer.invoke("shots-open", p),
-  shotsCopy: (p) => ipcRenderer.invoke("shots-copy", p)
+  shotsCopy: (p) => ipcRenderer.invoke("shots-copy", p),
+
+  killArm: (mins) => ipcRenderer.invoke("kill-arm", mins),
+  killCancel: () => ipcRenderer.invoke("kill-cancel"),
+  killToggle: (mins) => ipcRenderer.invoke("kill-toggle", mins),
+  killStatus: () => ipcRenderer.invoke("kill-status"),
+  killAsk: () => ipcRenderer.send("kill-ask"),
+  onKillStatus: (cb) => ipcRenderer.on("kill-status", (_, s) => cb(s)),
+  onKillAsk: (cb) => ipcRenderer.on("kill-ask", () => cb())
 });
