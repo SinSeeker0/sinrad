@@ -39,6 +39,7 @@ function createWindow(){
     _flushPendingParks();
   });
   try{ mainWin.webContents.setAudioMuted(true); }catch(e){}   // keep the app silent during the intro video; showMain() un-mutes it
+  mainWin.on("focus", function(){ try{ mainWin.webContents.send("app-focus"); }catch(_){} });
   mainWin.on("closed", ()=>{ mainWin=null; if(petWin){ try{petWin.close();}catch(e){} petWin=null; } });
 }
 
@@ -270,6 +271,78 @@ function _recordRecentFolder(p){
 }
 ipcMain.on("sync-pet-recents", (e, slots)=>{ syncPetRecents(slots); });
 ipcMain.handle("pet-recents", ()=> (_petSlots.length?_petSlots:_slotsFromStore()));
+
+/* ---------- screenshot library (images only, watch-in-place) ---------- */
+const { nativeImage, clipboard, dialog } = require("electron");
+const SHOT_EXTS = { ".png":1, ".jpg":1, ".jpeg":1, ".webp":1, ".gif":1, ".bmp":1, ".jfif":1 };
+function _shotsDefaultRoots(){
+  const out=[], seen=new Set();
+  function add(p){ if(!p) return; const r=path.resolve(p); const k=r.toLowerCase(); if(seen.has(k)) return; try{ if(fs.existsSync(r) && fs.statSync(r).isDirectory()){ seen.add(k); out.push(r); } }catch(_){} }
+  try{ add(path.join(app.getPath("pictures"),"Screenshots")); }catch(_){}
+  try{ add(path.join(app.getPath("home"),"Pictures","Screenshots")); }catch(_){}
+  try{ add(path.join(app.getPath("home"),"OneDrive","Pictures","Screenshots")); }catch(_){}
+  try{ add(path.join(app.getPath("home"),"OneDrive","Pictures","Screenshots")); }catch(_){}
+  return out;
+}
+function _shotsList(roots){
+  const dirs=(roots&&roots.length)?roots:_shotsDefaultRoots();
+  const files=[];
+  dirs.forEach(function(dir){
+    let names; try{ names=fs.readdirSync(dir); }catch(_){ return; }
+    names.forEach(function(name){
+      const ext=path.extname(name).toLowerCase();
+      if(!SHOT_EXTS[ext]) return;
+      const full=path.join(dir,name);
+      try{
+        const st=fs.statSync(full);
+        if(!st.isFile()) return;
+        files.push({ path:full, name:name, mtime:st.mtimeMs||+st.mtime, size:st.size });
+      }catch(_){}
+    });
+  });
+  files.sort(function(a,b){ return (b.mtime||0)-(a.mtime||0); });
+  return { files:files, roots:dirs, truncated:false };
+}
+ipcMain.handle("shots-scan", async (e, roots)=>{ try{ return _shotsList(roots); }catch(err){ return { files:[], roots:[], error:String(err&&err.message||err) }; } });
+ipcMain.handle("shots-defaults", async ()=> _shotsDefaultRoots());
+ipcMain.handle("shots-pick-folder", async ()=>{
+  try{
+    const r=await dialog.showOpenDialog({ title:"Watch a screenshot folder", properties:["openDirectory"] });
+    return (r&&!r.canceled&&r.filePaths&&r.filePaths[0])?r.filePaths[0]:"";
+  }catch(_){ return ""; }
+});
+ipcMain.handle("shots-thumb", async (e, p)=>{
+  try{
+    if(typeof p!=="string"||!p) return "";
+    const resolved=path.resolve(p);
+    if(!fs.existsSync(resolved)) return "";
+    let img=null;
+    try{ img=await nativeImage.createThumbnailFromPath(resolved,{ width:360, height:220 }); }catch(_){}
+    if(!img||img.isEmpty()){ img=nativeImage.createFromPath(resolved); if(img&&!img.isEmpty()) img=img.resize({ width:360, quality:"good" }); }
+    if(!img||img.isEmpty()) return "";
+    return img.toDataURL();
+  }catch(_){ return ""; }
+});
+ipcMain.handle("shots-reveal", async (e, p)=>{ try{ if(typeof p==="string"&&p) shell.showItemInFolder(p); return true; }catch(_){ return false; } });
+ipcMain.handle("shots-lookup", async (e, p)=>{
+  try{
+    if(typeof p!=="string"||!p) return false;
+    const img=nativeImage.createFromPath(path.resolve(p));
+    if(img&&!img.isEmpty()) clipboard.writeImage(img);
+    await shell.openExternal("https://lens.google.com/");
+    return true;
+  }catch(_){ return false; }
+});
+ipcMain.handle("shots-open", async (e, p)=>{ try{ if(typeof p==="string"&&p) await shell.openPath(p); return true; }catch(_){ return false; } });
+ipcMain.handle("shots-copy", async (e, p)=>{
+  try{
+    if(typeof p!=="string"||!p) return false;
+    const img=nativeImage.createFromPath(path.resolve(p));
+    if(!img||img.isEmpty()) return false;
+    clipboard.writeImage(img);
+    return true;
+  }catch(_){ return false; }
+});
 
 const BGM_DIR = path.join(app.getPath("userData"),"bgm");
 const BUNDLED_BGM = path.join(__dirname,"bgm");

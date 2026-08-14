@@ -29,18 +29,19 @@
     font-weight:800;
     text-transform:uppercase;
     line-height:1.35;
-    background:linear-gradient(90deg,#ff4d8d 0%,#ffb020 16%,#fff6a8 30%,#33d17a 45%,#27b4ff 62%,#b14bff 78%,#ff4d8d 100%);
-    background-size:240% 100%;
+    background-image:linear-gradient(90deg,#ff4d8d,#ffb020,#fff6a8,#33d17a,#27b4ff,#b14bff,#ff4d8d);
+    background-size:200% 100%;
+    background-repeat:repeat;
     -webkit-background-clip:text;
     background-clip:text;
     color:transparent;
     -webkit-text-fill-color:transparent;
-    animation:sloganShift 3.6s linear infinite;
+    animation:sloganShift 5.5s linear infinite;
     filter:drop-shadow(0 0 6px rgba(255,77,141,.35));
   }
   @keyframes sloganShift{
-    0%{background-position:0% 50%}
-    100%{background-position:240% 50%}
+    from{background-position:0% 50%}
+    to{background-position:200% 50%}
   }
   #menuPin{position:absolute;top:5px;right:5px;width:24px;height:24px;border-radius:4px;border:1px solid #2a2a35;background:#1b1b24;color:#cfd3dc;display:grid;place-items:center;cursor:pointer;z-index:2}
   #menuPin:hover{background:#262630;color:#fff;border-color:#ff4d8d}
@@ -64,6 +65,7 @@
       <div class="mi" data-nav="vault"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg> Vault</div>
       <div class="mi" data-nav="links"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10 13a5 5 0 0 0 7 0l2-2a5 5 0 0 0-7-7l-1 1"/><path d="M14 11a5 5 0 0 0-7 0l-2 2a5 5 0 0 0 7 7l1-1"/></svg> Links</div>
       <div class="mi" data-nav="folders"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg> Folders</div>
+      <div class="mi" data-nav="shots"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="3.2"/></svg> Screenies</div>
       <div class="dv"></div>
       <div class="rf-head">Recent Folders</div>
       <div id="rfList" class="rf-list"><div class="rf-empty">no recents yet</div></div>

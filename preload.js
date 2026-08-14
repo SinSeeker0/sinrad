@@ -59,5 +59,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
   syncPetRecents: (slots) => ipcRenderer.send("sync-pet-recents", slots),
   petRecents: () => ipcRenderer.invoke("pet-recents"),
   onRecentFolders: (cb) => ipcRenderer.on("recent-folders-update", (_, list) => cb(list)),
-  onRecordRecentFolder: (cb) => ipcRenderer.on("record-recent-folder", (_, info) => cb(info))
+  onRecordRecentFolder: (cb) => ipcRenderer.on("record-recent-folder", (_, info) => cb(info)),
+  onAppFocus: (cb) => ipcRenderer.on("app-focus", () => cb()),
+
+  // screenshot library
+  shotsScan: (roots) => ipcRenderer.invoke("shots-scan", roots),
+  shotsDefaults: () => ipcRenderer.invoke("shots-defaults"),
+  shotsPickFolder: () => ipcRenderer.invoke("shots-pick-folder"),
+  shotsThumb: (p) => ipcRenderer.invoke("shots-thumb", p),
+  shotsReveal: (p) => ipcRenderer.invoke("shots-reveal", p),
+  shotsLookup: (p) => ipcRenderer.invoke("shots-lookup", p),
+  shotsOpen: (p) => ipcRenderer.invoke("shots-open", p),
+  shotsCopy: (p) => ipcRenderer.invoke("shots-copy", p)
 });
