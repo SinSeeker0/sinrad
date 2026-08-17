@@ -8,10 +8,10 @@ const fs = require("fs");
 process.chdir(__dirname);
 
 function run(command, args) {
-  return execFileSync(command, args, { stdio: "inherit", shell: process.platform === "win32" });
+  return execFileSync(command, args, { stdio: "inherit", shell: process.platform === "win32" && command === "npm" });
 }
 function output(command, args) {
-  return String(execFileSync(command, args, { encoding: "utf8", shell: process.platform === "win32" })).trim();
+  return String(execFileSync(command, args, { encoding: "utf8", shell: false })).trim();
 }
 
 if (output("git", ["status", "--porcelain"])) {
@@ -24,9 +24,19 @@ if (output("git", ["branch", "--show-current"]) !== "main") {
 }
 
 run("npm", ["run", "check"]);
-run("npm", ["version", "patch", "-m", "release %s"]);
-
-const version = JSON.parse(fs.readFileSync("package.json", "utf8")).version;
+const packageJson = JSON.parse(fs.readFileSync("package.json", "utf8"));
+const match = String(packageJson.version || "").match(/^(\d+)\.(\d+)\.(\d+)$/);
+if (!match) throw new Error("package.json version must use major.minor.patch format");
+const version = match[1] + "." + match[2] + "." + (Number(match[3]) + 1);
+packageJson.version = version;
+fs.writeFileSync("package.json", JSON.stringify(packageJson, null, 2) + "\n");
+const packageLock = JSON.parse(fs.readFileSync("package-lock.json", "utf8"));
+packageLock.version = version;
+if (packageLock.packages && packageLock.packages[""]) packageLock.packages[""].version = version;
+fs.writeFileSync("package-lock.json", JSON.stringify(packageLock, null, 2) + "\n");
 const tag = "v" + version;
+run("git", ["add", "--", "package.json", "package-lock.json"]);
+run("git", ["commit", "-m", "release " + version]);
+run("git", ["tag", tag]);
 run("git", ["push", "--atomic", "origin", "HEAD", tag]);
 console.log("Released " + tag + ". GitHub Actions will build the installers.");
