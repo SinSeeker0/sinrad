@@ -1,6 +1,7 @@
 # dependencies & build output (never commit these)
 node_modules/
 dist/
+dist-verify/
 out/
 build/
 
@@ -23,6 +24,9 @@ Thumbs.db
 .vscode/
 .idea/
 
-# NOTE: the image assets (celebrate-*.png, norma.png) and scan.js ARE tracked —
-# they ship inside the app. Your personal data (vault/links) is NOT in this
-# folder (it lives in your OS app-data), so it's never committed or shared.
+# local Sinrad state and crash-safe backups (may contain vault secrets)
+sinrad-data*.json
+sinrad-kill.json
+*.sinrad-tmp
+
+# Runtime data always lives in the OS app-data directory and is never tracked.

@@ -4,13 +4,33 @@ on:
   push:
     tags:
       - 'v*'
-  workflow_dispatch:   # lets you press "Run workflow" in the Actions tab too
 
 permissions:
-  contents: write      # needed to create the GitHub Release + upload files
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm audit --audit-level=high
+
   build:
+    needs: checks
+    permissions:
+      contents: write
     strategy:
       fail-fast: false
       matrix:
@@ -18,25 +38,16 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
 
       - name: Setup Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
-          node-version: 20
-
-      # If you triggered this manually (no tag), make a tag from package.json version
-      - name: Tag from package.json version (manual runs only)
-        if: github.ref_type != 'tag'
-        shell: bash
-        run: |
-          VER="v$(node -p "require('./package.json').version")"
-          git config user.email "ci@users.noreply.github.com"
-          git config user.name "github-actions"
-          git tag "$VER" || true
+          node-version: 22
+          cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       # electron-builder builds this OS's installers and uploads them to a GitHub Release
       - name: Build + publish release

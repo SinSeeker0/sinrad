@@ -1,6 +1,6 @@
 # S.I.R Quick Save — Browser Extension
 
-One-click save any page or link to S.I.R. No dialogs, no prompts, works on every site.
+One-click save any web page or link to S.I.R through an authenticated local connection.
 
 ## Install (Chrome / Opera GX / Edge / Brave / Vivaldi)
 
@@ -24,8 +24,9 @@ One-click save any page or link to S.I.R. No dialogs, no prompts, works on every
 - **Right-click anywhere** → "Save page to S.I.R"
 - **Right-click a link** → "Save link to S.I.R"
 - **Select text that's a URL, right-click** → "Save selection to S.I.R"
+- **Park ALL tabs** → waits for acknowledgements; the close option leaves failed tabs open
 
 ## Requirements
 
-- The S.I.R desktop app must be running (it hosts a tiny localhost server)
+- The S.I.R desktop app must be running (it hosts an extension-only localhost bridge)
 - That's it. No account, no internet, no config.

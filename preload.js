@@ -16,6 +16,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
   // persistent on-disk store
   storeLoad: () => ipcRenderer.invoke("store-load"),
+  storeSecurity: () => ipcRenderer.invoke("store-security"),
   storeSave: (data) => ipcRenderer.invoke("store-save", data),
 
   // desktop pet (floating Norma that lives OUTSIDE the app window)
@@ -46,6 +47,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onMusicCmd: (cb) => ipcRenderer.on("music-cmd", (_, c) => cb(c)),
   musicRead: (p) => ipcRenderer.invoke("music-read", p),
   clipRead: () => ipcRenderer.invoke("clip-read"),
+  clipClearIf: (value) => ipcRenderer.invoke("clip-clear-if", value),
   onHotkeyPark: (cb) => ipcRenderer.on("hotkey-park", (_, t) => cb(t)),
   hotkeyStatus: (cb) => ipcRenderer.on("hotkey-status", (_, mm) => cb(mm)),
   hotkeyToggle: (enabled) => ipcRenderer.invoke("hotkey-toggle", enabled),
@@ -68,6 +70,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   shotsDefaults: () => ipcRenderer.invoke("shots-defaults"),
   shotsPickFolder: () => ipcRenderer.invoke("shots-pick-folder"),
   shotsThumb: (p) => ipcRenderer.invoke("shots-thumb", p),
+  shotsRead: (p) => ipcRenderer.invoke("shots-read", p),
   shotsReveal: (p) => ipcRenderer.invoke("shots-reveal", p),
   shotsLookup: (p) => ipcRenderer.invoke("shots-lookup", p),
   shotsOpen: (p) => ipcRenderer.invoke("shots-open", p),

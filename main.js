@@ -1,24 +1,88 @@
 // Sinrad — Electron main process (main window + floating desktop "pet" window)
-const { app, BrowserWindow, ipcMain, shell, screen } = require("electron");
+const { app, BrowserWindow, ipcMain, shell, screen, safeStorage } = require("electron");
 app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
 const PROTOCOL="sinrad"; app.setAsDefaultProtocolClient(PROTOCOL);
 app.setAppUserModelId("S.I.R — Personal Command Center");
 const path = require("path");
 const fs = require("fs");
+const crypto = require("crypto");
 const scanFolders = require("./scan.js");
+const { normalizeHttpUrl, isAllowedExtensionOrigin, isPathInside } = require("./lib/security.js");
+const { validDirectories, listScreenshotFiles } = require("./lib/screenshots.js");
 let autoUpdater=null; try{ autoUpdater=require("electron-updater").autoUpdater; }catch(_e){ try{ console.error("[sinrad] electron-updater unavailable:", _e&&_e.message); }catch(_){} }
 
-function _writableDir(d){ try{ const t=path.join(d,".sinrad_wtest"); fs.writeFileSync(t,"1"); fs.unlinkSync(t); return true; }catch(_){ return false; } }
-const DATA_FILE = _writableDir(__dirname) ? path.join(__dirname,"sinrad-data.json") : path.join(app.getPath("userData"),"sinrad-data.json");
-const _SEED_STORE = path.join(app.getPath("userData"),"sinrad-data.json");
-try{
-  const _leg=[ path.join(path.dirname(DATA_FILE),"sinrad-SANDBOX.json"), path.join(app.getPath("userData"),"sinrad-SANDBOX.json") ].filter(function(p,i,a){ return a.indexOf(p)===i; });
-  const _legF=_leg.find(function(p){ try{ return fs.existsSync(p) && path.resolve(p)!==path.resolve(DATA_FILE); }catch(_){ return false; } });
-  if(_legF){ if(fs.existsSync(DATA_FILE)){ try{ fs.renameSync(DATA_FILE, path.join(path.dirname(DATA_FILE),"sinrad-data-before-parkinglot-backup.json")); }catch(_){} } try{ fs.renameSync(_legF, DATA_FILE); }catch(_){} }
-  else if(!fs.existsSync(DATA_FILE) && fs.existsSync(_SEED_STORE) && path.resolve(DATA_FILE)!==path.resolve(_SEED_STORE)){ try{ fs.writeFileSync(DATA_FILE, fs.readFileSync(_SEED_STORE)); }catch(_){} }
-}catch(_){}
-function readStore(){ try{ if(fs.existsSync(DATA_FILE)) return JSON.parse(fs.readFileSync(DATA_FILE,"utf8")); }catch(e){ console.error("[sinrad] read store failed:", e.message); } return null; }
-function writeStore(data){ try{ fs.writeFileSync(DATA_FILE, JSON.stringify(data), "utf8"); return true; }catch(e){ console.error("[sinrad] write store failed:", e.message); return false; } }
+const DATA_DIR = app.getPath("userData");
+const DATA_FILE = path.join(DATA_DIR,"sinrad-data.json");
+const DATA_BACKUP = DATA_FILE+".bak";
+const DATA_TMP = DATA_FILE+".sinrad-tmp";
+let _plainStoreWarningShown=false;
+let _storeLocked=false;
+let _recoveredFromBackup=false;
+let _storeCache=null;
+let _storeCacheLoaded=false;
+let _storeRevision=0;
+function _encryptionAvailable(){
+  if(!safeStorage.isEncryptionAvailable()) return false;
+  return !(process.platform==="linux" && typeof safeStorage.getSelectedStorageBackend==="function" && safeStorage.getSelectedStorageBackend()==="basic_text");
+}
+function storeSecurity(){ return _encryptionAvailable()?"encrypted":"permissions-only"; }
+function _validStore(data){
+  if(!data || typeof data!=="object" || Array.isArray(data)) return null;
+  ["vault","links","folders","console","petRecents","petPins","shots","shotWatch","scanRoots"].forEach(function(k){ if(data[k]!==undefined && !Array.isArray(data[k])) data[k]=[]; });
+  if(data.settings!==undefined && (!data.settings || typeof data.settings!=="object" || Array.isArray(data.settings))) data.settings={};
+  return data;
+}
+function _decodeStore(raw){
+  const parsed=JSON.parse(raw);
+  if(parsed && parsed.format==="sinrad-encrypted-v1" && typeof parsed.payload==="string"){
+    if(!_encryptionAvailable()) throw new Error("OS encryption is currently unavailable");
+    return _validStore(JSON.parse(safeStorage.decryptString(Buffer.from(parsed.payload,"base64"))));
+  }
+  return _validStore(parsed);
+}
+function _encodeStore(data){
+  const json=JSON.stringify(data);
+  if(Buffer.byteLength(json,"utf8")>10*1024*1024) throw new Error("store exceeds 10 MB safety limit");
+  if(_encryptionAvailable()){
+    return JSON.stringify({format:"sinrad-encrypted-v1",payload:safeStorage.encryptString(json).toString("base64")});
+  }
+  if(!_plainStoreWarningShown){ _plainStoreWarningShown=true; console.warn("[sinrad] OS encryption unavailable; store is protected only by file permissions"); }
+  return json;
+}
+function _readStoreFile(file){ try{ if(fs.existsSync(file)) return _decodeStore(fs.readFileSync(file,"utf8")); }catch(e){ console.error("[sinrad] read store failed:",file,e.message); } return null; }
+function readStore(){
+  if(_storeCacheLoaded) return _storeCache;
+  _storeLocked=false; _recoveredFromBackup=false;
+  const primaryExists=fs.existsSync(DATA_FILE);
+  const primary=_readStoreFile(DATA_FILE); if(primary){ _storeCache=primary; _storeCacheLoaded=true; _storeRevision++; return primary; }
+  const backup=_readStoreFile(DATA_BACKUP);
+  if(backup){ _recoveredFromBackup=primaryExists; _storeCache=backup; _storeCacheLoaded=true; _storeRevision++; return backup; }
+  if(primaryExists || fs.existsSync(DATA_BACKUP)){ _storeLocked=true; console.error("[sinrad] no readable store copy; writes locked to protect existing data"); }
+  _storeCache=null; _storeCacheLoaded=true; _storeRevision++;
+  return null;
+}
+function writeStore(data){
+  try{
+    if(_storeLocked) return false;
+    const clean=_validStore(data); if(!clean) return false;
+    fs.mkdirSync(DATA_DIR,{recursive:true,mode:0o700});
+    fs.writeFileSync(DATA_TMP,_encodeStore(clean),{encoding:"utf8",mode:0o600});
+    try{ fs.chmodSync(DATA_TMP,0o600); }catch(_){}
+    if(_recoveredFromBackup && fs.existsSync(DATA_FILE)) fs.renameSync(DATA_FILE,DATA_FILE+".corrupt-"+Date.now());
+    else{
+      if(fs.existsSync(DATA_BACKUP)) fs.unlinkSync(DATA_BACKUP);
+      if(fs.existsSync(DATA_FILE)) fs.renameSync(DATA_FILE,DATA_BACKUP);
+    }
+    try{ fs.renameSync(DATA_TMP,DATA_FILE); }
+    catch(err){ if(fs.existsSync(DATA_BACKUP)&&!fs.existsSync(DATA_FILE)) fs.renameSync(DATA_BACKUP,DATA_FILE); throw err; }
+    _storeCache=clean; _storeCacheLoaded=true; _storeRevision++; _recoveredFromBackup=false; return true;
+  }catch(e){ try{ if(fs.existsSync(DATA_TMP)) fs.unlinkSync(DATA_TMP); }catch(_){} console.error("[sinrad] write store failed:",e.message); return false; }
+}
+function migrateLegacyStore(){
+  if(fs.existsSync(DATA_FILE)) return;
+  const candidates=[path.join(__dirname,"sinrad-data.json"),path.join(__dirname,"sinrad-SANDBOX.json"),path.join(DATA_DIR,"sinrad-SANDBOX.json")];
+  for(const file of candidates){ const old=_readStoreFile(file); if(old && writeStore(old)){ console.log("[sinrad] migrated legacy store from",file); return; } }
+}
 
 let mainWin = null;
 let petWin = null;
@@ -27,8 +91,9 @@ function createWindow(){
   mainWin = new BrowserWindow({
     width:1280, height:900, minWidth:900, minHeight:640,
     frame:false, show:false, backgroundColor:"#060608", title:"S.I.R", icon:path.join(__dirname,"icon.png"),
-    webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false }
+    webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:true, webSecurity:true }
   });
+  lockNavigation(mainWin,"index.html");
   mainWin.loadFile(path.join(__dirname,"index.html"));
   // Auto-undock pet if setting is enabled; also flush parks queued during boot
   mainWin.webContents.on("did-finish-load", function(){
@@ -53,8 +118,9 @@ function createPet(){
     transparent:true, frame:false, alwaysOnTop:true, resizable:false,
     skipTaskbar:true, hasShadow:false, focusable:true, fullscreenable:false,
     backgroundColor:"#00000000",
-    webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false }
+    webPreferences:{ preload:path.join(__dirname,"pet-preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:true, webSecurity:true }
   });
+  lockNavigation(petWin,"pet.html");
   try{ petWin.setBackgroundColor("#00000000"); }catch(_){}
   petWin.setAlwaysOnTop(true, "screen-saver");           // float above everything
   petWin.setVisibleOnAllWorkspaces(true, { visibleOnFullScreen:true });
@@ -87,7 +153,8 @@ const BOOT_DIR=path.join(app.getPath("userData"),"boot");
 let splashWin=null;
 function syncBoot(){ const dest=BOOT_DIR; try{ fs.mkdirSync(dest,{recursive:true}); }catch(e){} const exts=[".mp4",".webm",".mkv",".mov",".ogg",".ogv",".m4v"]; const src=path.join(__dirname,"boot"); try{ fs.readdirSync(src).forEach(function(f){ if(exts.indexOf(path.extname(f).toLowerCase())<0) return; const dp=path.join(dest,f); if(!fs.existsSync(dp)){ try{ fs.writeFileSync(dp, fs.readFileSync(path.join(src,f))); }catch(e){} } }); }catch(e){} }
 function pickBootVideo(){ try{ if(!fs.existsSync(BOOT_DIR)) return null; const exts=[".mp4",".webm",".mkv",".mov",".ogg",".ogv",".m4v"]; const files=fs.readdirSync(BOOT_DIR).filter(function(f){ return exts.indexOf(path.extname(f).toLowerCase())>=0; }); if(!files.length) return null; return path.join(BOOT_DIR, files[Math.floor(Math.random()*files.length)]); }catch(e){ return null; } }
-function createSplash(vid){ try{ splashWin=new BrowserWindow({ width:720, height:408, frame:false, transparent:false, alwaysOnTop:true, skipTaskbar:true, resizable:false, show:true, backgroundColor:"#000000", webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:false, webSecurity:false } }); splashWin.setMenuBarVisibility(false); splashWin.loadFile(path.join(__dirname,"splash.html")); splashWin.webContents.once("did-finish-load",function(){ try{ splashWin.webContents.executeJavaScript("window.__BOOT_VIDEO="+JSON.stringify(vid)+"; if(window.__bootGotVideo) window.__bootGotVideo();"); }catch(e){} }); splashWin.on("closed",function(){ splashWin=null; finishBoot(); }); try{ splashWin.webContents.on("render-process-gone",function(){ finishBoot(); }); splashWin.webContents.on("crashed",function(){ finishBoot(); }); }catch(e){} }catch(e){ splashWin=null; } }
+function lockNavigation(win, file){ const expected=path.resolve(__dirname,file).toLowerCase(); win.webContents.on("will-navigate",function(e,url){ try{ const actual=path.resolve(decodeURIComponent(new URL(url).pathname).replace(/^\/(?:([a-zA-Z]:))/,"$1")).toLowerCase(); if(actual!==expected)e.preventDefault(); }catch(_){e.preventDefault();} }); win.webContents.setWindowOpenHandler(function(){ return {action:"deny"}; }); }
+function createSplash(vid){ try{ splashWin=new BrowserWindow({ width:720, height:408, frame:false, transparent:false, alwaysOnTop:true, skipTaskbar:true, resizable:false, show:true, backgroundColor:"#000000", webPreferences:{ preload:path.join(__dirname,"splash-preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:true, webSecurity:true } }); lockNavigation(splashWin,"splash.html"); splashWin.setMenuBarVisibility(false); splashWin.loadFile(path.join(__dirname,"splash.html")); splashWin.webContents.once("did-finish-load",function(){ try{ splashWin.webContents.send("boot-video",vid); }catch(e){} }); splashWin.on("closed",function(){ splashWin=null; finishBoot(); }); try{ splashWin.webContents.on("render-process-gone",function(){ finishBoot(); }); splashWin.webContents.on("crashed",function(){ finishBoot(); }); }catch(e){} }catch(e){ splashWin=null; } }
 /* Boot flow: the splash video plays FIRST (to completion or until skipped).
    The main window loads hidden in the background and only appears once the
    video is done, so the user always gets to see the boot video. */
@@ -121,36 +188,49 @@ function _handleProtocolUrl(url){
   try{
     var u=new URL(url);
     if(u.hostname==='park'||u.pathname==='/park'){
-      var linkUrl=u.searchParams.get('url')||'';
-      var title=u.searchParams.get('title')||'';
+      var linkUrl=normalizeHttpUrl(u.searchParams.get('url')||'');
+      var title=String(u.searchParams.get('title')||'').slice(0,500);
       var lot=u.searchParams.get('lot')==='1';
       if(linkUrl) _sendPark({url:linkUrl,title:title,lot:lot});
     }
   }catch(_){}
 }
+app.on("open-url",function(event,url){ event.preventDefault(); _handleProtocolUrl(url); });
 
-// --- localhost HTTP server for bookmarklet (no browser dialog) ---
+// --- authenticated localhost bridge for the browser extension ---
 const LOCAL_PORT = 47821;
+const LOCAL_TOKEN = crypto.randomBytes(32).toString("hex");
 let _localServer = null;
+let _localHits=[];
+function _localJson(res,status,data,origin){ if(origin) res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin"); res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}); res.end(JSON.stringify(data)); }
 function _startLocalServer(){
   if(_localServer) return;
   try{
     const http = require('http');
     _localServer = http.createServer(function(req, res){
-      res.setHeader('Access-Control-Allow-Origin','*');
-      res.setHeader('Access-Control-Allow-Methods','GET,OPTIONS');
-      if(req.method==='OPTIONS'){ res.writeHead(204); res.end(); return; }
-      try{
-        const u = new URL(req.url, 'http://localhost');
-        if(u.pathname==='/park'){
-          const linkUrl = u.searchParams.get('url')||'';
-          const title = u.searchParams.get('title')||'';
-          const lot = u.searchParams.get('lot')==='1';
-          if(linkUrl) _sendPark({url:linkUrl, title:title, lot:lot});
-        }
-      }catch(_){}
-      res.writeHead(200,{'Content-Type':'image/gif'});
-      res.end(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7','base64'));
+      const origin=String(req.headers.origin||"");
+      if(!isAllowedExtensionOrigin(origin)){ _localJson(res,403,{ok:false,error:"extension origin required"}); return; }
+      res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin");
+      res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers","Content-Type,X-Sinrad-Token");
+      if(req.method==="OPTIONS"){ res.writeHead(204); res.end(); return; }
+      const u=new URL(req.url,"http://localhost");
+      if(req.method==="GET" && u.pathname==="/token"){ _localJson(res,200,{ok:true,token:LOCAL_TOKEN},origin); return; }
+      if(req.method!=="POST" || u.pathname!=="/park"){ _localJson(res,404,{ok:false,error:"not found"},origin); return; }
+      if(req.headers["x-sinrad-token"]!==LOCAL_TOKEN){ _localJson(res,401,{ok:false,error:"invalid token"},origin); return; }
+      const now=Date.now(); _localHits=_localHits.filter(function(t){return now-t<60000;});
+      if(_localHits.length>=120){ _localJson(res,429,{ok:false,error:"rate limit"},origin); return; }
+      _localHits.push(now);
+      let body=""; let tooLarge=false;
+      req.on("data",function(chunk){ body+=chunk; if(Buffer.byteLength(body,"utf8")>65536){ tooLarge=true; req.destroy(); } });
+      req.on("end",function(){
+        if(tooLarge){ _localJson(res,413,{ok:false,error:"request too large"},origin); return; }
+        try{
+          const data=JSON.parse(body||"{}"); const linkUrl=normalizeHttpUrl(data.url); const title=String(data.title||"").slice(0,500); const lot=data.lot===true;
+          if(!linkUrl){ _localJson(res,400,{ok:false,error:"http(s) URL required"},origin); return; }
+          _sendPark({url:linkUrl,title:title,lot:lot}); _localJson(res,200,{ok:true},origin);
+        }catch(err){ _localJson(res,400,{ok:false,error:"invalid JSON"},origin); }
+      });
     });
     _localServer.on('error', function(e){ console.error('[sinrad] local server port '+LOCAL_PORT+' unavailable:', e.message); _localServer=null; });
     _localServer.listen(LOCAL_PORT, '127.0.0.1');
@@ -164,6 +244,7 @@ function _hkRegister(){ try{ if(_hkEnabled&&!_hkOk){ _hkOk=!!globalShortcut.regi
 function _hkUnregister(){ try{ if(_hkOk){ globalShortcut.unregister(HK_COMBO); _hkOk=false; } }catch(_){} }
 app.whenReady().then(()=>{
   if(!_gotLock) return;
+  migrateLegacyStore();
   try{ _killRestore(); }catch(_){}
   syncBoot();
   try{ if(autoUpdater){ autoUpdater.autoDownload=false; autoUpdater.autoInstallOnAppQuit=true; autoUpdater.allowDowngrade=false; autoUpdater.allowPrerelease=false; try{ autoUpdater.setFeedURL({provider:"github",owner:"SinSeeker0",repo:"sinrad"}); }catch(_){} autoUpdater.on("error", function(e){ try{ console.error("[sinrad] autoUpdater:", e&&e.message); }catch(_){} }); } }catch(_e){ try{ console.error("[sinrad] autoUpdater config failed:", _e&&_e.message); }catch(_){} }
@@ -183,31 +264,36 @@ app.whenReady().then(()=>{
   setTimeout(finishBoot, 600000);
   app.on("activate", ()=>{ if(BrowserWindow.getAllWindows().length===0) createWindow(); });
 });
-ipcMain.on("boot-done", ()=>finishBoot());
+function _from(e,win){ return !!(e&&win&&!win.isDestroyed()&&e.sender===win.webContents); }
+function _fromMain(e){ return _from(e,mainWin); }
+function _fromPet(e){ return _from(e,petWin); }
+function _fromSplash(e){ return _from(e,splashWin); }
+ipcMain.on("boot-done", (e)=>{ if(_fromSplash(e)) finishBoot(); });
 app.on("before-quit", ()=>{ try{ _killPersist(); }catch(_){} });
 app.on("window-all-closed", ()=>{ if(process.platform!=="darwin") app.quit(); });
 
 /* ---------- IPC: main window controls ---------- */
-ipcMain.on("win-min",  (e)=>{ const w=BrowserWindow.fromWebContents(e.sender); if(w) w.minimize(); });
-ipcMain.on("win-max",  (e)=>{ const w=BrowserWindow.fromWebContents(e.sender); if(w){ w.isMaximized()?w.unmaximize():w.maximize(); } });
-ipcMain.on("win-close",(e)=>{ const w=BrowserWindow.fromWebContents(e.sender); if(w) w.close(); });
+ipcMain.on("win-min",  (e)=>{ if(_fromMain(e)) mainWin.minimize(); });
+ipcMain.on("win-max",  (e)=>{ if(_fromMain(e)){ mainWin.isMaximized()?mainWin.unmaximize():mainWin.maximize(); } });
+ipcMain.on("win-close",(e)=>{ if(_fromMain(e)) mainWin.close(); });
 
 /* ---------- IPC: open urls / local apps ---------- */
-ipcMain.on("shell-open", (e,url)=>{ if(typeof url==="string"&&url) shell.openExternal(url); });
-ipcMain.handle("open-path", async (e,p)=>{ if(typeof p!=="string"||!p) return false; try{ const err=await shell.openPath(p); if(err) return false; try{ _recordRecentFolder(p); }catch(_){} return true; }catch(err){ return false; } });
+ipcMain.on("shell-open", (e,url)=>{ if(!_fromMain(e)) return; const safe=normalizeHttpUrl(url); if(safe) shell.openExternal(safe); });
+ipcMain.handle("open-path", async (e,p)=>{ if(!(_fromMain(e)||_fromPet(e))||typeof p!=="string"||!p||p.indexOf("\0")>=0) return false; try{ const resolved=path.resolve(p); if(!fs.existsSync(resolved)) return false; const err=await shell.openPath(resolved); if(err) return false; try{ _recordRecentFolder(resolved); }catch(_){} return true; }catch(err){ return false; } });
 
 /* ---------- IPC: store ---------- */
-ipcMain.handle("store-load", ()=>readStore());
-ipcMain.handle("store-save", (e,data)=>writeStore(data));
+ipcMain.handle("store-load", (e)=>_fromMain(e)?readStore():null);
+ipcMain.handle("store-security", (e)=>_fromMain(e)?storeSecurity():"unknown");
+ipcMain.handle("store-save", (e,data)=>_fromMain(e)?writeStore(data):false);
 
 /* ---------- IPC: pet window ---------- */
-ipcMain.on("pet-show", ()=>showPet());
-ipcMain.on("pet-hide", ()=>hidePet());
-ipcMain.on("pet-drag-start", (e,off)=>startDrag(off));
-ipcMain.on("pet-drag-end",   ()=>stopDrag());
-ipcMain.on("set-mouse-ignore", (e,b,opts)=>{ const w=BrowserWindow.fromWebContents(e.sender); if(w) w.setIgnoreMouseEvents(!!b, opts||{}); });
-ipcMain.on("pet-nav", (e,mod)=>{ if(mainWin){ mainWin.webContents.send("norma-nav", mod); if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.focus(); } });
-ipcMain.on("pet-pin", ()=>{ hidePet(); if(mainWin){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.focus(); mainWin.webContents.send("norma-dock"); } });
+ipcMain.on("pet-show", (e)=>{ if(_fromMain(e)) showPet(); });
+ipcMain.on("pet-hide", (e)=>{ if(_fromMain(e)) hidePet(); });
+ipcMain.on("pet-drag-start", (e,off)=>{ if(_fromPet(e)) startDrag(off); });
+ipcMain.on("pet-drag-end",   (e)=>{ if(_fromPet(e)) stopDrag(); });
+ipcMain.on("set-mouse-ignore", (e,b,opts)=>{ if(_fromPet(e)) petWin.setIgnoreMouseEvents(!!b, opts||{}); });
+ipcMain.on("pet-nav", (e,mod)=>{ if(_fromPet(e)&&["vault","links","folders","shots","lot"].indexOf(mod)>=0&&mainWin){ mainWin.webContents.send("norma-nav", mod); if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.focus(); } });
+ipcMain.on("pet-pin", (e)=>{ if(!_fromPet(e))return; hidePet(); if(mainWin){ if(mainWin.isMinimized()) mainWin.restore(); mainWin.show(); mainWin.moveTop(); mainWin.focus(); mainWin.webContents.send("norma-dock"); } });
 
 /* ---------- pet recent / pinned folders ---------- */
 let _petSlots=[];
@@ -272,52 +358,50 @@ function _recordRecentFolder(p){
     }
   }catch(_){}
 }
-ipcMain.on("sync-pet-recents", (e, slots)=>{ syncPetRecents(slots); });
-ipcMain.handle("pet-recents", ()=> (_petSlots.length?_petSlots:_slotsFromStore()));
+ipcMain.on("sync-pet-recents", (e, slots)=>{ if(_fromMain(e)) syncPetRecents(slots); });
+ipcMain.handle("pet-recents", (e)=> (_fromPet(e)||_fromMain(e))?(_petSlots.length?_petSlots:_slotsFromStore()):[]);
 
 /* ---------- screenshot library (images only, watch-in-place) ---------- */
 const { nativeImage, clipboard, dialog } = require("electron");
 const SHOT_EXTS = { ".png":1, ".jpg":1, ".jpeg":1, ".webp":1, ".gif":1, ".bmp":1, ".jfif":1 };
+let _sessionShotRoots=[];
+let _defaultShotRoots=null;
+let _shotAllowedCache=[];
+let _shotAllowedRevision=-1;
+let _shotSessionRevision=0;
+let _shotAllowedSessionRevision=-1;
 function _shotsDefaultRoots(){
+  if(_defaultShotRoots) return _defaultShotRoots.slice();
   const out=[], seen=new Set();
   function add(p){ if(!p) return; const r=path.resolve(p); const k=r.toLowerCase(); if(seen.has(k)) return; try{ if(fs.existsSync(r) && fs.statSync(r).isDirectory()){ seen.add(k); out.push(r); } }catch(_){} }
   try{ add(path.join(app.getPath("pictures"),"Screenshots")); }catch(_){}
   try{ add(path.join(app.getPath("home"),"Pictures","Screenshots")); }catch(_){}
   try{ add(path.join(app.getPath("home"),"OneDrive","Pictures","Screenshots")); }catch(_){}
   try{ add(path.join(app.getPath("home"),"OneDrive","Pictures","Screenshots")); }catch(_){}
-  return out;
+  _defaultShotRoots=out; return out.slice();
 }
-function _shotsList(roots){
-  const dirs=(roots&&roots.length)?roots:_shotsDefaultRoots();
-  const files=[];
-  dirs.forEach(function(dir){
-    let names; try{ names=fs.readdirSync(dir); }catch(_){ return; }
-    names.forEach(function(name){
-      const ext=path.extname(name).toLowerCase();
-      if(!SHOT_EXTS[ext]) return;
-      const full=path.join(dir,name);
-      try{
-        const st=fs.statSync(full);
-        if(!st.isFile()) return;
-        files.push({ path:full, name:name, mtime:st.mtimeMs||+st.mtime, size:st.size });
-      }catch(_){}
-    });
-  });
-  files.sort(function(a,b){ return (b.mtime||0)-(a.mtime||0); });
-  return { files:files, roots:dirs, truncated:false };
+function _shotAllowedRoots(){
+  if(_shotAllowedRevision!==_storeRevision || _shotAllowedSessionRevision!==_shotSessionRevision){
+    _shotAllowedCache=_sessionShotRoots.concat(((readStore()||{}).shotWatch||[]),_shotsDefaultRoots());
+    _shotAllowedRevision=_storeRevision; _shotAllowedSessionRevision=_shotSessionRevision;
+  }
+  return _shotAllowedCache;
 }
-ipcMain.handle("shots-scan", async (e, roots)=>{ try{ return _shotsList(roots); }catch(err){ return { files:[], roots:[], error:String(err&&err.message||err) }; } });
-ipcMain.handle("shots-defaults", async ()=> _shotsDefaultRoots());
-ipcMain.handle("shots-pick-folder", async ()=>{
+ipcMain.handle("shots-scan", async (e, roots)=>{ if(!_fromMain(e))return {files:[],roots:[],error:"unauthorized"}; try{ const dirs=await validDirectories(Array.isArray(roots)?roots:_shotsDefaultRoots(),20); _sessionShotRoots=dirs; _shotSessionRevision++; return await listScreenshotFiles(dirs); }catch(err){ return { files:[], roots:[], error:String(err&&err.message||err) }; } });
+ipcMain.handle("shots-defaults", async (e)=> _fromMain(e)?_shotsDefaultRoots():[]);
+ipcMain.handle("shots-pick-folder", async (e)=>{
+  if(!_fromMain(e)) return "";
   try{
     const r=await dialog.showOpenDialog({ title:"Watch a screenshot folder", properties:["openDirectory"] });
-    return (r&&!r.canceled&&r.filePaths&&r.filePaths[0])?r.filePaths[0]:"";
+    const picked=(r&&!r.canceled&&r.filePaths&&r.filePaths[0])?r.filePaths[0]:""; if(picked&&_sessionShotRoots.indexOf(picked)<0){ _sessionShotRoots.push(picked); _shotSessionRevision++; } return picked;
   }catch(_){ return ""; }
 });
 ipcMain.handle("shots-thumb", async (e, p)=>{
   try{
-    if(typeof p!=="string"||!p) return "";
+    if(!_fromMain(e)||typeof p!=="string"||!p) return "";
     const resolved=path.resolve(p);
+    const roots=_shotAllowedRoots();
+    if(!isPathInside(resolved,roots)||!SHOT_EXTS[path.extname(resolved).toLowerCase()]) return "";
     if(!fs.existsSync(resolved)) return "";
     let img=null;
     try{ img=await nativeImage.createThumbnailFromPath(resolved,{ width:360, height:220 }); }catch(_){}
@@ -326,20 +410,23 @@ ipcMain.handle("shots-thumb", async (e, p)=>{
     return img.toDataURL();
   }catch(_){ return ""; }
 });
-ipcMain.handle("shots-reveal", async (e, p)=>{ try{ if(typeof p==="string"&&p) shell.showItemInFolder(p); return true; }catch(_){ return false; } });
+ipcMain.handle("shots-read", async (e,p)=>{ try{ if(!_fromMain(e)||typeof p!=="string"||!p)return Buffer.alloc(0); const resolved=path.resolve(p); if(!isPathInside(resolved,_shotAllowedRoots())||!SHOT_EXTS[path.extname(resolved).toLowerCase()])return Buffer.alloc(0); const st=await fs.promises.stat(resolved); if(!st.isFile()||st.size>50*1024*1024)return Buffer.alloc(0); return await fs.promises.readFile(resolved); }catch(_){ return Buffer.alloc(0); } });
+ipcMain.handle("shots-reveal", async (e, p)=>{ try{ if(!_fromMain(e)||typeof p!=="string"||!p)return false; if(!isPathInside(p,_shotAllowedRoots()))return false; shell.showItemInFolder(path.resolve(p)); return true; }catch(_){ return false; } });
 ipcMain.handle("shots-lookup", async (e, p)=>{
   try{
-    if(typeof p!=="string"||!p) return false;
+    if(!_fromMain(e)||typeof p!=="string"||!p) return false;
+    if(!isPathInside(p,_shotAllowedRoots()))return false;
     const img=nativeImage.createFromPath(path.resolve(p));
     if(img&&!img.isEmpty()) clipboard.writeImage(img);
     await shell.openExternal("https://lens.google.com/");
     return true;
   }catch(_){ return false; }
 });
-ipcMain.handle("shots-open", async (e, p)=>{ try{ if(typeof p==="string"&&p) await shell.openPath(p); return true; }catch(_){ return false; } });
+ipcMain.handle("shots-open", async (e, p)=>{ try{ if(!_fromMain(e)||typeof p!=="string"||!p)return false; if(!isPathInside(p,_shotAllowedRoots()))return false; return !(await shell.openPath(path.resolve(p))); }catch(_){ return false; } });
 ipcMain.handle("shots-copy", async (e, p)=>{
   try{
-    if(typeof p!=="string"||!p) return false;
+    if(!_fromMain(e)||typeof p!=="string"||!p) return false;
+    if(!isPathInside(p,_shotAllowedRoots()))return false;
     const img=nativeImage.createFromPath(path.resolve(p));
     if(!img||img.isEmpty()) return false;
     clipboard.writeImage(img);
@@ -446,11 +533,12 @@ function _killToggle(mins){
   if(_killAt>Date.now()) return _killCancel();
   return _killArm(mins);
 }
-ipcMain.handle("kill-arm", (e, mins)=> _killArm(mins));
-ipcMain.handle("kill-cancel", ()=> _killCancel());
-ipcMain.handle("kill-toggle", (e, mins)=> _killToggle(mins));
-ipcMain.handle("kill-status", ()=> _killPayload());
-ipcMain.on("kill-ask", ()=>{
+ipcMain.handle("kill-arm", (e, mins)=> (_fromMain(e)||_fromPet(e))?_killArm(Math.min(1440,Math.max(1,Number(mins)||30))):{armed:false,at:0});
+ipcMain.handle("kill-cancel", (e)=> (_fromMain(e)||_fromPet(e))?_killCancel():{armed:false,at:0});
+ipcMain.handle("kill-toggle", (e, mins)=> (_fromMain(e)||_fromPet(e))?_killToggle(Math.min(1440,Math.max(1,Number(mins)||30))):{armed:false,at:0});
+ipcMain.handle("kill-status", (e)=> (_fromMain(e)||_fromPet(e))?_killPayload():{armed:false,at:0});
+ipcMain.on("kill-ask", (e)=>{
+  if(!_fromPet(e)) return;
   try{
     if(mainWin&&!mainWin.isDestroyed()){
       if(mainWin.isMinimized()) mainWin.restore();
@@ -464,19 +552,21 @@ const BGM_DIR = path.join(app.getPath("userData"),"bgm");
 const BUNDLED_BGM = path.join(__dirname,"bgm");
 function syncBundled(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){} const exts=[".mp3",".ogg",".wav",".m4a",".flac",".webm",".opus"]; try{ fs.readdirSync(BUNDLED_BGM).forEach(function(f){ if(exts.indexOf(path.extname(f).toLowerCase())<0) return; const dest=path.join(BGM_DIR,f); if(!fs.existsSync(dest)){ try{ fs.writeFileSync(dest, fs.readFileSync(path.join(BUNDLED_BGM,f))); }catch(_){} } }); }catch(_){} }
 function scanBgm(){ try{ fs.mkdirSync(BGM_DIR,{recursive:true}); }catch(_){} const exts=[".mp3",".ogg",".wav",".m4a",".flac",".webm",".opus"]; let out=[]; try{ out=fs.readdirSync(BGM_DIR).filter(function(f){ return exts.indexOf(path.extname(f).toLowerCase())>=0; }).map(function(f){ return {name:f, path:path.join(BGM_DIR,f)}; }); }catch(_){} return out; }
-ipcMain.on("music-request",(e)=>{ syncBundled(); const w=BrowserWindow.fromWebContents(e.sender); if(w) w.webContents.send("music-list", {files:scanBgm(), dir:BGM_DIR}); });
-ipcMain.on("music-cmd",(e,c)=>{ if(mainWin) mainWin.webContents.send("music-cmd", c); });
-ipcMain.handle("music-read", async (e,p)=>{ try{ if(typeof p!=="string"||!p) return Buffer.alloc(0); const resolved=path.resolve(p); const root=path.resolve(BGM_DIR)+path.sep; if(resolved!==path.resolve(BGM_DIR) && resolved.indexOf(root)!==0) return Buffer.alloc(0); return await fs.promises.readFile(resolved); }catch(_){ return Buffer.alloc(0); } });
-ipcMain.handle("clip-read", async () => { try { return require("electron").clipboard.readText(); } catch(_){ return ""; } });
-ipcMain.handle("hotkey-toggle", (e, enabled)=>{ _hkEnabled=!!enabled; if(_hkEnabled){ _hkRegister(); } else { _hkUnregister(); } try{ if(mainWin) mainWin.webContents.send("hotkey-status",{ok:_hkOk,combo:"Ctrl+Alt+P",enabled:_hkEnabled}); }catch(_){} return {ok:_hkOk, enabled:_hkEnabled}; });
-ipcMain.handle("set-autostart", (e, enabled)=>{ try{ app.setLoginItemSettings({openAtLogin:!!enabled}); }catch(_){} try{ return app.getLoginItemSettings().openAtLogin; }catch(_){ return !!enabled; } });
-ipcMain.handle("ext-dir", ()=> path.join(__dirname, "extension").replace("app.asar","app.asar.unpacked"));
-ipcMain.handle("ext-open", ()=>{ try{ var p=path.join(__dirname,"extension").replace("app.asar","app.asar.unpacked"); require("electron").shell.openPath(p); return true; }catch(_){ return false; } });
-ipcMain.on("show-notif", (e, data)=>{ try{ const {Notification:nN}=require('electron'); const n=new nN({title:data&&data.title||'S.I.R', body:data&&data.body||'', silent:true}); n.show(); }catch(er){ try{console.error('[sinrad] notif:',er.message);}catch(_){} } });
+ipcMain.on("music-request",(e)=>{ if(!_fromMain(e))return; syncBundled(); mainWin.webContents.send("music-list", {files:scanBgm(), dir:BGM_DIR}); });
+ipcMain.on("music-cmd",(e,c)=>{ if(_fromMain(e)&&mainWin&&["toggle","next","prev"].indexOf(c)>=0) mainWin.webContents.send("music-cmd", c); });
+ipcMain.handle("music-read", async (e,p)=>{ try{ if(!_fromMain(e)||typeof p!=="string"||!p) return Buffer.alloc(0); const resolved=path.resolve(p); const root=path.resolve(BGM_DIR)+path.sep; if(resolved!==path.resolve(BGM_DIR) && resolved.indexOf(root)!==0) return Buffer.alloc(0); return await fs.promises.readFile(resolved); }catch(_){ return Buffer.alloc(0); } });
+ipcMain.handle("clip-read", async (e) => { if(!_fromMain(e))return ""; try { return require("electron").clipboard.readText(); } catch(_){ return ""; } });
+ipcMain.handle("clip-clear-if", async (e,value)=>{ if(!_fromMain(e)||typeof value!=="string")return false; try{ const cb=require("electron").clipboard; if(cb.readText()===value){ cb.clear(); return true; } }catch(_){} return false; });
+ipcMain.handle("hotkey-toggle", (e, enabled)=>{ if(!_fromMain(e))return {ok:false,enabled:false}; _hkEnabled=!!enabled; if(_hkEnabled){ _hkRegister(); } else { _hkUnregister(); } try{ if(mainWin) mainWin.webContents.send("hotkey-status",{ok:_hkOk,combo:"Ctrl+Alt+P",enabled:_hkEnabled}); }catch(_){} return {ok:_hkOk, enabled:_hkEnabled}; });
+ipcMain.handle("set-autostart", (e, enabled)=>{ if(!_fromMain(e))return false; try{ app.setLoginItemSettings({openAtLogin:!!enabled}); }catch(_){} try{ return app.getLoginItemSettings().openAtLogin; }catch(_){ return !!enabled; } });
+ipcMain.handle("ext-dir", (e)=> _fromMain(e)?path.join(__dirname, "extension").replace("app.asar","app.asar.unpacked"):"");
+ipcMain.handle("ext-open", (e)=>{ if(!_fromMain(e))return false; try{ var p=path.join(__dirname,"extension").replace("app.asar","app.asar.unpacked"); require("electron").shell.openPath(p); return true; }catch(_){ return false; } });
+ipcMain.on("show-notif", (e, data)=>{ if(!_fromMain(e))return; try{ const {Notification:nN}=require('electron'); const n=new nN({title:String(data&&data.title||'S.I.R').slice(0,100), body:String(data&&data.body||'').slice(0,500), silent:true}); n.show(); }catch(er){ try{console.error('[sinrad] notif:',er.message);}catch(_){} } });
 
 const activeScans = new Map();
-ipcMain.handle("fs-home", ()=> app.getPath("home"));
+ipcMain.handle("fs-home", (e)=> _fromMain(e)?app.getPath("home"):"");
 ipcMain.on("fs-scan", (e, payload)=>{
+  if(!_fromMain(e)||!payload||typeof payload!=="object") return;
   const win = BrowserWindow.fromWebContents(e.sender);
   const id = payload && payload.id;
   const ctrl = scanFolders(
@@ -490,7 +580,7 @@ ipcMain.on("fs-scan", (e, payload)=>{
   );
   activeScans.set(id, ctrl);
 });
-ipcMain.on("fs-scan-cancel", (e, payload)=>{ const c = activeScans.get(payload && payload.id); if(c){ c.abort(); activeScans.delete(payload && payload.id); } });
+ipcMain.on("fs-scan-cancel", (e, payload)=>{ if(!_fromMain(e))return; const c = activeScans.get(payload && payload.id); if(c){ c.abort(); activeScans.delete(payload && payload.id); } });
 
 /* ===================== updater: GitHub latest for check, electron-updater for install ===================== */
 const https = require("https");
@@ -516,8 +606,9 @@ function updPickAsset(assets){
   }
   return null;
 }
-ipcMain.handle("app-version", ()=> app.getVersion());
+ipcMain.handle("app-version", (e)=> _fromMain(e)?app.getVersion():"");
 ipcMain.handle("update-check", async function(e, rendererVer){
+  if(!_fromMain(e)) return {ok:false,error:"unauthorized"};
   const cur=updStrip(app.getVersion()||rendererVer||"0.0.0");
   try{
     const rel=await updGetJSON(UPD_API);
@@ -538,6 +629,7 @@ ipcMain.handle("update-check", async function(e, rendererVer){
   }
 });
 ipcMain.handle("update-download", async function(e, payload){
+  if(!_fromMain(e)) return {manual:false,error:"unauthorized"};
   if(autoUpdater && app.isPackaged){
     const onProg=function(p){ if(mainWin&&!mainWin.isDestroyed()){ mainWin.webContents.send("update-progress", {got:p.transferred||0, total:p.total||0, percent:p.percent||0}); } };
     autoUpdater.on("download-progress", onProg);
@@ -550,11 +642,11 @@ ipcMain.handle("update-download", async function(e, payload){
       try{ autoUpdater.removeListener("download-progress", onProg); }catch(_){}
     }
   }
-  const url=(payload&&payload.url)||UPD_PAGE;
-  try{ shell.openExternal(url); }catch(_){}
+  try{ shell.openExternal(UPD_PAGE); }catch(_){}
   return {manual:true};
 });
-ipcMain.handle("update-install", async function(){
+ipcMain.handle("update-install", async function(e){
+  if(!_fromMain(e)) return {ok:false,error:"unauthorized"};
   if(autoUpdater && app.isPackaged){
     try{ autoUpdater.quitAndInstall(false,true); return {ok:true}; }catch(err){ try{ console.error("[sinrad] update install:", err&&err.message); }catch(_){} }
   }

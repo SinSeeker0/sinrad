@@ -20,11 +20,14 @@
     "dist": "electron-builder",
     "build:linux": "electron-builder --linux",
     "build:win": "electron-builder --win",
-    "build:mac": "electron-builder --mac"
+    "build:mac": "electron-builder --mac",
+    "test": "node --test",
+    "lint": "node --check main.js && node --check preload.js && node --check pet-preload.js && node --check splash-preload.js && node --check scan.js && node --check lib/security.js && node --check lib/screenshots.js && node --check release.js && node --check assets/renderer.js && node --check assets/pet.js && node --check assets/splash.js && node --check extension/background.js",
+    "check": "npm run lint && npm test"
   },
   "devDependencies": {
-    "electron": "^32.2.0",
-    "electron-builder": "^25.1.8"
+    "electron": "^43.4.0",
+    "electron-builder": "^26.15.3"
   },
   "build": {
     "appId": "com.sinrad.commandcenter",
@@ -35,7 +38,11 @@
     "files": [
       "main.js",
       "preload.js",
+      "pet-preload.js",
+      "splash-preload.js",
       "scan.js",
+      "lib/**",
+      "assets/**",
       "index.html",
       "pet.html",
       "package.json",
@@ -92,6 +99,6 @@
     }
   },
   "dependencies": {
-    "electron-updater": "^6.3.0"
+    "electron-updater": "^6.8.9"
   }
 }

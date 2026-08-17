@@ -16,7 +16,12 @@ echo "=============================================="
 
 # 1. toolchain check
 if ! command -v node >/dev/null 2>&1; then
-  echo "ERROR: Node.js not found. Install Node 18+ from https://nodejs.org and re-run." >&2
+  echo "ERROR: Node.js not found. Install Node 22+ from https://nodejs.org and re-run." >&2
+  exit 1
+fi
+NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]')"
+if [ "$NODE_MAJOR" -lt 22 ]; then
+  echo "ERROR: Node.js 22+ is required (found $(node -v))." >&2
   exit 1
 fi
 if ! command -v npm >/dev/null 2>&1; then

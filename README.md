@@ -1,63 +1,57 @@
-# S.I.R — Personal Command Center
+# Sinrad — S.I.R Personal Command Center
 
-Was a password manager at first but kinda turned into something more idk i kept coming up with ideas i wanna add and i still got ideas i need to add so lets see how far i can take this.
+An offline-first Electron desktop app for passwords, links, temporary tab stacks, quick folders, screenshots, music, and device-folder search.
 
-## Modules
+## Features
 
-- **Vault** — store logins locally; show/hide and copy password, copy username, open site, favorites, priority, search.
-- **Links** — save links with title, URL, category (Anime / Interesting / Check out / Artist / Guides), favorites; filter and search.
-- **Parking Lot** — temporary holding area for links; auto-stacks by site; send individual links or whole stacks to Links; search with Ctrl+F; rename stacks; multi-select + delete.
-- **Quick Folders** — pin folder paths; open with double-click; favorites; search.
-- **Console** — docked terminal with command input; logs activity; `rad "query"` scans your folders; `rad set` for app settings; one-click save chips for visited sites/folders.
-
-## Quick Capture
-
-- **Bookmarklet** — one-click browser bookmark saves the current page (or selected URL) straight to Links [Check out]. Type `bookmarklet` in the console for the code. Uses a custom `sinrad://` protocol — no extension needed.
-- **Global Hotkey (Ctrl+Alt+P)** — copies clipboard URL and saves to Links [Check out]. Toggle with `rad set hk off` before gaming so it doesn't eat your keybinds.
-- **Park command** — type `park` in the console to grab whatever URL is in your clipboard into the Parking Lot. Paste a list of URLs to bulk-import.
-
-## App Features
-
-- **Auto-update** — checks GitHub Releases on launch; downloads and installs in one click (Windows/Linux); falls back to opening the release page if needed.
-- **Auto-start on boot** — `rad set autostart on` makes the app launch when you log in. Toggle off anytime.
-- **NSIS Installer** (Windows) — proper install/uninstall, Start Menu + Desktop shortcuts, pinned taskbar survives updates.
-- **Floating Norma** — transparent always-on-top desktop pet; drag anywhere; right-click menu; docks back into the app.
-- **Music player** — plays BGM from the `bgm/` folder; auto-play on boot if enabled (`rad set music on`).
-- **Boot intro** — drop a video in `boot/` and it plays on launch (`rad set intro off` to skip).
-- **Celebration** — random art zooms across the screen on every save; drop your own `.gif` or `.png` in to customize.
-- **Search** — Ctrl+F in every module; Esc to close.
-- **Square UI** — clean angular design, minimal border-radius, dark theme.
-
-## Terminal Commands
-
-| Command | What it does |
-|---------|-------------|
-| `rad "query"` | Search your folders |
-| `rad set` | Show all toggleable settings |
-| `rad set autostart` | Toggle launch on boot |
-| `rad set hk` | Toggle global hotkey (Ctrl+Alt+P) |
-| `rad set music` | Toggle BGM auto-play |
-| `rad set intro` | Toggle boot video |
-| `park` | Save clipboard URL to Parking Lot |
-| `park <url>` | Park a specific URL |
-| `parklist` | Bulk-import URLs from clipboard |
-| `bookmarklet` | Show the one-click browser bookmark code |
-| `help` | List all commands |
-
-## Settings (`rad set <name> on|off`)
-
-`autostart` · `hotkey` · `music` · `intro` · `hidden` · `autoscroll` · `click`
+- **Vault:** encrypted local credentials, favorites, priority, search, reveal, and copy.
+- **Links:** categorized bookmarks with favorites and multi-select.
+- **Parking Lot:** temporary links grouped into site stacks.
+- **Quick Folders:** pinned paths and recent folders shared with the desktop pet.
+- **Screenies:** watch screenshot folders, organize captures, copy, reveal, and slideshow.
+- **Console:** activity log plus `rad`, `park`, `parklist`, and settings commands.
+- **Quick capture:** global hotkey and the included Manifest V3 browser extension.
+- **Desktop extras:** floating Norma pet, local BGM, optional boot videos, update checks, autostart, and a confirmed 30-minute shutdown timer.
 
 ## Install
 
-Grab the latest **Setup** from [Releases](https://github.com/SinSeeker0/sinrad/releases). Windows and Linux available. Download, run the installer, done.
+Download the latest installer from [GitHub Releases](https://github.com/SinSeeker0/sinrad/releases). Windows uses NSIS; Linux provides AppImage and deb packages.
 
-## Dev / Build
+## Browser extension
+
+1. In Sinrad, type `ext open` in the console.
+2. Open your browser's extensions page and enable Developer mode.
+3. Choose **Load unpacked** and select the opened `extension` directory.
+
+The extension talks only to Sinrad's authenticated localhost bridge. “Park all and close” closes only tabs the app acknowledges.
+
+## Data and security
+
+- Data is stored under Electron's OS `userData` directory, never in the repository.
+- The state file is encrypted with Electron `safeStorage` when OS encryption is available.
+- Writes are atomic and the previous state is retained as `sinrad-data.json.bak`.
+- Existing plaintext data is migrated automatically on the next successful save.
+- Copied passwords are removed from the clipboard after 45 seconds if unchanged.
+
+Back up both `sinrad-data.json` and its `.bak` file. The encryption is tied to the current OS user, so restore them under the same account. If OS encryption is temporarily unavailable, Sinrad locks writes rather than replacing encrypted data.
+
+## Development
+
+Requires Node.js 22 or newer.
 
 ```bash
-npm install
-npm start          # run in dev
-npm run dist       # build installer
+npm ci
+npm start
+npm run check
+npm run dist
 ```
 
-Ships as a proper installer (NSIS on Windows, AppImage/deb on Linux).
+Use `release.bat`, `release.sh`, or `node release.js` from a clean `main` branch after committing reviewed changes. The helper runs checks, creates one version commit/tag, and pushes only that tag.
+
+## Settings
+
+Run `rad set` to see settings for autostart, hotkey, music, intro, hidden-folder scanning, console autoscroll, click mode, and pet auto-undock.
+
+## License
+
+[MIT](LICENSE)
