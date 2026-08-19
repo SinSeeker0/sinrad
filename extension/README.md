@@ -14,9 +14,9 @@ One-click save any web page or link to S.I.R through an authenticated local conn
 
 3. Click **"Load unpacked"** (or "Load unpacked extension")
 
-4. Select this `extension` folder (the one containing `manifest.json` and `background.js`)
+4. In Sinrad, run `ext open` and select the folder it opens.
 
-5. Done! You'll see a S.I.R icon in your toolbar.
+5. Done! Sinrad updates that stable folder in place, so future app updates do not require loading it again. If Opera does not notice changed files immediately, click **Reload** once on `opera://extensions`.
 
 ## Usage
 

@@ -19,11 +19,11 @@ Download the latest installer from [GitHub Releases](https://github.com/SinSeeke
 
 ## Browser extension
 
-1. In Sinrad, type `ext open` in the console.
+1. In Sinrad, type `ext open` in the console. This opens a stable per-user folder that Sinrad updates in place.
 2. Open your browser's extensions page and enable Developer mode.
 3. Choose **Load unpacked** and select the opened `extension` directory.
 
-The extension talks only to Sinrad's authenticated localhost bridge. “Park all and close” closes only tabs the app acknowledges.
+The extension talks only to Sinrad's authenticated localhost bridge. “Park all and close” closes only tabs the app acknowledges. Opera keeps the same unpacked extension across Sinrad upgrades; click **Reload** in Opera's extension page only if it does not detect an update automatically.
 
 ## Data and security
 

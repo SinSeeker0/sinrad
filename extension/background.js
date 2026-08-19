@@ -2,8 +2,14 @@
 // Sends page URL + title to the S.I.R desktop app's localhost server
 
 const PORT = 47821;
-const BASE = 'http://localhost:' + PORT;
+const BASE = 'http://127.0.0.1:' + PORT;
 let sessionToken = '';
+
+function setStatus(ok) {
+  chrome.action.setBadgeBackgroundColor({ color: ok ? '#168a45' : '#c62828' });
+  chrome.action.setBadgeText({ text: ok ? '✓' : '!' });
+  setTimeout(() => chrome.action.setBadgeText({ text: '' }), 2500);
+}
 
 async function getToken() {
   if (sessionToken) return sessionToken;
@@ -35,19 +41,21 @@ async function saveToSinrad(url, title, lot) {
   if (!response.ok) throw new Error('Sinrad rejected the save');
   const result = await response.json();
   if (!result.ok) throw new Error(result.error || 'Save failed');
+  setStatus(true);
   return true;
 }
 
-function notifyUnavailable() {
+function notifyUnavailable(error) {
+  setStatus(false);
   chrome.notifications.create('sinrad-err-' + Date.now(), {
-    type: 'basic', iconUrl: 'icon.png', title: 'S.I.R not running',
-    message: 'Start the app to save links', priority: -1, silent: true
+    type: 'basic', iconUrl: 'icon.png', title: 'S.I.R not connected',
+    message: (error && error.message) || 'Start Sinrad, then try again', priority: 1, silent: true
   });
 }
 
 function saveOne(url, title, lot) {
   return saveToSinrad(url, title, lot).catch((error) => {
-    notifyUnavailable();
+    notifyUnavailable(error);
     throw error;
   });
 }
@@ -59,6 +67,7 @@ chrome.action.onClicked.addListener((tab) => {
 
 // === Right-click context menu ===
 chrome.runtime.onInstalled.addListener(() => {
+  chrome.contextMenus.removeAll(() => {
   chrome.contextMenus.create({
     id: 'sinrad-save-page',
     title: 'Save page to S.I.R',
@@ -83,6 +92,7 @@ chrome.runtime.onInstalled.addListener(() => {
     id: 'sinrad-park-all-close',
     title: 'Park ALL tabs & close them',
     contexts: ['page']
+  });
   });
 });
 

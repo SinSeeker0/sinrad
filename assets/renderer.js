@@ -291,7 +291,7 @@ function renameStack(coll){
   setTimeout(function(){ var i=document.getElementById("rs_name"); if(i){ i.focus(); i.select(); } },30);
 }
 
-function renderView(){ if(currentView!=="lot"){ lotSelLinks={}; lotSelColls={}; } if(currentView!=="links"){ linkSelLinks={}; } const c=$("#content"); try{ c.parentElement.classList.toggle("lot-active", currentView==="lot"); }catch(_){} switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "lot":c.innerHTML=viewLot();break; case "folders":c.innerHTML=viewFolders();break; case "shots":c.innerHTML=viewShots(); shotsHydrateThumbs(); break; default:c.innerHTML=viewVault(); } renderTermBody(); }
+function renderView(){ if(currentView!=="lot"){ lotSelLinks={}; lotSelColls={}; } if(currentView!=="links"){ linkSelLinks={}; } const c=$("#content"); try{ c.parentElement.classList.toggle("lot-active", currentView==="lot"); }catch(_){} switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "lot":c.innerHTML=viewLot();break; case "folders":c.innerHTML=viewFolders();break; case "shots":c.innerHTML=viewShots(); shotsHydrateThumbs(); break; default:c.innerHTML=viewVault(); } }
 function head(t,d,a){ return `<div class="mod-head"><div><h1>${esc(t)}</h1><p>${esc(d)}</p></div><div class="spacer"></div>${a||""}</div>`; }
 function emptyState(i,m){ return `<div class="empty"><div class="e-ico">${i}</div><p>${esc(m)}</p></div>`; }
 
@@ -419,17 +419,33 @@ async function shotsRefresh(silent){
 }
 const _shotThumbs={};
 const _shotThumbOrder=[];
-function shotCacheSet(p,url){
-  _shotThumbs[p]=url;
-  const i=_shotThumbOrder.indexOf(p); if(i>=0) _shotThumbOrder.splice(i,1);
-  _shotThumbOrder.push(p);
+const _thumbQueue=[];
+const _thumbPending={};
+let _thumbActive=0;
+function shotThumbKey(p,mtime){ return String(p||"")+"\u0000"+String(Math.trunc(Number(mtime)||0)); }
+function shotCacheSet(key,url){
+  _shotThumbs[key]=url;
+  const i=_shotThumbOrder.indexOf(key); if(i>=0) _shotThumbOrder.splice(i,1);
+  _shotThumbOrder.push(key);
   while(_shotThumbOrder.length>200){ const old=_shotThumbOrder.shift(); delete _shotThumbs[old]; }
+}
+function shotThumbPump(){
+  while(_thumbActive<4 && _thumbQueue.length){
+    const job=_thumbQueue.shift(); _thumbActive++;
+    Promise.resolve(E.shotsThumb(job.path)).then(function(url){ if(url)shotCacheSet(job.key,url); job.resolve(url||""); },function(){job.resolve("");}).finally(function(){ _thumbActive--; delete _thumbPending[job.key]; shotThumbPump(); });
+  }
+}
+function shotThumbRequest(path,key){
+  if(_thumbPending[key]) return _thumbPending[key];
+  _thumbPending[key]=new Promise(function(resolve){ _thumbQueue.push({path:path,key:key,resolve:resolve}); shotThumbPump(); });
+  return _thumbPending[key];
 }
 function shotLoadThumb(img){
   const p=img.getAttribute("data-spath"); if(!p) return;
-  if(_shotThumbs[p]){ img.src=_shotThumbs[p]; return; }
+  const key=shotThumbKey(p,img.getAttribute("data-smtime"));
+  if(_shotThumbs[key]){ img.src=_shotThumbs[key]; return; }
   if(!E||!E.shotsThumb) return;
-  E.shotsThumb(p).then(function(url){ if(url){ shotCacheSet(p,url); if(img.isConnected) img.src=url; } });
+  shotThumbRequest(p,key).then(function(url){ if(url&&img.isConnected&&shotThumbKey(img.getAttribute("data-spath"),img.getAttribute("data-smtime"))===key) img.src=url; });
 }
 let _thumbObs=null;
 function shotsHydrateThumbs(){
@@ -443,7 +459,8 @@ function shotsHydrateThumbs(){
   },{ root:root||null, rootMargin:"240px", threshold:0.01 });
   imgs.forEach(function(img){
     const p=img.getAttribute("data-spath");
-    if(p&&_shotThumbs[p]){ img.src=_shotThumbs[p]; return; }
+    const key=shotThumbKey(p,img.getAttribute("data-smtime"));
+    if(p&&_shotThumbs[key]){ img.src=_shotThumbs[key]; return; }
     _thumbObs.observe(img);
   });
 }
@@ -467,8 +484,8 @@ function viewShots(){
   if(!_shotIndex.length) body=emptyState(ICO_FOLDER,"No screenshots found — drop PNGs in your Screenshots folder, or add another folder.");
   else if(!all.length) body=emptyState(ICO_SEARCH,"Nothing in this tray yet.");
   else body=`<div class="shot-grid size-${shotSize}">`+slice.map(function(s){
-    const src=_shotThumbs[s.path]||"";
-    return `<div class="shot-card" data-ctx="shot" data-id="${esc(s.id)}" data-action="shot-open"><img class="shot-thumb" data-spath="${esc(s.path)}" src="${src}" alt=""><div class="shot-cap"><b>${esc(s.name)}</b><span>${esc(fmtDate(s.mtime))}</span></div></div>`;
+    const src=_shotThumbs[shotThumbKey(s.path,s.mtime)]||"";
+    return `<div class="shot-card" data-ctx="shot" data-id="${esc(s.id)}" data-action="shot-open"><img class="shot-thumb" data-spath="${esc(s.path)}" data-smtime="${esc(s.mtime||0)}" src="${src}" alt=""><div class="shot-cap"><b>${esc(s.name)}</b><span>${esc(fmtDate(s.mtime))}</span></div></div>`;
   }).join("")+`</div>`;
   const pager=pages>1?`<div class="shot-pager"><button type="button" data-action="shot-page" data-dir="-1"${shotPage<=0?" disabled":""}>‹ Prev</button><span>Page ${shotPage+1} / ${pages} · ${SHOT_PAGE} per page</span><button type="button" data-action="shot-page" data-dir="1"${shotPage>=pages-1?" disabled":""}>Next ›</button></div>`:"";
   return head("Screenies", (shotFilter==="inbox"?"Inbox — unfiled captures":"Tray: "+shotFilter)+" · click to open · right-click to file / copy / look up")+banner+pills+searchRow("shots","Search screenies...")+body+pager;
@@ -779,7 +796,8 @@ document.addEventListener("click",async(ev)=>{
 });
 function hostOf(u){ try{ const h=new URL(u).hostname; return h||String(u).slice(0,40); }catch(e){ return String(u).slice(0,40); } }
 
-document.addEventListener("input",(ev)=>{ const s=ev.target.closest("[data-search]"); if(s){ const k=s.dataset.search,pos=s.value.length; searchTerms[k]=s.value; renderView(); const again=document.querySelector('[data-search="'+k+'"]'); if(again){ again.focus(); try{ again.setSelectionRange(pos,pos); }catch(e){} } } });
+let _searchRenderTimer=null;
+document.addEventListener("input",(ev)=>{ const s=ev.target.closest("[data-search]"); if(!s)return; const k=s.dataset.search,pos=s.value.length; searchTerms[k]=s.value; if(_searchRenderTimer)clearTimeout(_searchRenderTimer); _searchRenderTimer=setTimeout(function(){ _searchRenderTimer=null; if(k==="console"){ renderTermBody(); return; } renderView(); const again=document.querySelector('[data-search="'+k+'"]'); if(again){ again.focus(); try{ again.setSelectionRange(pos,pos); }catch(e){} } },140); });
 
 document.addEventListener("keydown",(ev)=>{
   if((ev.ctrlKey||ev.metaKey)&&ev.key.toLowerCase()==="f"){
@@ -929,7 +947,7 @@ async function handleCommand(line){
   if(!line.trim())return;
   const pc=parseCommand(line); const cmd=pc.cmd,arg=pc.arg;
   const out=[]; const push=(m,meta)=>out.push({message:m,meta:meta});
-  const flush=()=>{ if(!out.length)return; for(let i=0;i<out.length;i++)pushRaw(out[i].message,out[i].meta,true); out.length=0; renderView(); };
+  const flush=()=>{ if(!out.length)return; for(let i=0;i<out.length;i++)pushRaw(out[i].message,out[i].meta,true); out.length=0; renderTermBody(); };
   push("> "+line);
   if(cmd===state.radCmd){
     var _setInner=(arg==='set'||arg==='settings')?'':((arg||'').indexOf('set ')===0?(arg||'').slice(4):((arg||'').indexOf('settings ')===0?(arg||'').slice(9):null));
@@ -959,9 +977,9 @@ async function handleCommand(line){
   else { push("> unknown command: "+cmd+"  -  type  help"); flush(); return; }
 }
 function parseCommand(line){ const m=line.match(/^(\S+)\s*([\s\S]*)$/); if(!m)return {cmd:line.trim(),arg:""}; let arg=(m[2]||"").trim(); if(arg.length>=2&&arg[0]==='"'&&arg[arg.length-1]==='"')arg=arg.slice(1,-1); return {cmd:m[1],arg:arg}; }
-function pushRaw(message,meta,silent){ const e={id:uid(),ts:nowMs(),level:"raw",message:String(message),raw:true}; if(meta)e.meta=meta; state.console.unshift(e); if(state.console.length>500)state.console.length=500; saveState(); if(!silent&&currentView==="console")renderView(); }
+function pushRaw(message,meta,silent){ const e={id:uid(),ts:nowMs(),level:"raw",message:String(message),raw:true}; if(meta)e.meta=meta; state.console.unshift(e); if(state.console.length>500)state.console.length=500; saveState(); if(!silent)renderTermBody(); }
 let scanActive=false, currentScanId=null; const pendingScans={};
-if(E){ if(E.onFsChunk)E.onFsChunk(p=>{ const pend=pendingScans[p.id]; if(!pend)return; (p.items||[]).forEach(it=>{ pend.found++; pushRaw("> "+it.name,{openPath:it.path},true); }); renderView(); }); if(E.onFsDone)E.onFsDone(p=>{ const pend=pendingScans[p.id]; if(pend){ pushRaw("> done - "+pend.found+" folder(s)"+(p.truncated?"   (truncated: narrow the query or raise  depth)":""),null,false); delete pendingScans[p.id]; } scanActive=false; currentScanId=null; renderView(); }); }
+if(E){ if(E.onFsChunk)E.onFsChunk(p=>{ const pend=pendingScans[p.id]; if(!pend)return; (p.items||[]).forEach(it=>{ pend.found++; pushRaw("> "+it.name,{openPath:it.path},true); }); renderTermBody(); }); if(E.onFsDone)E.onFsDone(p=>{ const pend=pendingScans[p.id]; if(pend){ pushRaw("> done - "+pend.found+" folder(s)"+(p.truncated?"   (truncated: narrow the query or raise  depth)":""),null,false); delete pendingScans[p.id]; } scanActive=false; currentScanId=null; renderTermBody(); }); }
 
 function tickClock(){ $("#clock").textContent=new Date().toLocaleTimeString([],{hour12:false}); }
 setInterval(tickClock,1000);
@@ -1024,7 +1042,7 @@ if(!_killTick) _killTick=setInterval(killPaint, 1000);
   try{ if(E&&E.appVersion){ const v=await E.appVersion(); if(v) APP_VERSION=String(v).replace(/^v/i,""); } }catch(_){}
   const av=$('#appver'); if(av)av.textContent='v'+APP_VERSION;
   const ae=$("#appedits"); if(ae)ae.textContent="#"+EDIT_COUNT+" edits";
-  buildThinkBar(); renderNav(); renderView(); tickClock();
+  buildThinkBar(); renderNav(); renderView(); renderTermBody(); tickClock();
   { const ng=$("#normaGif"); const nd=(NORMA_EMBED&&NORMA_EMBED.indexOf("data:")===0)?NORMA_EMBED:""; if(ng&&nd)ng.src=nd; }
   loadArt();
   if(E&&E.onNormaDock)E.onNormaDock(()=>setFloating(false));

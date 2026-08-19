@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "S.I.R Quick Save",
-  "version": "1.1.0",
+  "version": "1.1.1",
   "description": "One-click save pages and links to S.I.R (Personal Command Center)",
   "permissions": [
     "activeTab",
@@ -10,7 +10,7 @@
     "notifications"
   ],
   "host_permissions": [
-    "http://localhost:47821/*"
+    "http://127.0.0.1:47821/*"
   ],
   "background": {
     "service_worker": "background.js"

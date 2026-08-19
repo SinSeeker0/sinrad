@@ -9,12 +9,16 @@ const crypto = require("crypto");
 const scanFolders = require("./scan.js");
 const { normalizeHttpUrl, isAllowedExtensionOrigin, isPathInside } = require("./lib/security.js");
 const { validDirectories, listScreenshotFiles } = require("./lib/screenshots.js");
+const { thumbnailKey, pruneThumbnailCache } = require("./lib/thumbnail-cache.js");
 let autoUpdater=null; try{ autoUpdater=require("electron-updater").autoUpdater; }catch(_e){ try{ console.error("[sinrad] electron-updater unavailable:", _e&&_e.message); }catch(_){} }
 
 const DATA_DIR = app.getPath("userData");
 const DATA_FILE = path.join(DATA_DIR,"sinrad-data.json");
 const DATA_BACKUP = DATA_FILE+".bak";
 const DATA_TMP = DATA_FILE+".sinrad-tmp";
+const EXTENSION_SOURCE = path.join(__dirname,"extension").replace("app.asar","app.asar.unpacked");
+const EXTENSION_DIR = path.join(DATA_DIR,"browser-extension");
+const THUMBNAIL_DIR = path.join(DATA_DIR,"thumbnail-cache");
 let _plainStoreWarningShown=false;
 let _storeLocked=false;
 let _recoveredFromBackup=false;
@@ -82,6 +86,19 @@ function migrateLegacyStore(){
   if(fs.existsSync(DATA_FILE)) return;
   const candidates=[path.join(__dirname,"sinrad-data.json"),path.join(__dirname,"sinrad-SANDBOX.json"),path.join(DATA_DIR,"sinrad-SANDBOX.json")];
   for(const file of candidates){ const old=_readStoreFile(file); if(old && writeStore(old)){ console.log("[sinrad] migrated legacy store from",file); return; } }
+}
+function syncBrowserExtension(){
+  try{
+    fs.mkdirSync(EXTENSION_DIR,{recursive:true,mode:0o700});
+    fs.readdirSync(EXTENSION_SOURCE,{withFileTypes:true}).forEach(function(entry){
+      if(!entry.isFile()) return;
+      const source=path.join(EXTENSION_SOURCE,entry.name);
+      const destination=path.join(EXTENSION_DIR,entry.name);
+      const incoming=fs.readFileSync(source);
+      let current=null; try{ current=fs.readFileSync(destination); }catch(_){}
+      if(!current || !current.equals(incoming)) fs.writeFileSync(destination,incoming,{mode:0o600});
+    });
+  }catch(error){ console.error("[sinrad] extension sync failed:",error.message); }
 }
 
 let mainWin = null;
@@ -245,6 +262,8 @@ function _hkUnregister(){ try{ if(_hkOk){ globalShortcut.unregister(HK_COMBO); _
 app.whenReady().then(()=>{
   if(!_gotLock) return;
   migrateLegacyStore();
+  syncBrowserExtension();
+  fs.promises.mkdir(THUMBNAIL_DIR,{recursive:true,mode:0o700}).then(function(){ return pruneThumbnailCache(THUMBNAIL_DIR,{maxFiles:1500,maxBytes:256*1024*1024}); }).catch(function(){});
   try{ _killRestore(); }catch(_){}
   syncBoot();
   try{ if(autoUpdater){ autoUpdater.autoDownload=false; autoUpdater.autoInstallOnAppQuit=true; autoUpdater.allowDowngrade=false; autoUpdater.allowPrerelease=false; try{ autoUpdater.setFeedURL({provider:"github",owner:"SinSeeker0",repo:"sinrad"}); }catch(_){} autoUpdater.on("error", function(e){ try{ console.error("[sinrad] autoUpdater:", e&&e.message); }catch(_){} }); } }catch(_e){ try{ console.error("[sinrad] autoUpdater config failed:", _e&&_e.message); }catch(_){} }
@@ -364,6 +383,8 @@ ipcMain.handle("pet-recents", (e)=> (_fromPet(e)||_fromMain(e))?(_petSlots.lengt
 /* ---------- screenshot library (images only, watch-in-place) ---------- */
 const { nativeImage, clipboard, dialog } = require("electron");
 const SHOT_EXTS = { ".png":1, ".jpg":1, ".jpeg":1, ".webp":1, ".gif":1, ".bmp":1, ".jfif":1 };
+const _thumbnailInflight=new Map();
+let _thumbnailWrites=0;
 let _sessionShotRoots=[];
 let _defaultShotRoots=null;
 let _shotAllowedCache=[];
@@ -402,12 +423,24 @@ ipcMain.handle("shots-thumb", async (e, p)=>{
     const resolved=path.resolve(p);
     const roots=_shotAllowedRoots();
     if(!isPathInside(resolved,roots)||!SHOT_EXTS[path.extname(resolved).toLowerCase()]) return "";
-    if(!fs.existsSync(resolved)) return "";
-    let img=null;
-    try{ img=await nativeImage.createThumbnailFromPath(resolved,{ width:360, height:220 }); }catch(_){}
-    if(!img||img.isEmpty()){ img=nativeImage.createFromPath(resolved); if(img&&!img.isEmpty()) img=img.resize({ width:360, quality:"good" }); }
-    if(!img||img.isEmpty()) return "";
-    return img.toDataURL();
+    const stat=await fs.promises.stat(resolved); if(!stat.isFile()) return "";
+    const key=thumbnailKey(resolved,stat);
+    if(_thumbnailInflight.has(key)) return await _thumbnailInflight.get(key);
+    const task=(async function(){
+      await fs.promises.mkdir(THUMBNAIL_DIR,{recursive:true,mode:0o700});
+      const cached=path.join(THUMBNAIL_DIR,key+".jpg");
+      try{ const bytes=await fs.promises.readFile(cached); return "data:image/jpeg;base64,"+bytes.toString("base64"); }catch(_){}
+      let img=null;
+      try{ img=await nativeImage.createThumbnailFromPath(resolved,{ width:360, height:220 }); }catch(_){}
+      if(!img||img.isEmpty()){ img=nativeImage.createFromPath(resolved); if(img&&!img.isEmpty()) img=img.resize({ width:360, quality:"good" }); }
+      if(!img||img.isEmpty()) return "";
+      const bytes=img.toJPEG(78);
+      await fs.promises.writeFile(cached,bytes,{mode:0o600});
+      if(++_thumbnailWrites%50===1) pruneThumbnailCache(THUMBNAIL_DIR,{maxFiles:1500,maxBytes:256*1024*1024}).catch(function(){});
+      return "data:image/jpeg;base64,"+bytes.toString("base64");
+    })();
+    _thumbnailInflight.set(key,task);
+    try{ return await task; }finally{ _thumbnailInflight.delete(key); }
   }catch(_){ return ""; }
 });
 ipcMain.handle("shots-read", async (e,p)=>{ try{ if(!_fromMain(e)||typeof p!=="string"||!p)return Buffer.alloc(0); const resolved=path.resolve(p); if(!isPathInside(resolved,_shotAllowedRoots())||!SHOT_EXTS[path.extname(resolved).toLowerCase()])return Buffer.alloc(0); const st=await fs.promises.stat(resolved); if(!st.isFile()||st.size>50*1024*1024)return Buffer.alloc(0); return await fs.promises.readFile(resolved); }catch(_){ return Buffer.alloc(0); } });
@@ -559,8 +592,8 @@ ipcMain.handle("clip-read", async (e) => { if(!_fromMain(e))return ""; try { ret
 ipcMain.handle("clip-clear-if", async (e,value)=>{ if(!_fromMain(e)||typeof value!=="string")return false; try{ const cb=require("electron").clipboard; if(cb.readText()===value){ cb.clear(); return true; } }catch(_){} return false; });
 ipcMain.handle("hotkey-toggle", (e, enabled)=>{ if(!_fromMain(e))return {ok:false,enabled:false}; _hkEnabled=!!enabled; if(_hkEnabled){ _hkRegister(); } else { _hkUnregister(); } try{ if(mainWin) mainWin.webContents.send("hotkey-status",{ok:_hkOk,combo:"Ctrl+Alt+P",enabled:_hkEnabled}); }catch(_){} return {ok:_hkOk, enabled:_hkEnabled}; });
 ipcMain.handle("set-autostart", (e, enabled)=>{ if(!_fromMain(e))return false; try{ app.setLoginItemSettings({openAtLogin:!!enabled}); }catch(_){} try{ return app.getLoginItemSettings().openAtLogin; }catch(_){ return !!enabled; } });
-ipcMain.handle("ext-dir", (e)=> _fromMain(e)?path.join(__dirname, "extension").replace("app.asar","app.asar.unpacked"):"");
-ipcMain.handle("ext-open", (e)=>{ if(!_fromMain(e))return false; try{ var p=path.join(__dirname,"extension").replace("app.asar","app.asar.unpacked"); require("electron").shell.openPath(p); return true; }catch(_){ return false; } });
+ipcMain.handle("ext-dir", (e)=> _fromMain(e)?EXTENSION_DIR:"");
+ipcMain.handle("ext-open", (e)=>{ if(!_fromMain(e))return false; try{ syncBrowserExtension(); require("electron").shell.openPath(EXTENSION_DIR); return true; }catch(_){ return false; } });
 ipcMain.on("show-notif", (e, data)=>{ if(!_fromMain(e))return; try{ const {Notification:nN}=require('electron'); const n=new nN({title:String(data&&data.title||'S.I.R').slice(0,100), body:String(data&&data.body||'').slice(0,500), silent:true}); n.show(); }catch(er){ try{console.error('[sinrad] notif:',er.message);}catch(_){} } });
 
 const activeScans = new Map();

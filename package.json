@@ -22,7 +22,7 @@
     "build:win": "electron-builder --win",
     "build:mac": "electron-builder --mac",
     "test": "node --test",
-    "lint": "node --check main.js && node --check preload.js && node --check pet-preload.js && node --check splash-preload.js && node --check scan.js && node --check lib/security.js && node --check lib/screenshots.js && node --check release.js && node --check assets/renderer.js && node --check assets/pet.js && node --check assets/splash.js && node --check extension/background.js",
+    "lint": "node --check main.js && node --check preload.js && node --check pet-preload.js && node --check splash-preload.js && node --check scan.js && node --check lib/security.js && node --check lib/screenshots.js && node --check lib/thumbnail-cache.js && node --check release.js && node --check assets/renderer.js && node --check assets/pet.js && node --check assets/splash.js && node --check extension/background.js",
     "check": "npm run lint && npm test"
   },
   "devDependencies": {
