@@ -8,9 +8,19 @@ function openGithub(){ if(E&&E.shellOpen){ E.shellOpen(GH_REPO_URL); } else { tr
 function showUpdateModal(){ const m=$("#update-modal"); if(m){ m.classList.add("show"); } }
 function hideUpdateModal(){ const m=$("#update-modal"); if(m) m.classList.remove("show"); updState=null; }
 function setUpdProgress(show, pct){ const box=$("#um-prog"); if(box) box.classList.toggle("show", !!show); const fill=$("#um-barfill"); if(fill) fill.style.width=(pct||0)+"%"; }
+function showUpdateToast(r){
+  const wrap=$("#toasts");if(!wrap)return;
+  const old=$("#update-toast");if(old)old.remove();
+  const item=document.createElement("div");item.id="update-toast";item.className="toast update-toast";
+  item.innerHTML='<span class="ut-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 3v11"/><path d="m8 10 4 4 4-4"/><path d="M5 19h14"/></svg></span><span class="ut-copy"><b>Update ready</b><small></small></span><button data-action="update-open">View update <b>→</b></button>';
+  const detail=item.querySelector("small");if(detail)detail.textContent="S.I.R v"+String(r&&r.latest||"")+" is available";
+  wrap.appendChild(item);
+}
 function renderUpdateResult(r, silent){
-  const t=$("#um-title"), v=$("#um-ver"), d=$("#um-date"), n=$("#um-notes"), go=$("#um-go"), lat=$("#um-later");
-  if(!silent){ try{ if(r&&r.ok&&r.available) toast("Update available: v"+(r.latest||""),"ok"); else if(r&&r.ok) toast("You're up to date","ok"); else if(r&&!r.ok) toast("Update check failed","err"); }catch(_){} }
+  const t=$("#um-title"), v=$("#um-ver"), cur=$("#um-current"), d=$("#um-date"), n=$("#um-notes"), go=$("#um-go"), lat=$("#um-later"), quiet=$(".um-quiet");
+  if(!silent){ try{ if(r&&r.ok&&!r.available) toast("You're up to date","ok"); else if(r&&!r.ok) toast("Update check failed","err"); }catch(_){} }
+  if(cur)cur.textContent="v"+String(r&&r.current||APP_VERSION||"0.0.0").replace(/^v/i,"");
+  if(quiet)quiet.style.display=(r&&r.ok&&r.available)?"":"none";
   setUpdProgress(false);
   setUpdateGif((!r||!r.ok)?null:(!r.available?"complete":"checking"));
   if(!r||!r.ok){ if(t)t.textContent="Update check failed"; if(v)v.textContent=r&&r.current?("v"+r.current):""; if(d)d.textContent=""; if(n)n.textContent=(r&&r.error)||"Could not reach GitHub. Check your connection."; if(go){go.style.display="none";} if(lat){lat.style.display="";lat.textContent="Close";} showUpdateModal(); return; }
@@ -18,10 +28,11 @@ function renderUpdateResult(r, silent){
   if(t)t.textContent="New Version Available";
   if(v)v.textContent="v"+r.latest;
   if(d)d.textContent=r.date||"";
-  if(n)n.textContent=(r.notes||"").trim()||"(no release notes)";
+  if(n)n.textContent=(r.notes||"").trim()||"This release includes the latest S.I.R improvements and fixes.";
   if(go){ go.style.display=""; go.disabled=false; go.textContent=r.canAuto?"Update now":(r.asset?"Download":"Open releases"); }
-  if(lat){ lat.style.display=""; lat.disabled=false; lat.textContent="Not now"; }
+  if(lat){ lat.style.display=""; lat.disabled=false; lat.textContent="Later"; }
   updState = r;
+  if(silent){showUpdateToast(r);return;}
   showUpdateModal();
 }
 function updateCheckClick(silent){
@@ -54,8 +65,9 @@ if(E&&E.onUpdateProgress){ E.onUpdateProgress(function(p){ const tot=p.total||0;
 (function(){ const m=$("#update-modal"); if(m) m.addEventListener("click",function(e){ if(e.target&&e.target.id==="update-modal") hideUpdateModal(); }); document.addEventListener("keydown",function(e){ if(e.key==="Escape"){ const m2=$("#update-modal"); if(m2&&m2.classList.contains("show")) hideUpdateModal(); } }); })();
 setTimeout(autoCheckUpdate, 1500);
 function openVerb(){ return (state.openMode==='single')?'Single-click':'Double-click'; }
-function setUpdateGif(phase){ const gif=$("#um-gif"), svg=$("#um-ico-svg"); const src=phase?UPD_GIF_SRC[phase]:null; if(gif){ if(src){ gif.src=src; gif.style.display="block"; if(svg)svg.style.display="none"; } else { gif.style.display="none"; gif.removeAttribute("src"); if(svg)svg.style.display="block"; } } }
-let UPD_GIF_SRC={checking:null,updating:null,complete:null};
+let currentUpdatePhase=null;
+function setUpdateGif(phase){ const gif=$("#um-gif"),svg=$("#um-ico-svg"),card=$(".um-card"),head=$(".um-head"),src=phase?UPD_GIF_SRC[phase]:null;currentUpdatePhase=phase||null;if(card){card.classList.remove("phase-checking","phase-updating","phase-complete");if(phase)card.classList.add("phase-"+phase);}if(src&&gif){gif.src=src;gif.style.display="block";if(svg)svg.style.display="none";if(head)head.classList.add("has-art");}else{if(gif){gif.style.display="none";gif.removeAttribute("src");}if(svg)svg.style.display="block";if(head)head.classList.remove("has-art");} }
+let UPD_GIF_SRC={checking:"checking.gif",updating:"updating.gif",complete:"complete.gif"};
 function settingsMenu(push){
   function p(s,n){ s=String(s); while(s.length<n)s+=' '; return s; }
   var musicOn=!!(state.settings&&state.settings.autoplayMusic);
@@ -122,7 +134,7 @@ updateMusicUI();
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 136;
+const EDIT_COUNT = 157;
 const APP_OPENED_AT = Date.now();
 let APP_VERSION="0.0.0";
 
@@ -273,7 +285,7 @@ function openTarget(target,type){ if(!target)return; if(type==="url"){ recordVis
 async function copy(text,label){ try{ if(navigator.clipboard&&navigator.clipboard.writeText){ await navigator.clipboard.writeText(text); } else { const ta=document.createElement("textarea"); ta.value=text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); } toast((label||"Value")+" copied"+(label==="Password"?" · clears in 45s":""),"ok"); log("ok","Copied "+(label||"value")+" to clipboard"); if(label==="Password"&&E&&E.clipClearIf){ setTimeout(function(){ E.clipClearIf(text).catch(function(){}); },45000); } }catch(e){ toast("Copy failed","err"); } }
 
 function probeImg(names){ return new Promise(res=>{ let i=0; (function n(){ if(i>=names.length)return res(null); const im=new Image(); im.onload=()=>res(names[i]); im.onerror=()=>{i++;n();}; im.src=names[i]; })(); }); }
-async function loadArt(){ const g=await Promise.all(CELEBRATE_FILES.map(probeImg)); EFFECTIVE=CELEBRATE_FILES.map((_,i)=>g[i]||CELEBRATE_EMBED[i]||""); const n=await probeImg(NORMA_FILES); const ng=$("#normaGif"); if(ng)ng.src=n||(NORMA_EMBED&&NORMA_EMBED.indexOf("data:")===0?NORMA_EMBED:""); const c=$("#celebrate"); if(c&&c.classList.contains("show")){ const im=$("#celImg"); if(im&&EFFECTIVE[celIdx])im.src=EFFECTIVE[celIdx]; } const ug=await Promise.all([probeImg(["checking.gif","checking.png","checking.webp"]),probeImg(["updating.gif","updating.png","updating.webp"]),probeImg(["complete.gif","complete.png","complete.webp"])]); UPD_GIF_SRC={checking:ug[0],updating:ug[1],complete:ug[2]}; }
+async function loadArt(){ const g=await Promise.all(CELEBRATE_FILES.map(probeImg)); EFFECTIVE=CELEBRATE_FILES.map((_,i)=>g[i]||CELEBRATE_EMBED[i]||""); const n=await probeImg(NORMA_FILES); const ng=$("#normaGif"); if(ng)ng.src=n||(NORMA_EMBED&&NORMA_EMBED.indexOf("data:")===0?NORMA_EMBED:""); const c=$("#celebrate"); if(c&&c.classList.contains("show")){ const im=$("#celImg"); if(im&&EFFECTIVE[celIdx])im.src=EFFECTIVE[celIdx]; } const ug=await Promise.all([probeImg(["checking.gif","checking.png","checking.webp"]),probeImg(["updating.gif","updating.png","updating.webp"]),probeImg(["complete.gif","complete.png","complete.webp"])]); UPD_GIF_SRC={checking:ug[0]||"checking.gif",updating:ug[1]||"updating.gif",complete:ug[2]||"complete.gif"}; if(currentUpdatePhase)setUpdateGif(currentUpdatePhase); }
 function celebrate(){ const c=$("#celebrate"); if(!c)return; const pool=(EFFECTIVE&&EFFECTIVE.length)?EFFECTIVE:CELEBRATE_EMBED; const im=$("#celImg"); if(im&&pool.length){ let p=0; if(pool.length>1){ do{ p=Math.floor(Math.random()*pool.length); }while(p===celIdx); } celIdx=p; im.src=pool[p]; } c.classList.remove("show"); void c.offsetWidth; c.classList.add("show"); clearTimeout(celebrate._t); celebrate._t=setTimeout(()=>c.classList.remove("show"),4000); }
 
 function renderNav(){ $("#nav").innerHTML=MODULES.map(m=>`<div class="nav-item ${m.id===currentView?"active":""}" data-action="nav" data-nav="${m.id}"><span class="nav-ico">${m.ico}</span><span class="nav-txt"><b>${esc(m.name)}</b><span>${esc(m.sub)}</span></span></div>`).join(""); }
@@ -321,12 +333,12 @@ function fmtDate(ts){ if(!ts) return ''; var d=new Date(ts); var t=d.toLocaleTim
 function viewVault(){
   const term=searchTerms.vault||"";
   let items=state.vault.filter(v=>{ const passF=vaultFilter==="all"?true:vaultFilter==="fav"?!!v.favorite:!!v.priority; return passF&&match(term,v.name,v.url,v.username); });
-  const pills=`<div class="toolbar"><div class="lf-left">${pill("All",vaultFilter==="all",ALL_COLOR,'data-action="vault-filter" data-filter="all"')}${pill(ICO_STAR+" Favorites",vaultFilter==="fav",FAV_COLOR,'data-action="vault-filter" data-filter="fav"')}${pill(ICO_WARN+" Priority",vaultFilter==="pri",PRI_COLOR,'data-action="vault-filter" data-filter="pri"')}</div></div>`;
+  const pills=`<div class="toolbar vaultfilter"><div class="lf-left">${pill("All",vaultFilter==="all",ALL_COLOR,'data-action="vault-filter" data-filter="all"')}${pill(ICO_STAR+" Favorites",vaultFilter==="fav",FAV_COLOR,'data-action="vault-filter" data-filter="fav"')}${pill(ICO_WARN+" Priority",vaultFilter==="pri",PRI_COLOR,'data-action="vault-filter" data-filter="pri"')}</div></div>`;
   let body;
   if(!state.vault.length) body=emptyState(ICO_LOCK,"No entries yet. Add your first password above.");
   else if(!items.length) body=emptyState(ICO_SEARCH,"Nothing matches your search or filter.");
   else body=`<div class="grid">`+items.map(v=>{ const show=revealed.has(v.id); const pw=show?esc(v.password):"•".repeat(Math.min(14,Math.max(6,(v.password||"").length))); return `<div class="card" style="${edgeShadow(v)}" data-ctx="vault" data-id="${v.id}" data-action="vault-open"><div class="row"><div style="flex:1;min-width:0"><h3>${esc(v.name)}</h3><div class="sub">${esc(v.url||"—")}</div></div></div><div class="meta">User: <span class="mono">${esc(v.username||"—")}</span></div><div class="meta" style="opacity:.6">${fmtDate(v.created)}</div><div class="meta">Pass: <span class="mono">${pw}</span></div></div>`; }).join("")+`</div>`;
-  const addbar=`<div class="toolbar linkbar"><div class="lin-input" style="cursor:default;color:var(--muted);opacity:.85;display:flex;align-items:center;gap:8px">${ICO_LOCK}Entries are saved locally on this device</div><button class="btn primary" data-action="vault-new">＋ Add entry</button></div>`;
+  const addbar=`<div class="toolbar linkbar"><div class="lin-input" style="cursor:default;color:var(--muted);opacity:.85;display:flex;align-items:center;gap:8px">${ICO_LOCK}Entries are saved locally on this device</div><button type="button" class="btn primary" data-action="vault-new">＋ Add entry</button></div>`;
   return head("Secure Vault",""+openVerb()+" · right-click for more · Ctrl+F to search")+addbar+searchRow("vault","Search vault...")+pills+body;
 }
 
@@ -342,7 +354,7 @@ function viewLinks(){
   const selN=_linkSelCount();
   const selBar=selN?`<div class="lot-bar" style="border-color:rgba(39,180,255,.55);background:#0e1420"><span class="lb-n" style="color:var(--cyan)">${selN} selected</span><button type="button" class="lb-del" data-action="link-sel-del">Delete</button><button type="button" class="lb-clear" data-action="link-sel-clear"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><path d="M3 6h18"/><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg> Clear</button></div>`:"";
   const card=(l)=>{const host=hostOf(l.url),cat=normCat(l),cats=linkCategoryList(l),color=cat?(CAT_COLORS[cat]||"#cfd3dc"):"#cfd3dc",multi=cats.length>1?`<span class="lc-multicats" title="${esc(cats.join(" + "))}">${cats.map(function(c){return `<i style="background:${CAT_COLORS[c]||"#cfd3dc"}"></i>`;}).join("")}<b>${cats.length}</b></span>`:"";return `<div class="link-card${linkSelLinks[l.id]?" sel":""}" style="--link-accent:${color};${edgeShadow(l)}" data-ctx="link" data-id="${l.id}" data-action="link-open"><div class="lc-top"><div class="lc-heading"><h3 class="lc-title" style="color:${color}">${esc(l.title)}</h3><span class="lc-host">${esc(host)}</span></div>${multi}${l.favorite?`<span class="lc-star" title="Favorite">★</span>`:""}</div><div class="lc-path" title="${esc(l.url)}">${esc(linkDisplayPath(l.url))}</div>${l.note?`<div class="lc-note">${esc(l.note)}</div>`:""}<div class="lc-foot"><span>${fmtDate(l.created)}</span></div></div>`;};
-  const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="lk_title" placeholder="Title"><input class="lin-input lk-url" id="lk_url" placeholder="https://..."><button class="btn primary" data-action="link-add">＋ Add</button></div>`;
+  const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="lk_title" placeholder="Title (optional)"><input class="lin-input lk-url" id="lk_url" placeholder="https://..."><button type="button" class="btn primary" data-action="link-add">＋ Add</button></div>`;
   const pills=`<div class="toolbar linkfilter"><div class="lf-left">${Object.keys(CAT_COLORS).map(c=>{ var lab=esc(c); if(state.categories&&state.categories[c]){ lab+='<span class="cat-del" data-action="cat-del-pill" data-cat="'+esc(c)+'" title="Delete category">×</span>'; } return pill(lab,linkCats.indexOf(c)>=0,CAT_COLORS[c],'data-action="link-cat" data-cat="'+esc(c)+'"'); }).join("")}</div><div class="lf-right">${pill(ICO_STAR+" Favorites",linkFav,FAV_COLOR,'data-action="link-fav"')}<button class="cat-add-btn" data-action="cat-add" title="Add category">+</button></div></div>`;
   const items=state.links.filter(l=>{ if(_inLot(l)) return false; const cats=linkCategoryList(l); const catOk=!linkCats.length||linkCats.every(function(c){return c?cats.indexOf(c)>=0:cats.length===0;}); const favOk=!linkFav||!!l.favorite; return catOk&&favOk&&match(term,l.title,l.url,l.note||""); });
   let body;
@@ -386,12 +398,23 @@ function parked0(){ const term=searchTerms.lot||""; return state.links.filter(l=
 
 
 
-function doLinkAdd(){ const t=$("#lk_title"),u=$("#lk_url"); const title=t?t.value.trim():"",url=safeWebUrl(u?u.value:""); if(!title||!url){ toast("A title and valid http(s) URL are required","warn"); return; } const selected=(linkCats||[]).filter(function(c){ return c && c!=="all"; }); const chosen=selected.length===1?selected[0]:"",auto=SinradShared.automaticLinkCategories(url,chosen),category=auto.main; state.links.unshift({id:uid(),title,url,category,categories:auto.all,favorite:false,created:nowMs()}); log("ok","Saved link: "+title+(category?" ["+category+"]":"")); saveState(); celebrate(); renderView(); toast(category==="YouTube"?"Saved to YouTube":"Link saved","ok"); }
+async function doLinkAdd(){
+  const t=$("#lk_title"),u=$("#lk_url"),url=safeWebUrl(u?u.value:"");
+  if(!url){ toast("Paste a valid http(s) link","warn"); if(u)u.focus(); return; }
+  const title=(t&&t.value.trim())||hostOf(url)||"Saved link";
+  const selected=(linkCats||[]).filter(function(c){ return c && c!=="all"; });
+  const chosen=selected.length===1?selected[0]:"",auto=SinradShared.automaticLinkCategories(url,chosen),category=auto.main;
+  const entry={id:uid(),title,url,category,categories:auto.all,favorite:false,created:nowMs()};
+  state.links.unshift(entry);
+  const saved=await flushSave();
+  if(!saved){ state.links=state.links.filter(function(item){return item.id!==entry.id;}); toast("Link could not be saved — your existing data was left unchanged","err"); return; }
+  log("ok","Saved link: "+title+(category?" ["+category+"]":"")); celebrate(); renderView(); toast(category==="YouTube"?"Saved to YouTube":"Link saved","ok");
+}
 
 function viewFolders(){
   const term=searchTerms.folders||"";
   let items=state.folders.filter(f=>{ const catOk=!folderCats.length||folderCats.indexOf(normCat(f))>=0; const passF=folderFilter==="all"?true:!!f.favorite; return catOk&&passF&&match(term,f.name,f.path); });
-  const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="fd_name" placeholder="Name (optional)"><input class="lin-input lk-url" id="fd_path" placeholder="Folder path  e.g. C:\\Users\\you\\Documents"><button class="btn primary" data-action="folder-add">＋ Add</button></div>`;
+  const addbar=`<div class="toolbar linkbar"><input class="lin-input" id="fd_name" placeholder="Name (optional)"><input class="lin-input lk-url" id="fd_path" placeholder="Folder path  e.g. C:\\Users\\you\\Documents"><button type="button" class="btn primary" data-action="folder-add">＋ Add</button></div>`;
   const pills=`<div class="toolbar linkfilter"><div class="lf-left">${Object.keys(FOLDER_CATS).map(c=>pill(c,folderCats.indexOf(c)>=0,FOLDER_CATS[c],'data-action="folder-cat" data-cat="'+esc(c)+'"')).join("")+'<button class="cat-add-btn" data-action="cat-add" data-type="folder" title="Add category">+</button>'}</div><div class="lf-right">${pill(ICO_STAR+" Favorites",folderFilter==="fav",FAV_COLOR,'data-action="folder-filter" data-filter="'+(folderFilter==="fav"?"all":"fav")+'"')}</div></div>`;
   let body;
   if(!state.folders.length) body=emptyState(ICO_FOLDER,"No quick folders yet — paste a path above. "+openVerb()+" · right-click for more.");
@@ -681,7 +704,16 @@ function shotIdleKick(){
   _idleT=setTimeout(function(){ shotSlideshowStart(true); }, SHOT_IDLE_MS);
 }
 
-function doFolderAdd(){ const n=$("#fd_name"),p=$("#fd_path"); const name=n?n.value.trim():"",path=p?p.value.trim():""; if(!path){ toast("Paste a folder path","warn"); return; } state.folders.unshift({id:uid(),name,path,category:folderCat!=="all"?folderCat:"",favorite:false,created:nowMs()}); log("ok","Added quick folder: "+(name||baseName(path))+(folderCat!=="all"?" ["+folderCat+"]":"")); saveState(); celebrate(); renderView(); toast("Folder saved","ok"); }
+async function doFolderAdd(){
+  const n=$("#fd_name"),p=$("#fd_path"),name=n?n.value.trim():"",path=p?p.value.trim():"";
+  if(!path){ toast("Paste a folder path","warn"); if(p)p.focus(); return; }
+  const category=SinradShared.primarySelection(folderCats);
+  const entry={id:uid(),name,path,category:category,favorite:false,created:nowMs()};
+  state.folders.unshift(entry);
+  const saved=await flushSave();
+  if(!saved){ state.folders=state.folders.filter(function(item){return item.id!==entry.id;}); toast("Folder could not be saved — your existing data was left unchanged","err"); return; }
+  log("ok","Added quick folder: "+(name||baseName(path))+(category?" ["+category+"]":"")); celebrate(); renderView(); toast("Folder saved","ok");
+}
 function folderEditModal(id){ const f=find(state.folders,id); if(!f)return; const p=f.path||f.name||""; openModal("Edit Quick Folder",`<div class="field"><label>Name (optional)</label><input id="fe_name" value="${esc(f.name||"")}"></div><div class="field"><label>Folder path</label><input id="fe_path" value="${esc(p)}"></div>`,"Save",()=>{ const path=$("#fe_path").value.trim(); if(!path){ toast("Path required","warn"); return; } f.name=$("#fe_name").value.trim(); f.path=path; log("info","Updated quick folder: "+(f.name||baseName(path))); saveState(); closeModal(); renderView(); toast("Folder updated","ok"); }); }
 
 function viewConsole(){
@@ -697,7 +729,9 @@ function openModal(t,b,l,onC,onX,danger){ $("#modal-title").innerHTML=t; $("#mod
 function closeModal(){ $("#overlay").classList.remove("show"); modalOnConfirm=null; modalOnCancel=null; const md=document.querySelector("#overlay .modal"); if(md) md.classList.remove("danger"); const mc=$("#modal-confirm"); if(mc){ mc.disabled=false; mc.classList.remove("kill-go"); mc.classList.add("primary"); } const xb=$("#modalCancelBtn"); if(xb) xb.textContent="Cancel"; }
 function cancelModal(){ const c=modalOnCancel; closeModal(); if(typeof c==="function")c(); }
 const modalConfirmButton=$("#modal-confirm");
-if(modalConfirmButton)modalConfirmButton.addEventListener("click",function(event){event.stopPropagation();if(typeof modalOnConfirm==="function")modalOnConfirm();});
+function reportActionError(label,error){const message=String(error&&error.message||error||"Unknown error");try{console.error("[sinrad] "+label.toLowerCase()+" failed:",error);}catch(_){}toast(label+" failed: "+message,"err");}
+function confirmActiveModal(){if(typeof modalOnConfirm!=="function")return;try{const result=modalOnConfirm();if(result&&typeof result.catch==="function")result.catch(function(error){const button=$("#modal-confirm");if(button){button.disabled=false;button.textContent="Save";}reportActionError("Save",error);});}catch(error){reportActionError("Save",error);}}
+if(modalConfirmButton)modalConfirmButton.addEventListener("click",function(event){event.preventDefault();event.stopPropagation();confirmActiveModal();});
 const modalCancelButton=$("#modalCancelBtn");
 if(modalCancelButton)modalCancelButton.addEventListener("click",function(event){event.stopPropagation();cancelModal();});
 function confirmModal(m,danger,spec){ return new Promise(res=>{ spec=spec||{}; const ico='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg>'; const title=spec.title||(danger?ico+" Arm kill switch":"⚠️ Confirm"); const go=spec.go||(danger?"Arm it":"Yes, do it"); openModal(title,`<p style="margin:0;color:var(--muted)">${esc(m)}</p>`,go,()=>{closeModal();res(true);},()=>res(false),!!danger); const xb=$("#modalCancelBtn"); if(xb&&spec.cancel) xb.textContent=spec.cancel; setTimeout(()=>{const b=$("#modal-confirm");if(b)b.focus();},30); }); }
@@ -762,6 +796,19 @@ function openByAction(a,id){
   else if(a==="folder-open"){ const f=find(state.folders,id); if(f){ const p=f.path||f.name||""; if(p){ openTarget(p,"app"); recordFolderVisit(p); } } }
 }
 document.addEventListener("dblclick",(ev)=>{ const t=ev.target.closest("[data-action]"); if(!t)return; const a=t.dataset.action; if((a==="vault-open"||a==="link-open"||a==="folder-open")&&(state.openMode||'double')==='double'){ openByAction(a,t.dataset.id); } });
+function runPrimaryAddAction(action){
+  if(action==="vault-new"){ vaultModal(); return null; }
+  if(action==="link-add")return doLinkAdd();
+  if(action==="folder-add")return doFolderAdd();
+  return null;
+}
+document.addEventListener("click",function(ev){
+  const target=ev.target.closest&&ev.target.closest('[data-action="vault-new"],[data-action="link-add"],[data-action="folder-add"]');
+  if(!target)return;
+  ev.preventDefault();
+  ev.stopPropagation();
+  try{const result=runPrimaryAddAction(target.dataset.action);if(result&&typeof result.catch==="function")result.catch(function(error){reportActionError("Add",error);});}catch(error){reportActionError("Add",error);}
+},true);
 document.addEventListener("click",async(ev)=>{
   const t=ev.target.closest("[data-action]"); if(!t)return; const a=t.dataset.action,id=t.dataset.id;
   if((a==="vault-open"||a==="link-open"||a==="folder-open")&&!t.closest("#ctxmenu")&&(state.openMode||'double')==='double')return;
@@ -770,7 +817,6 @@ document.addEventListener("click",async(ev)=>{
     case "win-min": E&&E.winMin?E.winMin():toast("Window controls work in the desktop build"); break;
     case "win-max": E&&E.winMax?E.winMax():toast("Window controls work in the desktop build"); break;
     case "win-close": E&&E.winClose?E.winClose():toast("Window controls work in the desktop build"); break;
-    case "vault-new": vaultModal(); break;
     case "vault-edit": vaultModal(find(state.vault,id)); break;
     case "vault-del": { const v=find(state.vault,id); if(v&&await confirmModal("Delete "+v.name+"?")){ state.vault=state.vault.filter(x=>x.id!==id); log("warn","Deleted vault entry: "+v.name); saveState(); renderView(); toast("Deleted","ok"); } break; }
     case "vault-fav": { const v=find(state.vault,id); if(v){ v.favorite=!v.favorite; log("info",(v.favorite?"Favorited":"Unfavorited")+": "+v.name); saveState(); renderView(); } break; }
@@ -780,7 +826,6 @@ document.addEventListener("click",async(ev)=>{
     case "vault-copy-u": { const v=find(state.vault,id); if(v)copy(v.username||"","Username"); break; }
     case "vault-copy-p": { const v=find(state.vault,id); if(v)copy(v.password||"","Password"); break; }
     case "vault-filter": vaultFilter=t.dataset.filter; renderView(); break;
-    case "link-add": doLinkAdd(); break;
     case "link-cat": { const cat=t.dataset.cat; if(cat==="all"){ linkCats=[]; } else { const idx=linkCats.indexOf(cat); if(idx>=0) linkCats.splice(idx,1); else linkCats.push(cat); const ai=linkCats.indexOf("all"); if(ai>=0) linkCats.splice(ai,1); } renderView(); break; }
     case "link-fav": linkFav=!linkFav; renderView(); break;
     case "link-fav-toggle": { const l=find(state.links,id); if(l){ l.favorite=!l.favorite; log("info",(l.favorite?"Favorited":"Unfavorited")+" link: "+l.title); saveState(); renderView(); } break; }
@@ -797,7 +842,6 @@ document.addEventListener("click",async(ev)=>{
     case "link-del": { const l=find(state.links,id); if(l&&await confirmModal("Delete "+l.title+"?")){ state.links=state.links.filter(x=>x.id!==id); log("warn","Deleted link: "+l.title); saveState(); renderView(); } break; }
     case "folder-pet-pin": { const f=find(state.folders,id); if(f){ const p=f.path||f.name||""; const on=togglePetPin(p, f.name||baseName(p)); log("info",(on?"Pinned":"Unpinned")+" folder to Pet Recents: "+(f.name||p)); toast(on?"Pinned to Pet Recents":"Unpinned from Pet Recents","ok"); renderView(); } break; }
     case "open-folder-path": { const p=t.dataset.path; if(p) openTarget(p,"app"); break; }
-    case "folder-add": doFolderAdd(); break;
     case "shot-filter": { const f=t.dataset.filter||"inbox"; shotFilter=(shotFilter===f)?"inbox":f; shotPage=0; renderView(); break; }
     case "shot-refresh": shotsRefresh(false); break;
     case "shot-size": shotSize=t.dataset.size||"m"; if(!state.settings)state.settings={}; state.settings.shotSize=shotSize; saveState(); renderView(); break;
@@ -842,12 +886,13 @@ document.addEventListener("click",async(ev)=>{
     case "music-prev": musicPrev(); break;
     case "music-open-folder": if(bgmDir && E && E.openPath){ E.openPath(bgmDir); } else if(bgmDir && E && E.shellOpen){ E.shellOpen(bgmDir); } break;
     case "update-check": updateCheckClick(false); break;
+    case "update-open": { const notice=$("#update-toast");if(notice)notice.remove();showUpdateModal();break; }
     case "open-github": openGithub(); break;
     case "toggle-autoscroll": { if(!state.settings)state.settings={}; state.settings.autoScroll=(state.settings.autoScroll===false); saveState(); updateAutoScrollBtn(); log("info","auto-scroll: "+(state.settings.autoScroll?"on":"off")); break; }
     case "update-later": hideUpdateModal(); break;
     case "update-go": updateGoClick(); break;
     case "modal-cancel": cancelModal(); break;
-    case "modal-confirm": if(typeof modalOnConfirm==="function")modalOnConfirm(); break;
+    case "modal-confirm": confirmActiveModal(); break;
   }
 });
 function hostOf(u){ try{ const h=new URL(u).hostname; return h||String(u).slice(0,40); }catch(e){ return String(u).slice(0,40); } }
@@ -863,7 +908,7 @@ document.addEventListener("keydown",(ev)=>{
     $("#content").classList.add("searching"); const i=document.querySelector('[data-search="'+k+'"]'); if(i){i.focus();i.select();}
     return;
   }
-  if(ev.key==="Enter"&&$("#overlay").classList.contains("show")&&ev.target.tagName!=="TEXTAREA"&&ev.target.tagName!=="SELECT"&&ev.target.tagName!=="BUTTON"){ ev.preventDefault(); if(typeof modalOnConfirm==="function")modalOnConfirm(); return; }
+  if(ev.key==="Enter"&&$("#overlay").classList.contains("show")&&ev.target.tagName!=="TEXTAREA"&&ev.target.tagName!=="SELECT"&&ev.target.tagName!=="BUTTON"){ ev.preventDefault(); confirmActiveModal(); return; }
   if($("#shotshow")&&$("#shotshow").classList.contains("on")){ ev.preventDefault(); shotSlideshowStop(); return; }
     if($("#shotbox")&&$("#shotbox").classList.contains("show")){
     if(ev.key==="Escape"){ ev.preventDefault(); shotHide(); return; }

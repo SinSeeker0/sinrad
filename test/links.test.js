@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { savedUrlIdentity, normalizeVaultDraft, automaticLinkCategory, automaticLinkCategories } = require("../assets/shared.js");
+const { savedUrlIdentity, normalizeVaultDraft, automaticLinkCategory, automaticLinkCategories, primarySelection } = require("../assets/shared.js");
 
 test("different paths on the same site are not duplicates", function () {
   const listing = "https://example.test/?tags=popular&tab=explore";
@@ -34,4 +34,10 @@ test("YouTube links automatically use the YouTube category", function () {
   assert.equal(automaticLinkCategory("https://youtu.be/abc","Guides"),"YouTube");
   assert.equal(automaticLinkCategory("https://notyoutube.com/watch?v=abc","Guides"),"Guides");
   assert.deepEqual(automaticLinkCategories("https://youtube.com/watch?v=abc","Guides"),{main:"YouTube",all:["YouTube","Guides"]});
+});
+
+test("folder Add safely chooses the first selected category", function () {
+  assert.equal(primarySelection(["Mods","Games"]),"Mods");
+  assert.equal(primarySelection([]),"");
+  assert.equal(primarySelection(null),"");
 });

@@ -49,5 +49,8 @@
     const main=automaticLinkCategory(value,prior);
     return {main:main,all:Array.from(new Set([main,prior].filter(Boolean)))};
   }
-  return { savedUrlIdentity: savedUrlIdentity, normalizeWebUrl: normalizeWebUrl, normalizeVaultDraft: normalizeVaultDraft, automaticLinkCategory: automaticLinkCategory, automaticLinkCategories: automaticLinkCategories };
+  function primarySelection(values) {
+    return Array.isArray(values)&&values.length?String(values[0]||""):"";
+  }
+  return { savedUrlIdentity: savedUrlIdentity, normalizeWebUrl: normalizeWebUrl, normalizeVaultDraft: normalizeVaultDraft, automaticLinkCategory: automaticLinkCategory, automaticLinkCategories: automaticLinkCategories, primarySelection: primarySelection };
 });

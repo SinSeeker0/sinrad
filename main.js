@@ -2,7 +2,7 @@
 const { app, BrowserWindow, ipcMain, shell, screen, safeStorage } = require("electron");
 app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
 const PROTOCOL="sinrad"; app.setAsDefaultProtocolClient(PROTOCOL);
-app.setAppUserModelId("S.I.R");
+app.setAppUserModelId("com.sinrad.commandcenter");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -760,7 +760,7 @@ ipcMain.handle("update-download", async function(e, payload){
 ipcMain.handle("update-install", async function(e){
   if(!_fromMain(e)) return {ok:false,error:"unauthorized"};
   if(autoUpdater && app.isPackaged){
-    try{ autoUpdater.quitAndInstall(false,true); return {ok:true}; }catch(err){ try{ console.error("[sinrad] update install:", err&&err.message); }catch(_){} }
+    try{ autoUpdater.quitAndInstall(true,true); return {ok:true,silent:true}; }catch(err){ try{ console.error("[sinrad] update install:", err&&err.message); }catch(_){} }
   }
   try{ shell.openExternal(UPD_PAGE); }catch(_){}
   return {manual:true};
