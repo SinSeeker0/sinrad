@@ -18,6 +18,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   storeLoad: () => ipcRenderer.invoke("store-load"),
   storeSecurity: () => ipcRenderer.invoke("store-security"),
   storeSave: (data) => ipcRenderer.invoke("store-save", data),
+  backupExport: (data, password) => ipcRenderer.invoke("backup-export", data, password),
+  backupImport: (password) => ipcRenderer.invoke("backup-import", password),
 
   // desktop pet (floating Norma that lives OUTSIDE the app window)
   petShow: () => ipcRenderer.send("pet-show"),
@@ -52,6 +54,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
   hotkeyStatus: (cb) => ipcRenderer.on("hotkey-status", (_, mm) => cb(mm)),
   hotkeyToggle: (enabled) => ipcRenderer.invoke("hotkey-toggle", enabled),
   onProtocolPark: (cb) => ipcRenderer.on("protocol-park", (_, data) => cb(data)),
+  protocolParkAck: (requestId, ok) => ipcRenderer.send("protocol-park-ack", requestId, !!ok),
   setAutostart: (enabled) => ipcRenderer.invoke("set-autostart", enabled),
   extDir: () => ipcRenderer.invoke("ext-dir"),
   extOpen: () => ipcRenderer.invoke("ext-open"),

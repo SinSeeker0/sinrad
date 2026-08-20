@@ -2,7 +2,7 @@
 const { app, BrowserWindow, ipcMain, shell, screen, safeStorage } = require("electron");
 app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
 const PROTOCOL="sinrad"; app.setAsDefaultProtocolClient(PROTOCOL);
-app.setAppUserModelId("S.I.R — Personal Command Center");
+app.setAppUserModelId("S.I.R");
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -18,7 +18,16 @@ const DATA_BACKUP = DATA_FILE+".bak";
 const DATA_TMP = DATA_FILE+".sinrad-tmp";
 const EXTENSION_SOURCE = path.join(__dirname,"extension").replace("app.asar","app.asar.unpacked");
 const EXTENSION_DIR = path.join(DATA_DIR,"browser-extension");
+const EXTENSION_KEY_FILE = path.join(DATA_DIR,"extension-bridge-key");
 const THUMBNAIL_DIR = path.join(DATA_DIR,"thumbnail-cache");
+function loadExtensionBridgeKey(){
+  try{
+    fs.mkdirSync(DATA_DIR,{recursive:true,mode:0o700});
+    if(fs.existsSync(EXTENSION_KEY_FILE)){ const key=fs.readFileSync(EXTENSION_KEY_FILE,"utf8").trim(); if(/^[a-f0-9]{64}$/.test(key))return key; }
+    const key=crypto.randomBytes(32).toString("hex"); fs.writeFileSync(EXTENSION_KEY_FILE,key,{encoding:"utf8",mode:0o600}); return key;
+  }catch(error){ console.error("[sinrad] bridge key failed:",error.message); return crypto.randomBytes(32).toString("hex"); }
+}
+const EXTENSION_BRIDGE_KEY=loadExtensionBridgeKey();
 let _plainStoreWarningShown=false;
 let _storeLocked=false;
 let _recoveredFromBackup=false;
@@ -94,7 +103,8 @@ function syncBrowserExtension(){
       if(!entry.isFile()) return;
       const source=path.join(EXTENSION_SOURCE,entry.name);
       const destination=path.join(EXTENSION_DIR,entry.name);
-      const incoming=fs.readFileSync(source);
+      let incoming=fs.readFileSync(source);
+      if(entry.name==="background.js") incoming=Buffer.from(incoming.toString("utf8").replace("__SINRAD_BRIDGE_KEY__",EXTENSION_BRIDGE_KEY),"utf8");
       let current=null; try{ current=fs.readFileSync(destination); }catch(_){}
       if(!current || !current.equals(incoming)) fs.writeFileSync(destination,incoming,{mode:0o600});
     });
@@ -112,8 +122,10 @@ function createWindow(){
   });
   lockNavigation(mainWin,"index.html");
   mainWin.loadFile(path.join(__dirname,"index.html"));
+  mainWin.webContents.on("did-start-loading",function(){ _mainRendererReady=false; });
   // Auto-undock pet if setting is enabled; also flush parks queued during boot
   mainWin.webContents.on("did-finish-load", function(){
+    _mainRendererReady=true;
     try{
       var st=readStore();
       if(st&&st.settings&&st.settings.petAutoUndock){ showPet(); }
@@ -189,9 +201,11 @@ if(_gotLock) {
   });
 }
 let _pendingParks=[];
+let _mainRendererReady=false;
+const _pendingParkAcks=new Map();
 function _sendPark(data){
   try{
-    if(mainWin && !mainWin.isDestroyed()){ mainWin.webContents.send('protocol-park', data); return true; }
+    if(_mainRendererReady && mainWin && !mainWin.isDestroyed()){ mainWin.webContents.send('protocol-park', data); return true; }
   }catch(_){}
   _pendingParks.push(data);
   return false;
@@ -212,6 +226,14 @@ function _handleProtocolUrl(url){
     }
   }catch(_){}
 }
+function _sendParkWithAck(data){
+  const requestId=crypto.randomBytes(16).toString("hex"); data=Object.assign({},data,{requestId:requestId});
+  return new Promise(function(resolve){
+    const timer=setTimeout(function(){ _pendingParkAcks.delete(requestId); resolve({ok:false,error:"Sinrad did not confirm the save"}); },15000);
+    _pendingParkAcks.set(requestId,function(ok){ clearTimeout(timer); resolve(ok?{ok:true}:{ok:false,error:"Sinrad could not persist the tab"}); });
+    _sendPark(data);
+  });
+}
 app.on("open-url",function(event,url){ event.preventDefault(); _handleProtocolUrl(url); });
 
 // --- authenticated localhost bridge for the browser extension ---
@@ -220,17 +242,19 @@ const LOCAL_TOKEN = crypto.randomBytes(32).toString("hex");
 let _localServer = null;
 let _localHits=[];
 function _localJson(res,status,data,origin){ if(origin) res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin"); res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}); res.end(JSON.stringify(data)); }
+function _validBridgeKey(value){ try{ const supplied=Buffer.from(String(value||""),"utf8"), expected=Buffer.from(EXTENSION_BRIDGE_KEY,"utf8"); return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected); }catch(_){return false;} }
 function _startLocalServer(){
   if(_localServer) return;
   try{
     const http = require('http');
     _localServer = http.createServer(function(req, res){
       const origin=String(req.headers.origin||"");
-      if(!isAllowedExtensionOrigin(origin)){ _localJson(res,403,{ok:false,error:"extension origin required"}); return; }
-      res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin");
+      if(req.method==="OPTIONS"){ if(origin)res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin"); res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS"); res.setHeader("Access-Control-Allow-Headers","Content-Type,X-Sinrad-Token,X-Sinrad-Bridge-Key"); res.writeHead(204); res.end(); return; }
+      const bridgeTrusted=_validBridgeKey(req.headers["x-sinrad-bridge-key"]);
+      if(!bridgeTrusted&&!isAllowedExtensionOrigin(origin)){ _localJson(res,403,{ok:false,error:"extension authentication required"}); return; }
+      if(origin) res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin");
       res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
-      res.setHeader("Access-Control-Allow-Headers","Content-Type,X-Sinrad-Token");
-      if(req.method==="OPTIONS"){ res.writeHead(204); res.end(); return; }
+      res.setHeader("Access-Control-Allow-Headers","Content-Type,X-Sinrad-Token,X-Sinrad-Bridge-Key");
       const u=new URL(req.url,"http://localhost");
       if(req.method==="GET" && u.pathname==="/token"){ _localJson(res,200,{ok:true,token:LOCAL_TOKEN},origin); return; }
       if(req.method!=="POST" || u.pathname!=="/park"){ _localJson(res,404,{ok:false,error:"not found"},origin); return; }
@@ -240,12 +264,12 @@ function _startLocalServer(){
       _localHits.push(now);
       let body=""; let tooLarge=false;
       req.on("data",function(chunk){ body+=chunk; if(Buffer.byteLength(body,"utf8")>65536){ tooLarge=true; req.destroy(); } });
-      req.on("end",function(){
+      req.on("end",async function(){
         if(tooLarge){ _localJson(res,413,{ok:false,error:"request too large"},origin); return; }
         try{
           const data=JSON.parse(body||"{}"); const linkUrl=normalizeHttpUrl(data.url); const title=String(data.title||"").slice(0,500); const lot=data.lot===true;
           if(!linkUrl){ _localJson(res,400,{ok:false,error:"http(s) URL required"},origin); return; }
-          _sendPark({url:linkUrl,title:title,lot:lot}); _localJson(res,200,{ok:true},origin);
+          const result=await _sendParkWithAck({url:linkUrl,title:title,lot:lot}); _localJson(res,result.ok?200:503,result,origin);
         }catch(err){ _localJson(res,400,{ok:false,error:"invalid JSON"},origin); }
       });
     });
@@ -288,6 +312,7 @@ function _fromMain(e){ return _from(e,mainWin); }
 function _fromPet(e){ return _from(e,petWin); }
 function _fromSplash(e){ return _from(e,splashWin); }
 ipcMain.on("boot-done", (e)=>{ if(_fromSplash(e)) finishBoot(); });
+ipcMain.on("protocol-park-ack",(e,requestId,ok)=>{ if(!_fromMain(e)||typeof requestId!=="string")return; const done=_pendingParkAcks.get(requestId); if(done){ _pendingParkAcks.delete(requestId); done(!!ok); } });
 app.on("before-quit", ()=>{ try{ _killPersist(); }catch(_){} });
 app.on("window-all-closed", ()=>{ if(process.platform!=="darwin") app.quit(); });
 
@@ -304,6 +329,47 @@ ipcMain.handle("open-path", async (e,p)=>{ if(!(_fromMain(e)||_fromPet(e))||type
 ipcMain.handle("store-load", (e)=>_fromMain(e)?readStore():null);
 ipcMain.handle("store-security", (e)=>_fromMain(e)?storeSecurity():"unknown");
 ipcMain.handle("store-save", (e,data)=>_fromMain(e)?writeStore(data):false);
+function _backupEncrypt(data,password){
+  const clean=_validStore(JSON.parse(JSON.stringify(data)));
+  if(!clean) throw new Error("Invalid S.I.R data");
+  const plain=Buffer.from(JSON.stringify(clean),"utf8");
+  if(plain.length>10*1024*1024) throw new Error("Backup exceeds 10 MB safety limit");
+  const salt=crypto.randomBytes(16),iv=crypto.randomBytes(12);
+  const key=crypto.scryptSync(password,salt,32,{N:16384,r:8,p:1,maxmem:64*1024*1024});
+  const cipher=crypto.createCipheriv("aes-256-gcm",key,iv);
+  const encrypted=Buffer.concat([cipher.update(plain),cipher.final()]);
+  return JSON.stringify({format:"sinrad-password-backup-v1",kdf:"scrypt",cipher:"aes-256-gcm",salt:salt.toString("base64"),iv:iv.toString("base64"),tag:cipher.getAuthTag().toString("base64"),payload:encrypted.toString("base64")});
+}
+function _backupDecrypt(raw,password){
+  const box=JSON.parse(raw);
+  if(!box||box.format!=="sinrad-password-backup-v1") throw new Error("Not a supported S.I.R backup");
+  const salt=Buffer.from(box.salt||"","base64"),iv=Buffer.from(box.iv||"","base64"),tag=Buffer.from(box.tag||"","base64"),payload=Buffer.from(box.payload||"","base64");
+  if(salt.length!==16||iv.length!==12||tag.length!==16||payload.length>10*1024*1024) throw new Error("Backup file is invalid");
+  const key=crypto.scryptSync(password,salt,32,{N:16384,r:8,p:1,maxmem:64*1024*1024});
+  const decipher=crypto.createDecipheriv("aes-256-gcm",key,iv); decipher.setAuthTag(tag);
+  return _validStore(JSON.parse(Buffer.concat([decipher.update(payload),decipher.final()]).toString("utf8")));
+}
+ipcMain.handle("backup-export",async(e,data,password)=>{
+  if(!_fromMain(e)||typeof password!=="string"||password.length<8)return {ok:false,error:"Use a password with at least 8 characters"};
+  try{
+    const stamp=new Date().toISOString().slice(0,10);
+    const picked=await require("electron").dialog.showSaveDialog(mainWin,{title:"Save encrypted S.I.R backup",defaultPath:"sinrad-backup-"+stamp+".sirbackup",filters:[{name:"S.I.R encrypted backup",extensions:["sirbackup"]}]});
+    if(picked.canceled||!picked.filePath)return {ok:false,canceled:true};
+    await fs.promises.writeFile(picked.filePath,_backupEncrypt(data,password),{encoding:"utf8",mode:0o600});
+    return {ok:true};
+  }catch(err){return {ok:false,error:String(err&&err.message||err)};}
+});
+ipcMain.handle("backup-import",async(e,password)=>{
+  if(!_fromMain(e)||typeof password!=="string"||!password)return {ok:false,error:"Enter the backup password"};
+  try{
+    const picked=await require("electron").dialog.showOpenDialog(mainWin,{title:"Open encrypted S.I.R backup",properties:["openFile"],filters:[{name:"S.I.R encrypted backup",extensions:["sirbackup"]}]});
+    if(picked.canceled||!picked.filePaths[0])return {ok:false,canceled:true};
+    const stat=await fs.promises.stat(picked.filePaths[0]); if(!stat.isFile()||stat.size>15*1024*1024)throw new Error("Backup file is too large");
+    const data=_backupDecrypt(await fs.promises.readFile(picked.filePaths[0],"utf8"),password);
+    if(!data)throw new Error("Backup data is invalid");
+    return {ok:true,data:data};
+  }catch(err){return {ok:false,error:"Could not unlock backup. Check the password and file."};}
+});
 
 /* ---------- IPC: pet window ---------- */
 ipcMain.on("pet-show", (e)=>{ if(_fromMain(e)) showPet(); });
@@ -385,6 +451,17 @@ const { nativeImage, clipboard, dialog } = require("electron");
 const SHOT_EXTS = { ".png":1, ".jpg":1, ".jpeg":1, ".webp":1, ".gif":1, ".bmp":1, ".jfif":1 };
 const _thumbnailInflight=new Map();
 let _thumbnailWrites=0;
+const _thumbnailGenerationQueue=[];
+let _thumbnailGenerationActive=0;
+function _queueThumbnailGeneration(work){
+  return new Promise(function(resolve,reject){ _thumbnailGenerationQueue.push({work:work,resolve:resolve,reject:reject}); _pumpThumbnailGeneration(); });
+}
+function _pumpThumbnailGeneration(){
+  while(_thumbnailGenerationActive<8 && _thumbnailGenerationQueue.length){
+    const job=_thumbnailGenerationQueue.shift(); _thumbnailGenerationActive++;
+    Promise.resolve().then(job.work).then(job.resolve,job.reject).finally(function(){ _thumbnailGenerationActive--; _pumpThumbnailGeneration(); });
+  }
+}
 let _sessionShotRoots=[];
 let _defaultShotRoots=null;
 let _shotAllowedCache=[];
@@ -430,11 +507,13 @@ ipcMain.handle("shots-thumb", async (e, p)=>{
       await fs.promises.mkdir(THUMBNAIL_DIR,{recursive:true,mode:0o700});
       const cached=path.join(THUMBNAIL_DIR,key+".jpg");
       try{ const bytes=await fs.promises.readFile(cached); return "data:image/jpeg;base64,"+bytes.toString("base64"); }catch(_){}
-      let img=null;
-      try{ img=await nativeImage.createThumbnailFromPath(resolved,{ width:360, height:220 }); }catch(_){}
-      if(!img||img.isEmpty()){ img=nativeImage.createFromPath(resolved); if(img&&!img.isEmpty()) img=img.resize({ width:360, quality:"good" }); }
-      if(!img||img.isEmpty()) return "";
-      const bytes=img.toJPEG(78);
+      const bytes=await _queueThumbnailGeneration(async function(){
+        let img=null;
+        try{ img=await nativeImage.createThumbnailFromPath(resolved,{ width:360, height:220 }); }catch(_){}
+        if(!img||img.isEmpty()){ img=nativeImage.createFromPath(resolved); if(img&&!img.isEmpty()) img=img.resize({ width:360, quality:"good" }); }
+        return (!img||img.isEmpty())?null:img.toJPEG(78);
+      });
+      if(!bytes) return "";
       await fs.promises.writeFile(cached,bytes,{mode:0o600});
       if(++_thumbnailWrites%50===1) pruneThumbnailCache(THUMBNAIL_DIR,{maxFiles:1500,maxBytes:256*1024*1024}).catch(function(){});
       return "data:image/jpeg;base64,"+bytes.toString("base64");

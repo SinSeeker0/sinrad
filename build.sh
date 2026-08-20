@@ -11,7 +11,7 @@ set -euo pipefail
 cd "$(dirname "$0")"
 
 echo "=============================================="
-echo " Sinrad — Personal Command Center builder"
+echo " Sinrad — S.I.R builder"
 echo "=============================================="
 
 # 1. toolchain check

@@ -1,4 +1,4 @@
-# Sinrad — S.I.R Personal Command Center
+# Sinrad — S.I.R
 
 An offline-first Electron desktop app for passwords, links, temporary tab stacks, quick folders, screenshots, music, and device-folder search.
 

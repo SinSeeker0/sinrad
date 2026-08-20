@@ -11,7 +11,6 @@
   <div class="window" id="window">
     <div class="titlebar" id="titlebar">
       <div class="brand">S.I.R</div>
-      <div class="brand-sub">Personal Command Center</div>
       <div class="spacer"></div>
       <div class="winctl">
         <button data-action="win-min" title="Minimize"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.6"/></svg></button>
@@ -50,7 +49,16 @@
       <span class="upd-sep"></span>
       
 
-      <span class="store-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><rect x="8" y="13" width="8" height="6"/></svg><span id="store-mode">Memory</span></span>
+      <div class="store-control" id="storeControl">
+        <button class="store-badge" data-action="store-menu" aria-expanded="false" title="Storage and backup options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h8V3"/><rect x="8" y="13" width="8" height="6"/></svg><span id="store-mode">Memory</span><span class="store-chevron">⌃</span></button>
+        <div class="store-menu" id="storeMenu">
+          <div class="store-menu-head"><span class="store-live-dot"></span><div><b>Protected storage</b><small id="store-menu-mode">Loading status…</small></div></div>
+          <button data-action="backup-export"><span class="store-action-icon">↓</span><span><b>Create backup</b><small>Save an encrypted copy</small></span></button>
+          <button data-action="backup-import"><span class="store-action-icon">↑</span><span><b>Restore backup</b><small>Import a .sirbackup file</small></span></button>
+        </div>
+      </div>
+      <span id="uptime" title="Time S.I.R has been open">UP 00:00:00</span>
+      <span class="sep">|</span>
       <span id="clock">--:--:--</span>
       <button type="button" class="kill-btn" id="killBtn" data-action="kill-toggle" title="Sleep timer — shut down this PC in 30 minutes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg><span class="kill-min"></span></button>
       
@@ -81,14 +89,15 @@
       <div class="modal-h" id="modal-title">Title</div>
       <div class="modal-b" id="modal-body"></div>
       <div class="modal-f">
-        <button class="btn ghost" id="modalCancelBtn" data-action="modal-cancel">Cancel</button>
-        <button class="btn primary" data-action="modal-confirm" id="modal-confirm">Save</button>
+        <button type="button" class="btn ghost" id="modalCancelBtn" data-action="modal-cancel">Cancel</button>
+        <button type="button" class="btn primary" data-action="modal-confirm" id="modal-confirm">Save</button>
       </div>
     </div>
   </div>
   <div id="update-modal"><div class="um-card"><div class="um-head"><div class="um-ico"><img id="um-gif" class="um-gif" alt="" style="display:none"><svg id="um-ico-svg" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12m0 0l-4-4m4 4l4-4M5 21h14"/></svg></div><h2 id="um-title">New Version Available</h2></div><div class="um-body"><div class="um-row"><span class="um-ver" id="um-ver">v0.0.0</span><span class="um-date" id="um-date"></span></div><div class="um-notes"><span class="um-lbl">Release notes</span><span id="um-notes">Checking&#8230;</span></div><div class="um-prog" id="um-prog"><div class="um-ptxt">Downloading&#8230;</div><div class="um-bar"><i id="um-barfill"></i></div><div class="um-pct"><span>Direct (GitHub)</span><span id="um-pct">0%</span></div></div><div class="um-foot"><button class="btn ghost" id="um-later" data-action="update-later">Not now</button><button class="btn primary" id="um-go" data-action="update-go">Update now</button></div></div></div>
   <div id="toasts"></div>
 
+<script src="assets/shared.js" defer></script>
 <script src="assets/renderer.js" defer></script>
 </body>
 </html>

@@ -2,8 +2,10 @@
 // Sends page URL + title to the S.I.R desktop app's localhost server
 
 const PORT = 47821;
-const BASE = 'http://127.0.0.1:' + PORT;
+const BASES = ['http://127.0.0.1:' + PORT, 'http://localhost:' + PORT];
+const BRIDGE_KEY = '__SINRAD_BRIDGE_KEY__';
 let sessionToken = '';
+let sessionBase = '';
 
 function setStatus(ok) {
   chrome.action.setBadgeBackgroundColor({ color: ok ? '#168a45' : '#c62828' });
@@ -12,29 +14,37 @@ function setStatus(ok) {
 }
 
 async function getToken() {
-  if (sessionToken) return sessionToken;
-  const response = await fetch(BASE + '/token', { cache: 'no-store' });
-  if (!response.ok) throw new Error('Sinrad token request failed');
-  const data = await response.json();
-  if (!data.token) throw new Error('Sinrad token missing');
-  sessionToken = data.token;
-  return sessionToken;
+  if (sessionToken && sessionBase) return sessionToken;
+  let lastError = null;
+  for (const base of BASES) {
+    try {
+      const response = await fetch(base + '/token', { cache: 'no-store', headers: { 'X-Sinrad-Bridge-Key': BRIDGE_KEY } });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      const data = await response.json();
+      if (!data.token) throw new Error('token missing');
+      sessionToken = data.token;
+      sessionBase = base;
+      return sessionToken;
+    } catch (error) { lastError = error; }
+  }
+  throw new Error('Sinrad token request failed' + (lastError && lastError.message ? ': ' + lastError.message : ''));
 }
 
 async function saveToSinrad(url, title, lot) {
   if (!/^https?:\/\//i.test(url || '')) throw new Error('Only web URLs can be saved');
   let token = await getToken();
-  let response = await fetch(BASE + '/park', {
+  let response = await fetch(sessionBase + '/park', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'X-Sinrad-Token': token },
+    headers: { 'Content-Type': 'application/json', 'X-Sinrad-Token': token, 'X-Sinrad-Bridge-Key': BRIDGE_KEY },
     body: JSON.stringify({ url, title: title || '', lot: !!lot })
   });
   if (response.status === 401) {
     sessionToken = '';
+    sessionBase = '';
     token = await getToken();
-    response = await fetch(BASE + '/park', {
+    response = await fetch(sessionBase + '/park', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'X-Sinrad-Token': token },
+      headers: { 'Content-Type': 'application/json', 'X-Sinrad-Token': token, 'X-Sinrad-Bridge-Key': BRIDGE_KEY },
       body: JSON.stringify({ url, title: title || '', lot: !!lot })
     });
   }
