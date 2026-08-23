@@ -10,7 +10,16 @@ const pkg = require(path.join(root, "package.json"));
 const main = fs.readFileSync(path.join(root, "main.js"), "utf8");
 
 test("Windows runtime identity matches the installed shortcut identity", function () {
-  assert.match(main, new RegExp("setAppUserModelId\\(\\\"" + pkg.build.appId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\\"\\)"));
+  assert.equal(pkg.build.appId, "com.sinrad.desktop");
+  assert.doesNotMatch(main, /commandcenter/i);
+  assert.match(main, new RegExp("PACKAGED_APP_ID=\\\"" + pkg.build.appId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\\""));
+  assert.match(main, /APP_ID=app\.isPackaged\?PACKAGED_APP_ID:PACKAGED_APP_ID\+"\.dev"/);
+  assert.match(main, /setAppUserModelId\(APP_ID\)/);
+  assert.ok(pkg.build.extraResources.includes("icon.ico"));
+  assert.ok(pkg.build.extraResources.includes("icon.png"));
+  assert.match(main, /path\.join\(process\.resourcesPath, process\.platform === "win32" \? "icon\.ico" : "icon\.png"\)/);
+  assert.match(main, /icon:process\.platform === "win32" \? undefined : WINDOW_ICON/);
+  assert.match(main, /setAppDetails\(\{appId:APP_ID,appIconPath:exe,appIconIndex:0/);
 });
 
 test("automatic updates use silent NSIS installation while fresh installs retain the wizard", function () {

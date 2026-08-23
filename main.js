@@ -2,10 +2,17 @@
 const { app, BrowserWindow, ipcMain, shell, screen, safeStorage } = require("electron");
 app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
 const PROTOCOL="sinrad"; app.setAsDefaultProtocolClient(PROTOCOL);
-app.setAppUserModelId("com.sinrad.commandcenter");
+// Fresh permanent Windows identity. The legacy ID was cached by Windows with
+// Electron's default taskbar icon and survived icon rebuilds.
+const PACKAGED_APP_ID="com.sinrad.desktop";
+const APP_ID=app.isPackaged?PACKAGED_APP_ID:PACKAGED_APP_ID+".dev";
+app.setAppUserModelId(APP_ID);
 const path = require("path");
 const fs = require("fs");
 const crypto = require("crypto");
+const WINDOW_ICON = app.isPackaged
+  ? path.join(process.resourcesPath, process.platform === "win32" ? "icon.ico" : "icon.png")
+  : path.join(__dirname, process.platform === "win32" ? "icon.ico" : "icon.png");
 const scanFolders = require("./scan.js");
 const { normalizeHttpUrl, isAllowedExtensionOrigin, isPathInside } = require("./lib/security.js");
 const { validDirectories, listScreenshotFiles } = require("./lib/screenshots.js");
@@ -117,9 +124,15 @@ let petWin = null;
 function createWindow(){
   mainWin = new BrowserWindow({
     width:1280, height:900, minWidth:900, minHeight:640,
-    frame:false, show:false, backgroundColor:"#060608", title:"S.I.R", icon:path.join(__dirname,"icon.png"),
+    frame:false, show:false, backgroundColor:"#060608", title:"S.I.R",
+    // On Windows, omitting icon makes Chromium use Sinrad.exe's embedded icon.
+    icon:process.platform === "win32" ? undefined : WINDOW_ICON,
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:true, webSecurity:true }
   });
+  if(process.platform === "win32"){
+    const exe=app.getPath("exe");
+    mainWin.setAppDetails({appId:APP_ID,appIconPath:exe,appIconIndex:0,relaunchCommand:'"'+exe+'"',relaunchDisplayName:"Sinrad"});
+  }
   lockNavigation(mainWin,"index.html");
   mainWin.loadFile(path.join(__dirname,"index.html"));
   mainWin.webContents.on("did-start-loading",function(){ _mainRendererReady=false; });

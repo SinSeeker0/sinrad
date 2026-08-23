@@ -31,10 +31,14 @@
     "electron-builder": "^26.15.3"
   },
   "build": {
-    "appId": "com.sinrad.commandcenter",
+    "appId": "com.sinrad.desktop",
     "productName": "Sinrad",
     "asarUnpack": [
       "extension/**"
+    ],
+    "extraResources": [
+      "icon.ico",
+      "icon.png"
     ],
     "files": [
       "main.js",

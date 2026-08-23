@@ -134,7 +134,7 @@ updateMusicUI();
 
 
 let STORE_MODE="Memory";
-const EDIT_COUNT = 165;
+const EDIT_COUNT = 170;
 const APP_OPENED_AT = Date.now();
 let APP_VERSION="0.0.0";
 
