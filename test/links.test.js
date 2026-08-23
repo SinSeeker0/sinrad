@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { savedUrlIdentity, normalizeVaultDraft, automaticLinkCategory, automaticLinkCategories, primarySelection } = require("../assets/shared.js");
+const { savedUrlIdentity, normalizeVaultDraft, automaticLinkCategory, automaticLinkCategories, primarySelection, globalSearch } = require("../assets/shared.js");
 
 test("different paths on the same site are not duplicates", function () {
   const listing = "https://example.test/?tags=popular&tab=explore";
@@ -40,4 +40,17 @@ test("folder Add safely chooses the first selected category", function () {
   assert.equal(primarySelection(["Mods","Games"]),"Mods");
   assert.equal(primarySelection([]),"");
   assert.equal(primarySelection(null),"");
+});
+
+test("global search spans modules without exposing or searching vault passwords", function () {
+  const state={
+    vault:[{id:"v1",name:"Mail account",username:"sean@example.com",password:"private-needle"}],
+    links:[{id:"l1",title:"Animation guide",url:"https://example.com/guide",category:"Guides"},{id:"l2",title:"Parked animation",url:"https://park.test",src:"park",category:"",inLinks:false}],
+    folders:[{id:"f1",name:"Animation assets",path:"C:\\Art\\Animation"}],
+    shots:[{id:"s1",name:"animation-frame.png",path:"C:\\Shots\\animation-frame.png"}]
+  };
+  assert.deepEqual(globalSearch(state,"private-needle"),[]);
+  const results=globalSearch(state,"animation");
+  assert.deepEqual(results.map(function(item){return item.view;}).sort(),["folders","links","lot","shots"]);
+  assert.equal(results.some(function(item){return Object.prototype.hasOwnProperty.call(item,"password");}),false);
 });

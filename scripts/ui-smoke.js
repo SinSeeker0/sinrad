@@ -35,12 +35,15 @@ async function run(){
     document.querySelector('#v_name').value='Sinrad Smoke Entry';
     click('#modal-confirm');await pause(80);
     const vault=Array.from(document.querySelectorAll('.card h3')).some(el=>el.textContent==='Sinrad Smoke Entry');
-    return {link,folder,vault};
+    const globalInput=document.querySelector('#globalSearchInput');
+    globalInput.value='example.test';globalInput.dispatchEvent(new Event('input',{bubbles:true}));await pause(50);
+    const globalSearch=Array.from(document.querySelectorAll('.gs-result .gs-copy b')).some(el=>el.textContent.includes('example.test'));
+    return {link,folder,vault,globalSearch};
   })()`);
   const persisted=!!(savedState&&savedState.links&&savedState.links.length&&savedState.folders&&savedState.folders.length&&savedState.vault&&savedState.vault.length);
-  if(!result.link||!result.folder||!result.vault||!persisted)throw new Error("UI Add smoke test failed: "+JSON.stringify({result,persisted}));
-  console.log("UI Add smoke test passed:",JSON.stringify(result));
+  if(!result.link||!result.folder||!result.vault||!result.globalSearch||!persisted)throw new Error("UI smoke test failed: "+JSON.stringify({result,persisted}));
+  console.log("UI smoke test passed:",JSON.stringify(result));
   win.destroy();
 }
 
-app.whenReady().then(run).then(()=>app.quit()).catch(error=>{console.error(error&&error.stack||error);app.exit(1);});
+app.whenReady().then(run).then(()=>app.exit(0)).catch(error=>{console.error(error&&error.stack||error);app.exit(1);});

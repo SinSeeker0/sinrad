@@ -11,6 +11,12 @@
   <div class="window" id="window">
     <div class="titlebar" id="titlebar">
       <div class="brand">S.I.R</div>
+      <div class="global-search" id="globalSearch">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg>
+        <input id="globalSearchInput" type="search" placeholder="Search everything…" autocomplete="off" spellcheck="false" aria-label="Search everything">
+        <kbd>Ctrl Shift F</kbd>
+        <div class="global-results" id="globalSearchResults" role="listbox"></div>
+      </div>
       <div class="spacer"></div>
       <div class="winctl">
         <button data-action="win-min" title="Minimize"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.6"/></svg></button>

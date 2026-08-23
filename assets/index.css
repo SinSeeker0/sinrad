@@ -574,10 +574,30 @@
   #ctxmenu,.store-menu,.modal,.um-card{border-radius:7px!important}
   #ctxmenu .ci,.store-menu>button,.store-action-icon,.um-version-flow,.um-notes,.um-prog,.um-quiet,.um-foot .btn,.um-close{border-radius:4px}
   .titlebar .winctl button,.brand-mark{border-radius:4px}
+  .global-search{position:relative;width:clamp(250px,32vw,470px);height:34px;margin-left:18px;display:flex;align-items:center;gap:8px;padding:0 9px;border:1px solid rgba(115,139,190,.20);border-radius:5px;background:rgba(5,9,17,.62);-webkit-app-region:no-drag;transition:border-color .15s,box-shadow .15s,background .15s}
+  .global-search:focus-within{border-color:rgba(39,180,255,.56);background:rgba(7,12,22,.96);box-shadow:0 0 0 3px rgba(39,180,255,.08),0 10px 30px rgba(0,0,0,.24)}
+  .global-search>svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:#60708e;stroke-width:1.8;stroke-linecap:round}
+  .global-search>input{min-width:0;flex:1;border:0;outline:0;background:transparent;color:var(--txt);font-size:11.5px;-webkit-app-region:no-drag}
+  .global-search>input::placeholder{color:#58657d}.global-search>input::-webkit-search-cancel-button{display:none}
+  .global-search>kbd{padding:3px 6px;border:1px solid rgba(115,139,190,.18);border-radius:3px;background:rgba(255,255,255,.035);color:#59667e;font:8px/1 var(--mono);white-space:nowrap}
+  .global-results{position:absolute;left:0;top:calc(100% + 9px);z-index:700;width:min(560px,72vw);max-height:min(520px,72vh);display:none;overflow:auto;padding:7px;border:1px solid rgba(101,137,195,.30);border-radius:6px;background:rgba(8,12,21,.985);box-shadow:0 24px 70px rgba(0,0,0,.70),inset 0 1px 0 rgba(255,255,255,.035)}
+  .global-results.show{display:block}.gs-empty{padding:24px;text-align:center;color:#64718a;font-size:11px}
+  .gs-group{padding:7px 9px 5px;color:#566680;font:800 8px/1 var(--mono);letter-spacing:1.3px;text-transform:uppercase}
+  .gs-result{width:100%;display:flex;align-items:center;gap:10px;padding:9px;border:0;border-radius:4px;background:transparent;text-align:left;color:var(--txt)}
+  .gs-result:hover,.gs-result.active{background:rgba(39,180,255,.09)}
+  .gs-dot{width:7px;height:7px;flex:0 0 auto;border-radius:50%;background:var(--gs-color,#27b4ff);box-shadow:0 0 9px color-mix(in srgb,var(--gs-color,#27b4ff) 70%,transparent)}
+  .gs-copy{min-width:0;flex:1}.gs-copy b,.gs-copy small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.gs-copy b{font-size:11.5px}.gs-copy small{margin-top:2px;color:#67758f;font:9px/1.25 var(--mono)}
+  .gs-kind{color:#52617a;font:8px/1 var(--mono);text-transform:uppercase}
+  .search-hit{animation:global-hit 1.2s ease!important}@keyframes global-hit{0%,100%{box-shadow:inherit}35%{box-shadow:0 0 0 2px rgba(39,180,255,.85),0 0 28px rgba(39,180,255,.28)}}
+  @media(max-width:1050px){.global-search{width:260px}.global-search>kbd{display:none}}
   .toast,.toast.update-toast{border-radius:5px}
   .um-head.has-art{min-height:225px;align-items:flex-end;justify-content:center;overflow:hidden;text-align:center;padding:0}
   .um-head.has-art .um-ico{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:0;background:#090d17;box-shadow:none}
-  .um-head.has-art .um-gif{position:absolute;left:0;top:-70px;display:block;width:100%;height:calc(100% + 70px);object-fit:cover;object-position:center;border-radius:0;opacity:1;filter:brightness(1.12) saturate(1.07) contrast(1.02)}
+  /* Individual update-animation placement settings. Keep top negative and height extra positive. */
+  .um-card.phase-checking{--um-gif-top:-70px;--um-gif-height:calc(100% + 70px)}
+  .um-card.phase-updating{--um-gif-top:-70px;--um-gif-height:calc(100% + 70px)}
+  .um-card.phase-complete{--um-gif-top:-70px;--um-gif-height:calc(100% + 70px)}
+  .um-head.has-art .um-gif{position:absolute;left:0;top:var(--um-gif-top,-70px);display:block;width:100%;height:var(--um-gif-height,calc(100% + 70px));object-fit:cover;object-position:center;border-radius:0;opacity:1;filter:brightness(1.12) saturate(1.07) contrast(1.02)}
   .um-head.has-art::after{display:none}
   .um-head.has-art .um-heading,.um-head.has-art .um-close{position:relative;z-index:2}
   .um-head.has-art .um-heading{position:absolute;inset:auto 0 0;max-width:none;padding:50px 22px 17px;background:linear-gradient(180deg,transparent,rgba(4,7,13,.88));box-shadow:none;text-shadow:0 2px 12px rgba(0,0,0,.88);backdrop-filter:none}

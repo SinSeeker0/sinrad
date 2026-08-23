@@ -21,10 +21,10 @@ One-click save any web page or link to S.I.R through an authenticated local conn
 ## Usage
 
 - **Click the toolbar icon** → saves current page to Links [Check out]
-- **Right-click anywhere** → "Save page to S.I.R"
-- **Right-click a link** → "Save link to S.I.R"
-- **Select text that's a URL, right-click** → "Save selection to S.I.R"
-- **Park ALL tabs** → waits for acknowledgements; the close option leaves failed tabs open
+- **Right-click a page, link, or selected URL** → open the S.I.R menu
+- **S.I.R Quick Save → Links** → saves the current page, link, or selected URL
+- **Bulk commands in the same menu** → save all tabs to Parking Lot, optionally closing saved tabs
+- **Park all tabs** → waits for acknowledgements; the close option leaves failed tabs open
 
 ## Requirements
 

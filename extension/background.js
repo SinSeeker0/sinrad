@@ -78,44 +78,31 @@ chrome.action.onClicked.addListener((tab) => {
 // === Right-click context menu ===
 chrome.runtime.onInstalled.addListener(() => {
   chrome.contextMenus.removeAll(() => {
-  chrome.contextMenus.create({
-    id: 'sinrad-save-page',
-    title: 'Save page to S.I.R',
-    contexts: ['page']
-  });
-  chrome.contextMenus.create({
-    id: 'sinrad-save-link',
-    title: 'Save link to S.I.R',
-    contexts: ['link']
-  });
-  chrome.contextMenus.create({
-    id: 'sinrad-save-selection',
-    title: 'Save selection to S.I.R',
-    contexts: ['selection']
-  });
-  chrome.contextMenus.create({
-    id: 'sinrad-park-all',
-    title: 'Park ALL tabs to S.I.R',
-    contexts: ['page']
-  });
-  chrome.contextMenus.create({
-    id: 'sinrad-park-all-close',
-    title: 'Park ALL tabs & close them',
-    contexts: ['page']
-  });
+    // Opera groups these page commands into one S.I.R submenu. This costs one
+    // extra click but keeps Quick Save and both bulk actions together.
+    chrome.contextMenus.create({
+      id: 'sinrad-quick-save',
+      title: 'S.I.R Quick Save → Links',
+      contexts: ['page', 'link', 'selection']
+    });
+    chrome.contextMenus.create({
+      id: 'sinrad-park-all',
+      title: 'Park all tabs → Parking Lot',
+      contexts: ['page']
+    });
+    chrome.contextMenus.create({
+      id: 'sinrad-park-all-close',
+      title: 'Park all tabs & close saved → Parking Lot',
+      contexts: ['page']
+    });
   });
 });
 
 chrome.contextMenus.onClicked.addListener((info, tab) => {
-  if (info.menuItemId === 'sinrad-save-link') {
-    saveOne(info.linkUrl, tab.title, false).catch(() => {});
-  } else if (info.menuItemId === 'sinrad-save-selection') {
+  if (info.menuItemId === 'sinrad-quick-save') {
     const sel = (info.selectionText || '').trim();
-    if (sel.match(/^https?:\/\//)) {
-      saveOne(sel, tab.title, false).catch(() => {});
-    } else {
-      saveOne(tab.url, tab.title, false).catch(() => {});
-    }
+    const targetUrl = info.linkUrl || (/^https?:\/\//i.test(sel) ? sel : tab.url);
+    saveOne(targetUrl, tab.title, false).catch(() => {});
   } else if (info.menuItemId === 'sinrad-park-all' || info.menuItemId === 'sinrad-park-all-close') {
     const shouldClose = info.menuItemId === 'sinrad-park-all-close';
     
@@ -129,11 +116,9 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
       if (shouldClose && savedIds.length) await chrome.tabs.remove(savedIds);
       chrome.notifications.create('sinrad-parked-' + Date.now(), {
         type: 'basic', iconUrl: 'icon.png', title: 'S.I.R',
-        message: 'Parked ' + savedIds.length + ' tab(s)' + (shouldClose ? ' and closed only those saved' : '') + (failed ? '; ' + failed + ' left open' : ''),
+        message: 'Saved ' + savedIds.length + ' tab(s) to Parking Lot' + (shouldClose ? ' and closed only those saved' : '') + (failed ? '; ' + failed + ' left open' : ''),
         priority: failed ? 1 : 0, silent: true
       });
     });
-  } else {
-    saveOne(tab.url, tab.title, false).catch(() => {});
   }
 });

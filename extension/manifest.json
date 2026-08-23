@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "S.I.R Quick Save",
-  "version": "1.1.2",
+  "version": "1.1.6",
   "description": "One-click save pages and links to S.I.R",
   "permissions": [
     "activeTab",
@@ -17,7 +17,7 @@
     "service_worker": "background.js"
   },
   "action": {
-    "default_title": "Save to S.I.R [Check out]",
+    "default_title": "Quick save current page to S.I.R Links",
     "default_icon": "icon.png"
   },
   "icons": {

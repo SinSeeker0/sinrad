@@ -52,5 +52,25 @@
   function primarySelection(values) {
     return Array.isArray(values)&&values.length?String(values[0]||""):"";
   }
-  return { savedUrlIdentity: savedUrlIdentity, normalizeWebUrl: normalizeWebUrl, normalizeVaultDraft: normalizeVaultDraft, automaticLinkCategory: automaticLinkCategory, automaticLinkCategories: automaticLinkCategories, primarySelection: primarySelection };
+  function globalSearch(data,query,limit) {
+    data=data&&typeof data==="object"?data:{};
+    const raw=String(query||"").trim(),tokens=raw.toLowerCase().split(/\s+/).filter(Boolean);
+    if(!tokens.length)return [];
+    const found=[];
+    function add(kind,view,item,title,detail,values){
+      title=String(title||"Untitled");detail=String(detail||"");
+      const hay=values.map(function(value){return String(value||"").toLowerCase();}).join("\n");
+      if(!tokens.every(function(token){return hay.indexOf(token)>=0;}))return;
+      const lowerTitle=title.toLowerCase(),needle=raw.toLowerCase();
+      const score=(lowerTitle.indexOf(needle)===0?100:lowerTitle.indexOf(needle)>=0?50:0)+(Number(item&&item.created)||0)/1e15;
+      found.push({kind:kind,view:view,id:String(item&&item.id||""),title:title,detail:detail,score:score});
+    }
+    (Array.isArray(data.vault)?data.vault:[]).forEach(function(item){add("Vault","vault",item,item.name,item.username||item.url,[item.name,item.url,item.username]);});
+    (Array.isArray(data.links)?data.links:[]).forEach(function(item){const parked=item.src==="park"&&!item.category&&!item.inLinks;add(parked?"Parking Lot":"Links",parked?"lot":"links",item,item.title,item.url,[item.title,item.url,item.note,item.category].concat(Array.isArray(item.categories)?item.categories:[]));});
+    (Array.isArray(data.folders)?data.folders:[]).forEach(function(item){add("Folders","folders",item,item.name||item.path,item.path,[item.name,item.path,item.category]);});
+    (Array.isArray(data.shots)?data.shots:[]).forEach(function(item){add("Screenies","shots",item,item.name||item.path,item.collection||item.path,[item.name,item.path,item.collection]);});
+    found.sort(function(a,b){return b.score-a.score||a.title.localeCompare(b.title);});
+    return found.slice(0,Math.max(1,Math.min(50,Number(limit)||24))).map(function(item){delete item.score;return item;});
+  }
+  return { savedUrlIdentity: savedUrlIdentity, normalizeWebUrl: normalizeWebUrl, normalizeVaultDraft: normalizeVaultDraft, automaticLinkCategory: automaticLinkCategory, automaticLinkCategories: automaticLinkCategories, primarySelection: primarySelection, globalSearch: globalSearch };
 });
