@@ -11,7 +11,7 @@ const main = fs.readFileSync(path.join(root, "main.js"), "utf8");
 
 test("Windows runtime identity matches the installed shortcut identity", function () {
   assert.equal(pkg.build.appId, "com.sinrad.desktop");
-  assert.doesNotMatch(main, /commandcenter/i);
+  assert.equal(pkg.build.nsis.guid, "da39281a-1d2a-5e1e-89f8-967e70dfa570");
   assert.match(main, new RegExp("PACKAGED_APP_ID=\\\"" + pkg.build.appId.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\\""));
   assert.match(main, /APP_ID=app\.isPackaged\?PACKAGED_APP_ID:PACKAGED_APP_ID\+"\.dev"/);
   assert.match(main, /setAppUserModelId\(APP_ID\)/);

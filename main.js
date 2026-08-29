@@ -2,8 +2,8 @@
 const { app, BrowserWindow, ipcMain, shell, screen, safeStorage } = require("electron");
 app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
 const PROTOCOL="sinrad"; app.setAsDefaultProtocolClient(PROTOCOL);
-// Fresh permanent Windows identity. The legacy ID was cached by Windows with
-// Electron's default taskbar icon and survived icon rebuilds.
+// Keep the packaged identity stable so Windows preserves installed shortcuts
+// and pinned taskbar entries across updates. Development uses a separate ID.
 const PACKAGED_APP_ID="com.sinrad.desktop";
 const APP_ID=app.isPackaged?PACKAGED_APP_ID:PACKAGED_APP_ID+".dev";
 app.setAppUserModelId(APP_ID);

@@ -81,6 +81,7 @@
       "icon": "icon.ico"
     },
     "nsis": {
+      "guid": "da39281a-1d2a-5e1e-89f8-967e70dfa570",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,
