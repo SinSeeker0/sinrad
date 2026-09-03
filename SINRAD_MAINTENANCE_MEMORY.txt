@@ -1606,3 +1606,5 @@ UPDATE LOG FOR THIS MEMORY
 - The first v2.0.29 release run stopped before packaging because GitHub's audit
   found newly disclosed issues in build-only dependencies. Refreshed xmldom and
   fast-uri to patched versions; npm audit now reports zero vulnerabilities.
+- Released v2.0.30 after 99/99 tests, the full UI smoke test, a local packaged
+  Windows build, and successful GitHub Windows and Linux release builds.
