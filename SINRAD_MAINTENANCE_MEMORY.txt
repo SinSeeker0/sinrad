@@ -1562,3 +1562,13 @@ UPDATE LOG FOR THIS MEMORY
   including visible artist-date filtering, and packaged build
   `dist-verify/ui-date-filter-215`. Packaged app.asar contains the expected #215
   sidebar, Screenies-density, and artist-filter markers. No release was made.
+- Edit #216 makes the creator name in a Monitoring Feed post reader open that
+  creator's internal artist page. Back from the artist returns to the Feed, so
+  the user no longer has to leave the post and search the Watchlist manually.
+- Replaced the native Windows date calendars and long year dropdown with SINRAD
+  controls: visible year buttons plus From/To sliders that step through dates
+  where the artist actually posted. The matching cards and download count stay
+  tied to that selected range.
+- Confirmed 96/96 automated tests, diff check, the full Electron UI smoke test
+  including Feed-to-artist navigation and timeline filtering, and packaged
+  build `dist-verify/artist-navigation-range-216`. No release was made.
