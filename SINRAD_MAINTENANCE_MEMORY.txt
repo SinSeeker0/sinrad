@@ -1242,6 +1242,8 @@ Planned source adapters:
 2. X/Twitter only where supported access and terms allow it.
 
 Other future work mentioned by the user:
+- Customize the interactive fresh-install wizard with user-approved anime
+  artwork or theming. Keep automatic updates silent and in the background.
 - Toolbox module for small portable utilities bundled with SINRAD.
 - User-added toolbox programs.
 - Future visual refreshes without losing established behavior.
