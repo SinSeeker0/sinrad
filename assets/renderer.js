@@ -107,7 +107,7 @@ function handleSet(inner,push){
   push('> usage: '+state.radCmd+' set <name>  toggles · names: autostart, hotkey, intro, hidden, autoscroll, click, pet   (add on|off to force)');
 }
 let STORE_MODE="Memory";
-const EDIT_COUNT = 214;
+const EDIT_COUNT = 215;
 const APP_OPENED_AT = Date.now();
 let TOTAL_OPEN_BASE = 0;
 let APP_VERSION="0.0.0";
@@ -130,7 +130,7 @@ let offlineMode=false,offlineTab="feed",offlineFilter="all",offlineQuery="",offl
 let offlineData={settings:{retentionDays:30,maxItems:2000},sources:[],items:[],updatedAt:0,storagePath:""};
 let offlineAuth={connected:false,username:"",clientId:"",secure:false};
 const offlineMediaCache=new Map();
-let monitoringMode=false,monitoringTab="activity",monitoringFilter="all",monitoringQuery="",monitoringLoading=false,monitoringSyncing=false,monitoringFocusId="",monitoringDetail=null,monitoringDetailLoading=false,monitoringDetailRequest=0,monitoringArtist=null,monitoringArtistLoading=false,monitoringArtistRequest=0;
+let monitoringMode=false,monitoringTab="activity",monitoringFilter="all",monitoringQuery="",monitoringLoading=false,monitoringSyncing=false,monitoringFocusId="",monitoringDetail=null,monitoringDetailLoading=false,monitoringDetailRequest=0,monitoringArtist=null,monitoringArtistLoading=false,monitoringArtistRequest=0,monitoringArtistRange={monitorId:"",from:"",to:""};
 let monitoringData={settings:{notifications:true,defaultIntervalMinutes:1440,retentionDays:90,maxEvents:2000,downloadFolder:""},monitors:[],events:[],updatedAt:0};
 const monitoringMediaCache=new Map();
 let searchTerms={};
@@ -565,12 +565,19 @@ function monitoringArtistPostCard(item){
   return '<article class="mon-artist-post" data-action="monitoring-artist-post-open" data-ctx="monitor-artist-post" data-id="'+esc(item.postId)+'" title="Open post · right-click for options"><div class="mon-artist-post-media">'+preview+'</div><div class="mon-artist-post-copy"><time>'+esc(monitoringDate(item.date))+'</time><h2>'+esc(item.title)+'</h2>'+(item.summary?'<p>'+esc(item.summary)+'</p>':'')+'<small>'+esc(item.attachmentCount||0)+' file'+(Number(item.attachmentCount)===1?'':'s')+'</small></div></article>';
 }
 function monitoringDateInput(value){const date=new Date(Number(value)||Date.now()),part=function(number){return String(number).padStart(2,'0');};return date.getFullYear()+'-'+part(date.getMonth()+1)+'-'+part(date.getDate());}
+function monitoringArtistRangeInfo(artist){
+  const all=(artist.posts||[]),newest=all.length?all[0].date:Date.now(),oldest=all.length?all[all.length-1].date:Date.now();
+  if(monitoringArtistRange.monitorId!==artist.monitorId)monitoringArtistRange={monitorId:artist.monitorId,from:monitoringDateInput(oldest),to:monitoringDateInput(newest)};
+  const fromTime=new Date(monitoringArtistRange.from+'T00:00:00').getTime(),toTime=new Date(monitoringArtistRange.to+'T23:59:59.999').getTime();
+  const valid=Number.isFinite(fromTime)&&Number.isFinite(toTime)&&fromTime<=toTime;
+  return {all:all,posts:valid?all.filter(function(post){return post.date>=fromTime&&post.date<=toTime;}):[],oldest:monitoringDateInput(oldest),newest:monitoringDateInput(newest),valid:valid};
+}
 function viewMonitoringArtist(artist){
   const avatar=monitoringMediaTag(artist.avatarRef,"mon-artist-avatar-img",artist.label),banner=monitoringMediaTag(artist.bannerRef,"mon-artist-banner","");
-  const posts=(artist.posts||[]),cards=posts.length?'<div class="mon-artist-grid">'+posts.map(monitoringArtistPostCard).join('')+'</div>':emptyState("◎","No posts were returned for this artist.");
-  const newest=posts.length?posts[0].date:Date.now(),oldest=posts.length?posts[posts.length-1].date:Date.now();
-  const range='<div class="mon-artist-range"><label>From <input id="mon_range_from" type="date" value="'+esc(monitoringDateInput(oldest))+'"></label><label>To <input id="mon_range_to" type="date" value="'+esc(monitoringDateInput(newest))+'"></label><button class="btn primary" data-action="monitoring-artist-download-range">Download date range</button></div>';
-  return '<div class="mon-artist" data-ctx="monitor-artist" data-id="'+esc(artist.monitorId)+'"><button type="button" class="mode-back" data-action="monitoring-artist-back">← Back</button><section class="mon-artist-hero">'+(banner||'<div class="mon-watch-banner-fallback"></div>')+'<div class="mon-artist-shade"></div><span class="mon-artist-avatar"><i>'+esc((artist.label||'P').charAt(0))+'</i>'+avatar+'</span><div class="mon-artist-title"><span>'+esc(String(artist.service||'Pawchive').toUpperCase())+'</span><h1>'+esc(artist.label)+'</h1><p>'+esc(posts.length)+' works · checked every '+esc(monitoringInterval(artist.intervalMinutes))+'</p></div></section>'+range+'<div class="mon-artist-note">Click a work to open it. Right-click this page for more options.</div>'+cards+'</div>';
+  const info=monitoringArtistRangeInfo(artist),posts=info.posts,cards=posts.length?'<div class="mon-artist-grid">'+posts.map(monitoringArtistPostCard).join('')+'</div>':emptyState("◎",info.valid?"No works match this date range.":"Choose a valid From and To date.");
+  const years=Array.from(new Set(info.all.map(function(post){return new Date(post.date).getFullYear();}))).sort(function(a,b){return b-a;}),selectedYear=years.find(function(year){return monitoringArtistRange.from===year+'-01-01'&&monitoringArtistRange.to===year+'-12-31';});
+  const range='<div class="mon-artist-range"><div class="mon-range-title"><b>Filter works by date</b><span>'+esc(posts.length)+' of '+esc(info.all.length)+' shown</span></div><label>Quick year <select id="mon_range_year"><option value="">Custom range</option>'+years.map(function(year){return '<option value="'+year+'"'+(year===selectedYear?' selected':'')+'>'+year+'</option>';}).join('')+'</select></label><label>From <input id="mon_range_from" type="date" min="'+esc(info.oldest)+'" max="'+esc(info.newest)+'" value="'+esc(monitoringArtistRange.from)+'"></label><label>To <input id="mon_range_to" type="date" min="'+esc(info.oldest)+'" max="'+esc(info.newest)+'" value="'+esc(monitoringArtistRange.to)+'"></label><button class="btn" data-action="monitoring-artist-range-reset">Show all</button><button class="btn primary" data-action="monitoring-artist-download-range"'+(!posts.length||!info.valid?' disabled':'')+'>Download shown ('+esc(posts.length)+')</button></div>';
+  return '<div class="mon-artist" data-ctx="monitor-artist" data-id="'+esc(artist.monitorId)+'"><button type="button" class="mode-back" data-action="monitoring-artist-back">← Back</button><section class="mon-artist-hero">'+(banner||'<div class="mon-watch-banner-fallback"></div>')+'<div class="mon-artist-shade"></div><span class="mon-artist-avatar"><i>'+esc((artist.label||'P').charAt(0))+'</i>'+avatar+'</span><div class="mon-artist-title"><span>'+esc(String(artist.service||'Pawchive').toUpperCase())+'</span><h1>'+esc(artist.label)+'</h1><p>'+esc(info.all.length)+' works · checked every '+esc(monitoringInterval(artist.intervalMinutes))+'</p></div></section>'+range+'<div class="mon-artist-note">Only the works inside the selected dates are shown below. Right-click this page for more options.</div>'+cards+'</div>';
 }
 function monitoringFilePreview(file){
   if(file.kind==='image')return '<div class="mon-media-frame image"><img class="mon-reader-media" src="'+esc(file.src)+'" alt="" loading="lazy"><span class="mon-media-state">Loading preview…</span></div>';
@@ -1216,9 +1223,10 @@ document.addEventListener("click",async(ev)=>{
     case "monitoring-tab": monitoringTab=t.dataset.tab==="watchlist"?"watchlist":"activity";monitoringFocusId="";monitoringDetail=null;monitoringArtist=null;renderView();break;
     case "monitoring-filter": monitoringFilter=t.dataset.filter==="unread"?"unread":"all";monitoringFocusId="";renderView();break;
     case "monitoring-add": monitoringAddModal();break;
-    case "monitoring-monitor-open": {const monitor=monitoringMonitor(id);if(!monitor)break;if(monitor.kind!=="pawchive"||!E||!E.monitoringArtistDetail){if(monitor.url)openTarget(monitor.url,"url");break;}const requestId=++monitoringArtistRequest;monitoringArtistLoading=true;renderView();const result=await E.monitoringArtistDetail(id);if(requestId!==monitoringArtistRequest)break;monitoringArtistLoading=false;if(result&&result.ok){monitoringArtist=result.artist;renderView();}else{renderView();toast(result&&result.error||"Could not load that artist","err");}break;}
+    case "monitoring-monitor-open": {const monitor=monitoringMonitor(id);if(!monitor)break;if(monitor.kind!=="pawchive"||!E||!E.monitoringArtistDetail){if(monitor.url)openTarget(monitor.url,"url");break;}const requestId=++monitoringArtistRequest;monitoringArtistLoading=true;monitoringArtistRange={monitorId:"",from:"",to:""};renderView();const result=await E.monitoringArtistDetail(id);if(requestId!==monitoringArtistRequest)break;monitoringArtistLoading=false;if(result&&result.ok){monitoringArtist=result.artist;renderView();}else{renderView();toast(result&&result.error||"Could not load that artist","err");}break;}
     case "monitoring-monitor-interval": monitoringIntervalModal(id);break;
     case "monitoring-artist-original": if(monitoringArtist&&monitoringArtist.url)openTarget(monitoringArtist.url,"url");break;
+    case "monitoring-artist-range-reset": if(monitoringArtist){monitoringArtistRange={monitorId:"",from:"",to:""};renderView();}break;
     case "monitoring-artist-post-open": {if(!monitoringArtist||!E||!E.monitoringArtistPostDetail)break;const requestId=++monitoringDetailRequest;monitoringDetailLoading=true;renderView();const result=await E.monitoringArtistPostDetail(monitoringArtist.monitorId,id);if(requestId!==monitoringDetailRequest)break;monitoringDetailLoading=false;if(result&&result.ok){monitoringDetail=result.detail;renderView();}else{renderView();toast(result&&result.error||"Could not open that post","err");}break;}
     case "monitoring-artist-download-range": {if(!monitoringArtist||!E||!E.monitoringArtistDownloadAll)break;const from=val("mon_range_from"),to=val("mon_range_to"),fromTime=new Date(from+"T00:00:00").getTime(),toTime=new Date(to+"T23:59:59.999").getTime();if(!from||!to||!Number.isFinite(fromTime)||!Number.isFinite(toTime)||fromTime>toTime){toast("Choose a valid From and To date","warn");break;}const selected=(monitoringArtist.posts||[]).filter(function(post){return post.date>=fromTime&&post.date<=toTime;}).length;if(!selected){toast("No works are inside that date range","warn");break;}const approved=await confirmModal("Download available files from "+selected+" works to the Monitoring output folder?",false,{title:"Download date range",go:"Download"});if(!approved)break;toast("Date-range download started — keep SINRAD open","ok");const result=await E.monitoringArtistDownloadAll(monitoringArtist.monitorId,from,to);if(result&&result.ok)toast("Downloaded "+result.count+" files from "+result.postCount+" works"+(result.failed?" · "+result.failed+" skipped":""),result.failed?"warn":"ok");else toast(result&&result.error||"Date-range download failed","err");break;}
     case "monitoring-artist-download-all": {if(!monitoringArtist||!E||!E.monitoringArtistDownloadAll)break;const approved=await confirmModal("Download every available file from "+monitoringArtist.posts.length+" works to the Monitoring output folder? This may use a lot of storage.",false,{title:"Download artist",go:"Download"});if(!approved)break;toast("Artist download started — keep SINRAD open","ok");const result=await E.monitoringArtistDownloadAll(monitoringArtist.monitorId,"","");if(result&&result.ok)toast("Downloaded "+result.count+" files from "+result.postCount+" works"+(result.failed?" · "+result.failed+" skipped":""),result.failed?"warn":"ok");else toast(result&&result.error||"Artist download failed","err");break;}
@@ -1344,6 +1352,15 @@ document.addEventListener("input",function(ev){
   const position=ev.target.value.length;offlineQuery=ev.target.value;
   if(_searchRenderTimer)clearTimeout(_searchRenderTimer);
   _searchRenderTimer=setTimeout(function(){_searchRenderTimer=null;renderView();const input=$("#offlineSearch");if(input){input.focus();try{input.setSelectionRange(position,position);}catch(_){}}},140);
+});
+document.addEventListener("change",function(ev){
+  if(!monitoringArtist||!ev.target)return;
+  if(ev.target.id==="mon_range_year"){
+    const year=Number(ev.target.value);if(!year)return;
+    monitoringArtistRange={monitorId:monitoringArtist.monitorId,from:year+'-01-01',to:year+'-12-31'};renderView();return;
+  }
+  if(ev.target.id!=="mon_range_from"&&ev.target.id!=="mon_range_to")return;
+  monitoringArtistRange={monitorId:monitoringArtist.monitorId,from:val("mon_range_from"),to:val("mon_range_to")};renderView();
 });
 document.addEventListener("input",function(ev){
   if(!ev.target||ev.target.id!=="monitoringSearch")return;

@@ -1551,3 +1551,14 @@ UPDATE LOG FOR THIS MEMORY
   and packaged build `dist-verify/navigation-cleanup-214`. Packaged app.asar
   contains the expected #214 navigation, full-width workspace, and grouped
   command markers. No release was made.
+- Edit #215 fixed the native white background exposed by the new semantic
+  sidebar buttons and widened compact Screenies cards so the full-width view
+  does not collapse into an unreadably dense wall of thumbnails.
+- Pawchive artist dates now filter the visible works immediately, show the
+  matching count, offer a quick year selector and Show all reset, and download
+  exactly the currently shown range. Empty and invalid ranges are explained in
+  the profile instead of silently leaving unrelated posts visible.
+- Confirmed 96/96 automated tests, diff check, the full Electron UI smoke test
+  including visible artist-date filtering, and packaged build
+  `dist-verify/ui-date-filter-215`. Packaged app.asar contains the expected #215
+  sidebar, Screenies-density, and artist-filter markers. No release was made.

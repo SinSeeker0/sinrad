@@ -396,6 +396,11 @@ test("watchlist uses artist profiles and keeps controls out of every card", func
   assert.match(renderer,/function viewMonitoringArtist[\s\S]*class="mon-artist-grid"/);
   assert.match(renderer,/type==="monitor-artist"[\s\S]*Download everything/);
   assert.match(renderer,/id="mon_range_from"[\s\S]*id="mon_range_to"[\s\S]*monitoring-artist-download-range/);
+  assert.match(renderer,/function monitoringArtistRangeInfo[\s\S]*No works match this date range/);
+  assert.match(renderer,/id="mon_range_year"[\s\S]*monitoring-artist-range-reset/);
+  assert.match(renderer,/Only the works inside the selected dates are shown below/);
   assert.match(renderer,/Monitoring downloads[\s\S]*monitoring-output/);
   assert.match(css,/\.mon-artist-grid\{display:grid/);
+  assert.match(css,/button\.nav-item\{[^}]*background:transparent/);
+  assert.match(css,/\.shot-grid\.size-s\{grid-template-columns:repeat\(auto-fill,minmax\(210px,1fr\)\)/);
 });
