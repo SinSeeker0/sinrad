@@ -1603,3 +1603,6 @@ UPDATE LOG FOR THIS MEMORY
 - Confirmed 99/99 automated tests, diff check, the full Electron UI smoke test
   including boundary shortcuts and global download status, and packaged build
   `dist-verify/monitor-download-queue-218`. No release was made.
+- The first v2.0.29 release run stopped before packaging because GitHub's audit
+  found newly disclosed issues in build-only dependencies. Refreshed xmldom and
+  fast-uri to patched versions; npm audit now reports zero vulnerabilities.
