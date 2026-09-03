@@ -2,6 +2,7 @@ var done=false;
 function finish(){ if(done) return; done=true; try{ if(window.electronAPI&&window.electronAPI.bootDone) window.electronAPI.bootDone(); }catch(e){} }
 function toFileURL(p){ return /^([a-zA-Z]:)/.test(p) ? "file:///"+p.replace(/\\/g,"/") : "file://"+p; }
 var video=document.getElementById("bv");
+document.addEventListener("click",finish);             // click anywhere -> skip the intro
 video.muted=false; try{ video.volume=1; }catch(e){}
 video.addEventListener("ended", finish);           // video played to the end -> open the app
 video.addEventListener("error", finish);            // can't play -> don't get stuck, open the app

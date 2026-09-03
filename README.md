@@ -1,6 +1,6 @@
 # Sinrad — S.I.R
 
-An offline-first Electron desktop app for passwords, links, temporary tab stacks, quick folders, screenshots, music, and device-folder search.
+An offline-first Electron desktop app for passwords, links, temporary tab stacks, quick folders, screenshots, monitoring, and device-folder search.
 
 ## Features
 
@@ -11,7 +11,9 @@ An offline-first Electron desktop app for passwords, links, temporary tab stacks
 - **Screenies:** watch screenshot folders, organize captures, copy, reveal, and slideshow.
 - **Console:** activity log plus `rad`, `park`, `parklist`, and settings commands.
 - **Quick capture:** global hotkey and the included Manifest V3 browser extension.
-- **Desktop extras:** floating Norma pet, local BGM, optional boot videos, update checks, autostart, and a confirmed 30-minute shutdown timer.
+- **Offline Reader:** cached feeds plus complete browser snapshots saved by the included extension.
+- **Monitoring:** quiet Pawchive/Bakemono and F95 checks, editable check times, full in-app Pawchive artist libraries, and organized attachment/archive downloads for a chosen date range. Downloads use the Windows Downloads folder by default.
+- **Desktop extras:** floating Norma pet, optional boot videos, update checks, autostart, and a confirmed 30-minute shutdown timer.
 
 ## Install
 
@@ -19,11 +21,11 @@ Download the latest installer from [GitHub Releases](https://github.com/SinSeeke
 
 ## Browser extension
 
-1. In Sinrad, type `ext open` in the console. This opens a stable per-user folder that Sinrad updates in place.
+1. In Sinrad Settings → Tools, open the browser-extension folder. Sinrad updates this stable folder in place.
 2. Open your browser's extensions page and enable Developer mode.
 3. Choose **Load unpacked** and select the opened `extension` directory.
 
-The extension talks only to Sinrad's authenticated localhost bridge. “Park all and close” closes only tabs the app acknowledges. Opera keeps the same unpacked extension across Sinrad upgrades; click **Reload** in Opera's extension page only if it does not detect an update automatically.
+The extension talks only to Sinrad's authenticated localhost bridge. It can save the current rendered page into Offline Reader as one MHTML file, so no second archiving extension is needed. “Park all and close” closes only tabs the app acknowledges. Opera keeps the same unpacked extension across Sinrad upgrades; click **Reload** in Opera's extension page only if it does not detect an update automatically.
 
 ## Data and security
 
@@ -50,7 +52,7 @@ Use `release.bat`, `release.sh`, or `node release.js` from a clean `main` branch
 
 ## Settings
 
-Run `rad set` to see settings for autostart, hotkey, music, intro, hidden-folder scanning, console autoscroll, click mode, and pet auto-undock.
+Use the top-right gear for autostart, hotkeys, download folders, intro and animation folders, hidden-folder scanning, click mode, and pet auto-undock. Use the list button or `Ctrl+Shift+P` to jump to any page or command without working through the sidebar.
 
 ## License
 

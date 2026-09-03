@@ -1,13 +1,15 @@
 {
   "manifest_version": 3,
   "name": "S.I.R Quick Save",
-  "version": "1.1.6",
-  "description": "One-click save pages and links to S.I.R",
+  "version": "1.2.5",
+  "description": "Save links, park tabs and capture pages for S.I.R offline use",
   "permissions": [
     "activeTab",
     "tabs",
     "contextMenus",
-    "notifications"
+    "notifications",
+    "pageCapture",
+    "scripting"
   ],
   "host_permissions": [
     "http://127.0.0.1:47821/*",

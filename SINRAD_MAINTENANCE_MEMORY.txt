@@ -1,0 +1,1553 @@
+SINRAD MAINTENANCE MEMORY
+=========================
+
+Purpose
+-------
+This file is long-term technical memory for anyone working on SINRAD.
+Read it before changing the app.
+Update it after every meaningful fix, feature, release, or discovery.
+
+It exists to prevent old bugs from returning and to preserve the reason
+behind important implementation choices.
+
+
+HOW TO USE THIS FILE
+--------------------
+1. Read Current Snapshot, Product Rules, and the relevant bug entry.
+2. Inspect the current code before assuming this file is still exact.
+3. Preserve unrelated user changes in the working tree.
+4. Reproduce a bug before changing its fix when possible.
+5. Add or update a regression test with every recurring bug.
+6. Do not mark work fixed until the packaged test build is checked.
+7. Add the date, cause, fix, and test evidence to this file.
+
+
+CURRENT SNAPSHOT — 2026-09-02
+-----------------------------
+Released version: 2.0.28
+Released Git commit: 956da44
+Current edit counter in the working tree: #211
+
+Important: the working tree contains unreleased work after v2.0.28.
+Do not discard, reset, or overwrite it.
+
+Current unreleased work includes:
+- Undo history and Ctrl+Z improvements.
+- Command palette and Ctrl+Shift+P desktop interception.
+- Exact duplicate review.
+- Smart link-category rules.
+- Saved-link health checks.
+- Rendering, searching, storage, and cache optimizations.
+- The Offline Reader / Offline Feed MVP.
+- The first pluggable source adapter for Reddit.
+- Monitoring Mode with Pawchive/Bakemono and F95zone watchers.
+- Cached, lazy preview images for Vault, Links, Quick Folders, and lightweight
+  website icons in the Parking Lot.
+- Cleaner Settings hierarchy and persistent global search in dedicated modes.
+- Focused Settings tabs and user-editable keyboard shortcuts.
+- The approved warm editorial archive / desktop workbench UI overhaul.
+- A compact top-right Settings toggle, visible-content sprite counter, simplified
+  Screenies toolbar, and recently visited Links ordering.
+- A large local Reddit image/video reader with formatted post text and loaded
+  comment threads with local avatars/media, large single-column Pawchive media,
+  and tighter menus.
+- A compact warm Norma menu with only Dock, recent folders, and Arm.
+- A user-visible, configurable Offline library with per-post media folders and
+  preserved Reddit comment quote/list formatting.
+
+Current Offline Reader test build:
+dist-verify/offline-reader/win-unpacked/Sinrad.exe
+
+Current Monitoring Mode test build:
+dist-verify/monitoring-image-gallery/win-unpacked/Sinrad.exe
+
+Current module-preview test build:
+dist-verify/module-previews/win-unpacked/Sinrad.exe
+
+Current full-cover link-card test build:
+dist-verify/link-cover-cards/win-unpacked/Sinrad.exe
+
+Current compact full-cover link-card test build:
+dist-verify/compact-link-cards/win-unpacked/Sinrad.exe
+
+Current parking/settings test build:
+dist-verify/parking-settings/win-unpacked/Sinrad.exe
+
+Current UI hierarchy test build:
+dist-verify/ui-hierarchy/win-unpacked/Sinrad.exe
+
+Current focused Settings test build:
+dist-verify/focused-settings/win-unpacked/Sinrad.exe
+
+Current warm archive UI test build:
+dist-verify/warm-archive-ui/win-unpacked/Sinrad.exe
+
+Current navigation/category polish test build:
+dist-verify/ui-polish-189/win-unpacked/Sinrad.exe
+
+Current monitoring card cleanup test build:
+dist-verify/monitor-card-cleanup-190/win-unpacked/Sinrad.exe
+
+Current artist watchlist test build:
+dist-verify/watchlist-profile-191/win-unpacked/Sinrad.exe
+
+Current final UI cleanup test build:
+dist-verify/final-ui-cleanup-192/win-unpacked/Sinrad.exe
+
+Current icon cleanup test build:
+dist-verify/icon-polish-193/win-unpacked/Sinrad.exe
+
+Current compact UI/counter test build:
+dist-verify/ui-counter-194/win-unpacked/Sinrad.exe
+
+Current Pawchive reader test build:
+dist-verify/monitor-reader-198/win-unpacked/Sinrad.exe
+
+Current interaction polish test build:
+dist-verify/click-monitor-ui-200/win-unpacked/Sinrad.exe
+
+Current saved-page metadata test build:
+dist-verify/offline-capture-metadata-201/win-unpacked/Sinrad.exe
+
+Current offline Reddit/menu test build:
+dist-verify/offline-reddit-menu-202/win-unpacked/Sinrad.exe
+
+Current large Pawchive media test build:
+dist-verify/pawchive-large-stack-203/win-unpacked/Sinrad.exe
+
+Current offline video/rich-text test build:
+dist-verify/offline-video-richtext-204/win-unpacked/Sinrad.exe
+
+Current offline comment-media test build:
+dist-verify/offline-comment-media-205/win-unpacked/Sinrad.exe
+
+Current offline reader right-click test build:
+dist-verify/offline-rightclick-back-206/win-unpacked/Sinrad.exe
+
+Current Monitor preload test build:
+dist-verify/monitor-preload-207/win-unpacked/Sinrad.exe
+
+Current Norma/offline storage test build:
+dist-verify/offline-storage-209-final/win-unpacked/Sinrad.exe
+
+Current context navigation and compact Settings test build:
+dist-verify/context-navigation-210/win-unpacked/Sinrad.exe
+
+Current top Settings test build:
+dist-verify/top-settings-211/win-unpacked/Sinrad.exe
+
+Test build marker:
+#211 edits
+
+Do not release these changes unless the user explicitly asks to release.
+
+
+PRODUCT RULES THAT MUST NOT BE LOST
+-----------------------------------
+- Product names are “Sinrad” and “S.I.R”.
+- Do not call it a “personal command center”.
+- Do not restore the removed header logo.
+- Keep the UI mostly square with restrained corner rounding.
+- Keep the user’s update animations.
+- Animation placement must remain adjustable per update phase.
+- The sleep/arm button activates immediately without a confirmation.
+- The user prefers short explanations and a brief TLDR.
+- Avoid decorative microcopy, extra captions, badges, icons, and outlines.
+- Do not add boxed letters, icon containers, badge-like chips, or decorative
+  status markers anywhere in the app. For website or creator identity, use the
+  real favicon/avatar. If it is unavailable, use a bare neutral symbol rather
+  than a letter badge. Keep necessary counts and states as plain text.
+- Avoid Apple/macOS visual language: no soft floating panels, glass effects,
+  excessive rounding, pill-heavy controls, or centered launcher-style layouts.
+- Prefer sharp, dark, content-dense layouts inspired by archive websites,
+  Windows desktop software, and media libraries.
+- The approved baseline is a warm editorial archive / desktop workbench:
+  warm near-black surfaces, amber as the main interaction accent, compact
+  Windows-style type, image-first cards, quiet dividers, and restrained
+  6–8 px rounding. Do not drift back to blue/cyan dashboard styling.
+- Settings lives at the top-right of the title bar and the same gear toggles it
+  open and closed.
+  Keep Escape and outside-click dismissal. Do not restore a separate Settings
+  title row or duplicate close X.
+- Keep Recently visited as quiet plain text over a Link card, never a boxed
+  badge. Sort visited links above unvisited links by last-opened time.
+- The footer page counter reports visible cards using the local Danbooru digit
+  sprites. Keep the bundled attribution and do not replace it with a remote
+  counter or network dependency.
+- Do not restore the decorative processing/think bar or the oversized Screenies
+  banner. Sidebar/module navigation must not expose horizontal scrollbars.
+- Active tabs and selections use thin 1 px amber lines. Keep type small and
+  avoid heavy all-caps headings except short navigation or section labels.
+- Sidebar navigation icons are bare glyphs. Do not put borders, boxes, or
+  button-like backgrounds around them, and do not restore a left active line.
+- Category colors stay identifiable but muted toward the warm neutral palette;
+  do not restore neon borders or glow effects.
+- Do not repeat Open, Read, or Unread buttons on every content card. When the
+  card has one obvious action, make the card itself perform it. Keep bulk or
+  filter actions in the toolbar instead.
+- Offline and Monitor labels stay exactly “Offline” and “Monitor” while active;
+  active styling communicates state without adding “Exit” and changing width.
+  Do not underline these mode buttons; use quiet background and text changes.
+- Monitoring watchlist entries use artist-profile cards with a large banner,
+  avatar, name, source, interval, and status. Do not return to admin-style rows.
+- Do not place Pause, Check, or Remove buttons on every watcher card. Clicking
+  opens the artist; watcher management stays in the card’s right-click menu.
+- Monitoring notification control belongs in General Settings, not above the
+  watchlist. The card open-mode setting is a switch, not a native dropdown.
+- New Monitoring watchers default to a daily check. Existing watcher intervals
+  remain user-controlled and must not be silently rewritten.
+- Monitoring activity cards size to their own content. Clamp long titles and
+  summaries with ellipses rather than stretching every card in the grid.
+- The music/player feature is removed. Do not restore player UI, IPC, startup
+  settings, bundled audio packaging, or console commands without a new request.
+- The status bar shows current SESSION time and persisted TOTAL app-open time.
+- Parking Lot titles, counts, and controls use quiet warm neutrals. Do not
+  restore the old bright pink title, neon hover, or intense cyan/amber buttons.
+- Helper text is for ambiguous, risky, or error-related actions only.
+- Prefer spacing, alignment, and restrained dividers over nested card borders.
+- Offline Reddit media uses one clean outer border around the player/gallery;
+  do not add nested media borders. Author flair belongs beside the author,
+  never in the post body. Preserve safe headings, emphasis, lists, quotes, and
+  code formatting when the page exposes it.
+- The Settings gear stays borderless at the far right of the title bar.
+- Offline and Monitor controls keep their stable title-bar positions.
+- Global search stays available in Offline Reader and Monitoring Mode.
+- Settings has General, Parking, and Tools only. Do not restore Search there.
+- Parking Settings only displays existing stacks; Parking actions stay in the
+  Parking Lot module.
+- Tools Settings contains link maintenance, Offline/media folders, the browser
+  extension, and editable hotkeys.
+- Prefer compact right-click menus for secondary and maintenance actions rather
+  than visible button rows. Keep Back/navigation, primary create/filter actions,
+  switches, hotkey fields, gallery controls, and media playback controls visible
+  when they are needed.
+- Give a rough usage percentage before starting substantial work.
+- Build test copies before releases.
+- Release only after the user explicitly says to release.
+- Increment the edit counter once per meaningful completed change batch.
+- Full URLs identify links. Same website does not mean duplicate page.
+- YouTube must remain the main category for YouTube links while preserving
+  any other categories already assigned to the link.
+- Selecting multiple link categories uses AND logic. A card must contain
+  every selected category.
+- Global search must never expose or search vault passwords.
+- Offline Mode is a separate experience. When enabled, the normal modules,
+  sidebar, and console disappear until the user exits Offline Mode.
+- Monitoring Mode is also a separate experience. It hides normal modules,
+  the sidebar, and console, and is mutually exclusive with Offline Mode.
+
+
+ARCHITECTURE MAP
+----------------
+main.js
+- Electron main process and privileged operations.
+- Window identity, protocol handling, extension bridge, file access,
+  storage, updates, screenshots, hotkeys, Offline Feed syncing, and monitor
+  polling/notifications.
+- Network requests belong here, not in the renderer.
+
+preload.js
+- Narrow IPC bridge between the isolated renderer and main process.
+- Add new renderer privileges here rather than enabling Node integration.
+
+index.html
+- App shell, title bar, status bar, modals, and root containers.
+- Content Security Policy intentionally blocks renderer network access.
+
+assets/renderer.js
+- UI state, rendering, actions, modals, searching, and mode switching.
+- EDIT_COUNT is maintained here.
+
+assets/index.css
+- Main UI, update UI, command palette, Offline Reader, and Monitoring styling.
+- Update GIF position variables are near the end of this file.
+
+assets/shared.js
+- Reusable URL, category, duplicate, and validation logic.
+
+extension/
+- Opera/Chromium Manifest V3 browser extension.
+- The installed extension is copied to a stable per-user directory.
+
+lib/
+- Security, screenshots, thumbnails, link checking, Offline Feed storage,
+  Monitoring storage, and source adapters.
+
+test/
+- Unit and regression tests. Add coverage for every repeated failure.
+
+scripts/ui-smoke.js
+- Hidden Electron test for real add flows, global search, and mode switching.
+
+
+DATA AND STORAGE MAP
+--------------------
+Production Electron userData:
+- sinrad-data.json: encrypted main application state.
+- sinrad-data.json.bak: last valid main-state copy.
+- thumbnail-cache/: generated screenshot thumbnails.
+- browser-extension/: stable unpacked extension installed in Opera.
+- extension-bridge-key: installation-specific extension authentication.
+- offline-feed/feed.json: Offline Reader sources and normalized feed text.
+- offline-feed/media/: downloaded Offline Reader images.
+- offline-feed/reddit-auth.json: Reddit OAuth credentials, encrypted with
+  Electron safeStorage when OS encryption is available.
+- monitoring/monitoring.json: watcher settings, baselines, errors, and
+  normalized monitoring activity.
+- monitoring/media/: locally cached creator avatars, banners, and post
+  thumbnails. Renderer images must be loaded through monitoring-media IPC.
+- site-preview-cache/: resized Open Graph images, YouTube thumbnails, and
+  favicons. It is disposable and is never placed in encrypted app state.
+
+Development uses a separate Sinrad-Dev userData folder.
+Never let a test build overwrite production data.
+
+The main encrypted state has a 10 MB safety limit.
+Large Offline Reader content must remain in offline-feed/, not state.
+
+
+FEATURE INVENTORY
+-----------------
+Vault
+- Encrypted local credentials.
+- Add, edit, delete, reveal, copy, favorite, priority, and search.
+- Clipboard password clearing after 45 seconds if unchanged.
+- Website previews receive only the saved URL; credentials never leave the
+  encrypted store.
+
+Links
+- Full-URL bookmarks, search, categories, favorites, multiple categories,
+  exact-duplicate review, smart rules, and manual health checking.
+- YouTube links automatically receive YouTube as their main category.
+- Rich previews prefer YouTube thumbnails or page Open Graph images and fall
+  back to the website icon.
+
+Parking Lot
+- Temporary tab stacks separate from permanent Links.
+- Can send individual links or stacks to Links.
+- Uses small cached website icons instead of full preview images.
+
+Quick Folders
+- Saved folders, categories, favorites, and Pet Recents integration.
+- Uses the newest image directly inside a saved folder as its local preview.
+
+Screenies
+- Watches screenshot folders.
+- Cached thumbnails, pagination, copying, revealing, categorizing,
+  slideshow, and Google Lens handoff.
+
+Browser extension
+- Quick Save sends the current page directly to Links.
+- Bulk actions park all tabs or park and close acknowledged tabs.
+- Uses an authenticated localhost bridge.
+
+Norma and desktop extras
+- Floating pet, folder shortcuts, music, boot animations, uptime,
+  update flow, autostart, and sleep timer.
+
+Global search
+- Searches modules without searching vault passwords.
+- Ctrl+Shift+F focuses global search.
+
+Command palette
+- Opens from the title-bar button or Ctrl+Shift+P.
+- Includes navigation, add actions, maintenance actions, backup, updates,
+  and Offline Reader mode switching.
+
+Undo
+- Ctrl+Z restores supported destructive changes from this app session.
+- Undo history is intentionally session-only at present.
+
+Offline Reader — unreleased MVP
+- Dedicated full-app mode, not a normal sidebar module.
+- Unified feed model for future Reddit, YouTube, and X adapters.
+- Offline text, cached Reddit-hosted images, useful top comments,
+  dates, original URLs, downloaded dates, unread state, and favorites.
+- Subreddit subscriptions with item limit, interval, sort, and comment count.
+- Exact source-key deduplication.
+- Configurable retention and maximum item count.
+- Favorites survive retention pruning.
+- Automatic catch-up sync while SINRAD is running.
+- Reddit OAuth uses a user-created approved client ID.
+- Renderer never directly contacts Reddit.
+- Reddit API rate-limit headers and HTTP 429 are respected.
+
+Monitoring Mode — unreleased MVP
+- Dedicated full-app mode, separate from normal modules and Offline Mode.
+- Accepts Pawchive and Bakemono creator links as the same Pawchive-backed
+  watcher, so users can paste either frontend URL.
+- Accepts F95zone thread links, including page links, and normalizes them to
+  one watcher per thread.
+- First check records a quiet baseline and never floods old entries.
+- Later checks deduplicate updates by stable post/reply IDs.
+- Configurable per-watcher intervals, pause/resume, manual checks, retention,
+  activity search, read/unread state, and Windows notifications.
+- Clicking a notification opens and focuses the matching Monitoring entry.
+- Automatic checks run while SINRAD is open and catch up on the next launch.
+- Monitoring never downloads attachments automatically. Explicit user downloads
+  accept only source-exposed, validated Pawchive file paths and never bypass
+  access controls or paywalls.
+- Pawchive watcher cards use locally cached creator avatars and banners.
+- New Pawchive activity uses locally cached image-first gallery cards.
+- The first Pawchive check quietly seeds up to 24 recent posts as read cards,
+  so the gallery is useful immediately without sending old notifications.
+- Only allowlisted Pawchive image routes are accepted; files are size-limited,
+  signature-checked, and never loaded directly by the renderer.
+- Pawchive reader attachments are one large item per row, stacked vertically.
+  Preserve their natural image proportions and do not return to a multi-column
+  thumbnail grid.
+
+
+BUG AND REGRESSION MEMORY
+=========================
+
+BUG-001 — release.bat says commit or stash changes first
+Status: expected safety behavior.
+
+Symptom:
+The release helper stops before publishing.
+
+Cause:
+release.js intentionally refuses to release a dirty working tree.
+
+Correct handling:
+- Review and test the changes.
+- Commit the intended files.
+- Confirm the main branch is clean.
+- Run release.bat only after explicit user approval.
+
+Never “fix” this by removing the clean-tree check.
+It prevents partial or accidental releases.
+
+
+BUG-002 — Windows update creates a second taskbar icon
+Status: fixed in v2.0.28. High regression risk.
+
+Symptoms:
+- The pinned Sinrad icon stays idle.
+- A second active Sinrad/Electron icon appears after an update.
+- Windows Search may label the app Electron.
+
+Root causes previously encountered:
+- Packaged and running windows used inconsistent Windows app identities.
+- Window icon settings could make Chromium use a different runtime identity.
+- Installer identity and application identity changed between builds.
+
+Current fix:
+- Keep PACKAGED_APP_ID exactly “com.sinrad.desktop”.
+- Development uses “com.sinrad.desktop.dev”.
+- app.setAppUserModelId is set before windows are created.
+- mainWin.setAppDetails uses the packaged executable.
+- On Windows, BrowserWindow omits the icon so Chromium uses the icon
+  embedded in Sinrad.exe.
+- Keep package build.appId stable.
+- Keep NSIS guid, productName, and shortcutName stable.
+
+Regression guard:
+test/updater.test.js checks runtime and installer identity.
+
+Verification:
+- Install/update over the existing installation.
+- Start from the already pinned shortcut.
+- The active window must group under that same pin.
+- A development test app may intentionally have a separate identity.
+
+
+BUG-003 — grey Electron icon instead of Sinrad icon
+Status: fixed. Related to BUG-002.
+
+Cause:
+Electron window icon behavior on Windows differed from the embedded EXE icon.
+
+Fix:
+- Use the correct multi-resolution icon.ico in the build.
+- Do not set BrowserWindow.icon on packaged Windows builds.
+- Do not replace icon.ico with a low-quality upscaled source.
+
+Verification:
+Check the EXE, Windows Search, Start menu, taskbar, and installer shortcut.
+
+
+BUG-004 — extension says S.I.R not connected / HTTP 403
+Status: fixed. High regression risk.
+
+Cause:
+- The localhost bridge was hardened to require an installation key.
+- Older extension files did not contain the current bridge key.
+- Reloading Opera alone did not help when an old SINRAD build was running.
+
+Fix:
+- Generate a per-installation extension-bridge-key.
+- Copy the bundled extension into userData/browser-extension.
+- Replace __SINRAD_BRIDGE_KEY__ while copying background.js.
+- Require both bridge authentication and the short-lived local token.
+- Bind the server only to 127.0.0.1.
+
+Important test rule:
+Close every SINRAD process before testing a newly packaged build.
+The single-instance lock can focus an older running build instead.
+
+Opera setup:
+Load the stable userData/browser-extension folder once.
+SINRAD updates that folder in place. Reload the extension only when needed.
+
+
+BUG-005 — new tabs are not saved because they share a website
+Status: fixed.
+
+Cause:
+Earlier duplicate logic treated a host/site as the identity.
+
+Fix:
+Use the normalized complete URL as identity.
+Paths, queries, and case-sensitive path content remain meaningful.
+
+Example behavior:
+example.com/feed and example.com/post/123 are different links.
+Only identical complete normalized URLs are duplicates.
+
+Regression guards:
+- test/links.test.js
+- Exact duplicate review tests.
+
+
+BUG-006 — extension Quick Save goes to Parking Lot or takes two clicks
+Status: fixed previously; bulk batch and isolation repair awaiting user test.
+
+Desired behavior:
+- The first context-menu Quick Save action saves the current page to Links.
+- Bulk actions remain directly below it.
+- Park All stores tabs in Parking Lot.
+- Park All and Close closes only tabs SINRAD confirms it saved.
+
+Do not merge Links and Parking Lot semantics again.
+
+2026-09-01 hardening:
+- Park All sends one authenticated tab batch and waits for one durable save
+  acknowledgement instead of posting every tab separately.
+- One batch produces one completion animation and one app notification.
+- Park All and Close closes tabs only after the complete batch is persisted.
+- A parked item is src="park" with inLinks=false. Its automatic category must
+  never move it into permanent Links.
+- Stack list, open, rename, send, and delete actions use parked items only.
+- Extension 1.1.7 contains the batch request. Reload the stable extension
+  after starting the new test build.
+
+Opera limitation:
+Opera controls where extension menus appear in its native context menus.
+SINRAD can control its menu items but not every Opera menu placement.
+
+
+BUG-007 — screenshot thumbnails are slow, delayed, or broken
+Status: improved. Continue monitoring on very large libraries.
+
+Causes addressed:
+- Full-size image decoding during grid rendering.
+- Repeated thumbnail generation.
+- Too much simultaneous work.
+- Cache entries not invalidating after source-image changes.
+
+Current fix:
+- Disk thumbnail cache keyed by path, size, and modification time.
+- Cached reads before generation.
+- Maximum four active thumbnail generation jobs.
+- Pagination and content-visibility for large grids.
+- Cache pruning by age, file count, and total bytes.
+
+Regression guards:
+- test/thumbnail-cache.test.js
+- test/screenshots.test.js
+
+Do not cache only the file path. Changed images must get a new key.
+
+
+BUG-008 — Vault Save or Add buttons do nothing
+Status: fixed. Recurred more than once.
+
+Cause:
+Click handlers and re-rendered controls could swallow, duplicate, or miss
+the primary Add action.
+
+Current fix:
+- A capture-phase primary Add handler owns vault-new, link-add,
+  and folder-add.
+- runPrimaryAddAction routes each operation exactly once.
+- Vault drafts are validated and normalized before mutation.
+- Save errors keep the modal open and show an error.
+
+Regression guards:
+- test/links.test.js validates vault drafts.
+- scripts/ui-smoke.js clicks real Vault, Links, and Folders controls.
+
+When this returns, test the actual button click first.
+Do not only call the save function from the console.
+
+
+BUG-009 — multi-category filtering shows cards with only one category
+Status: fixed.
+
+Correct behavior:
+Every selected category must exist on the card.
+The filter uses AND logic, not OR logic.
+
+Cards with multiple categories show a compact multi-category indicator.
+The main title color comes from the primary category.
+
+
+BUG-010 — YouTube migration removes the old category
+Status: fixed.
+
+Correct behavior:
+- YouTube becomes the primary category.
+- Previous categories remain in link.categories.
+- New YouTube links get the same behavior automatically.
+- Removing another category never removes YouTube from a YouTube URL.
+
+Regression guards:
+test/links.test.js covers automatic and preserved categories.
+
+
+BUG-011 — update animation is missing, too dim, cropped, or too low
+Status: fixed to the user-approved style. Visually sensitive.
+
+Current placement settings in assets/index.css:
+--um-gif-top
+--um-gif-height
+
+Separate values exist for:
+- .phase-checking
+- .phase-updating
+- .phase-complete
+
+Current baseline is top -70px and height calc(100% + 70px).
+
+Important:
+- Moving only object-position may not affect the visible placement.
+- Position is controlled by top plus the compensating height.
+- Do not enlarge the whole update window to move the image.
+- Keep the new system-update layout and the user’s animation files.
+- Do not restore the redundant X button; the Close button is sufficient.
+
+
+BUG-012 — updates show the old installer wizard
+Status: fixed.
+
+Desired behavior:
+- Fresh installs may use the NSIS setup wizard.
+- In-app updates use the quiet update flow and reopen SINRAD.
+- Update UI keeps checking, updating, and complete animation states.
+
+Regression guard:
+test/updater.test.js checks silent update configuration.
+
+
+BUG-013 — release version or GitHub release is unreliable
+Status: fixed.
+
+release.js now:
+- Requires a clean main branch.
+- Runs the full check suite.
+- Increments package.json and package-lock.json once.
+- Creates one version commit and tag.
+- Atomically pushes the commit and tag.
+
+GitHub Actions builds the release artifacts after the tag is pushed.
+
+Never manually mix several version changes with release.js unless its
+behavior is intentionally being changed and retested.
+
+
+BUG-014 — Ctrl+Z does not restore a deleted link
+Status: improved in unreleased work. Verify in packaged test build.
+
+Cause:
+Focused inputs or controls could receive the key before the app handler.
+
+Fix:
+- Capture Ctrl+Z on window before focused controls can swallow it.
+- Keep the last 20 supported mutations in an in-memory undo stack.
+- Restore state only after the replacement state saves successfully.
+
+Known limitation:
+Undo history is session-only and does not yet cover every Offline Feed action.
+
+Regression guard:
+test/regressions.test.js checks global capture wiring.
+
+
+BUG-015 — Ctrl+Shift+P command palette does not open
+Status: fixed in unreleased work. High regression risk.
+
+Cause:
+Electron or a focused renderer control could intercept the shortcut before
+the document-level JavaScript listener.
+
+Fix:
+- main.js catches it with webContents “before-input-event”.
+- main sends the “command-palette” event through preload.
+- renderer opens the palette from that privileged event.
+- A renderer capture listener remains as a fallback.
+
+Regression guard:
+test/regressions.test.js checks all three layers.
+
+Testing warning:
+Confirm the bottom bar shows the expected edit count.
+If an older installed SINRAD is still running, the test EXE can focus it
+instead of launching the new build because of the single-instance lock.
+
+
+BUG-016 — global search leaks or searches passwords
+Status: fixed.
+
+Fix:
+- The search index includes safe Vault labels such as service and username.
+- It never includes password values.
+- Large search work is moved to assets/search-worker.js.
+
+Regression guard:
+test/links.test.js checks cross-module results and password exclusion.
+
+
+BUG-017 — local storage corruption or failed restore overwrites good data
+Status: fixed. Security-critical.
+
+Fix:
+- Electron safeStorage encryption when available.
+- Atomic temp-file write and previous-file backup.
+- If encrypted files cannot be read, writes lock instead of replacing data.
+- Backup restore keeps the previous in-memory state until save succeeds.
+- Development and production data directories are separated.
+
+Never weaken the locked-write behavior to make an error disappear.
+
+
+BUG-018 — search/rendering slows down with large collections
+Status: improved in unreleased work.
+
+Fixes:
+- Browser content-visibility for large card collections.
+- Search worker for large global-search indexes.
+- Debounced and serialized state writes.
+- Screenshot pagination.
+- Lazy music byte loading.
+- Removed duplicate repeating timers.
+
+Regression guards:
+test/regressions.test.js and the full check suite.
+
+
+BUG-019 — test build appears unchanged
+Status: process/testing issue, not normally a code bug.
+
+Cause:
+The installed app is still running and owns SINRAD’s single-instance lock.
+Opening a packaged test copy focuses the older process.
+
+Fix for testing:
+1. Close every SINRAD window.
+2. Check Task Manager and close leftover SINRAD processes normally.
+3. Open the packaged test EXE.
+4. Confirm the edit count in the bottom bar.
+
+Development mode intentionally has a separate Windows identity and data path.
+
+
+BUG-020 — Offline Reader must still work with internet disconnected
+Status: implemented in unreleased MVP; real-world verification pending.
+
+Design that must be preserved:
+- Normalize source content into local feed items.
+- Store text and metadata in offline-feed/feed.json.
+- Download approved image media into offline-feed/media/.
+- Renderer reads only the local index and cached media while browsing.
+- Opening the original URL is optional and is the only reading action that
+  requires the external website.
+- Duplicate identity is platform plus stable source item ID.
+- Network and OAuth stay in main.js.
+- Source adapters return the same normalized feed format.
+- Browser snapshots keep the full MHTML as the source of truth, but also save
+  the visible post title, author, community, body, date, counts, and an approved
+  local gallery in the feed index so cards do not become generic placeholders.
+- A browser save can retain up to 20 ordered Reddit gallery images and up to 80
+  comment entries that are loaded in the page DOM. Media is copied locally and
+  comments are stored as sanitized text with author, score, date, and depth.
+- Saved Reddit details use a large contained carousel and a flat indented
+  comment thread. The internal reader approximates the post content hierarchy;
+  it does not copy Reddit's account controls or community sidebar.
+- Saving the same page again updates its existing Offline item, preserves its
+  read/favorite state, and removes the superseded snapshot and media files.
+
+Reddit compliance choices:
+- OAuth required.
+- User supplies an approved Reddit client ID.
+- Unique truthful User-Agent includes the user’s Reddit username.
+- API rate headers and HTTP 429 are honored.
+- Reddit-hosted image domains are allowlisted.
+- No aggressive HTML scraping.
+
+Known limitations:
+- A real Reddit sync has not been end-to-end tested without user credentials.
+- Automatic sync runs while SINRAD is open and catches up on the next launch.
+- Existing encrypted backup does not yet include offline-feed/ content.
+- X/Twitter and YouTube adapters are not implemented yet.
+- Browser-captured Reddit videos are supported only when Reddit exposes a
+  direct approved MP4/WebM file. Cache at most 96 MB per video. HLS manifests,
+  external video hosts, and YouTube video downloads remain outside scope.
+- Browser snapshots made before edit #201 need to be saved again to gain the
+  richer feed metadata; the original MHTML remains available meanwhile.
+- Browser snapshots made before edit #202 need to be saved again to gain the
+  full local gallery and comment thread.
+- Browser snapshots made before edit #204 need to be saved again to gain local
+  video, author-flair separation, and formatted post text.
+- Browser snapshots made before edit #205 need to be saved again to gain the
+  separate subreddit post flair, author/comment avatars, and inline comment
+  images or GIF/video.
+- The extension can only capture comments currently loaded in Reddit's page.
+  The user should scroll through or expand the desired comments before saving;
+  unloaded or collapsed comments require Reddit API access and are not scraped.
+- Platform deletion/compliance workflows need further design before broad
+  distribution of the module.
+
+Regression guards:
+- test/offline-feed.test.js
+- test/reddit-source.test.js
+- test/regressions.test.js
+- scripts/ui-smoke.js verifies entering and leaving dedicated mode.
+
+
+BUG-021 — Monitoring creates duplicate alerts or floods old entries
+Status: prevented in unreleased Monitoring Mode MVP.
+
+Design that must be preserved:
+- A watcher has a stable key: Pawchive service + creator ID, or F95 thread ID.
+- Adding the same source through Pawchive and Bakemono is rejected as a
+  duplicate because both point to the same Pawchive source.
+- The first successful check only stores lastSeenKey/lastSeenAt.
+- New activity is created only after that baseline.
+- Every event also has a stable platform post/reply key and the store rejects
+  keys it already contains.
+- Failed checks keep their error on the watcher and do not advance the
+  successful baseline.
+
+Known limitations:
+- F95zone may block or time out automatic requests because of anti-bot or
+  sign-in protection. The watcher reports this instead of scraping around it.
+- Notifications/checks run only while SINRAD is open.
+- F95zone mod/file classification is not implemented yet.
+- The encrypted backup does not yet include monitoring/monitoring.json.
+- Cached Monitoring images are removed when their watcher/activity is pruned.
+
+Regression guards:
+- test/monitoring-sources.test.js
+- test/monitoring-store.test.js
+- test/regressions.test.js
+- scripts/ui-smoke.js verifies entering and leaving Monitoring Mode.
+
+
+CACHED MODULE PREVIEWS — EDIT #182
+==================================
+
+Goal:
+- Make saved items recognizable at a glance without turning every module into
+  a live web browser.
+
+Implementation:
+- lib/site-preview.js performs bounded, read-only HTTP(S) requests in the main
+  process. It extracts Open Graph/Twitter images and favicons without running
+  page scripts. YouTube thumbnails are derived from the video ID.
+- Every redirect and image request is DNS checked. Localhost, private network
+  addresses, file URLs, and unsupported image data are rejected.
+- assets/renderer.js receives data URLs through narrow IPC. Previews load only
+  when cards approach the visible area and the in-memory renderer cache is
+  bounded.
+- main.js stores resized previews in site-preview-cache. Repeated visits use
+  disk cache and failed requests cool down for 30 minutes.
+- Folder previews only inspect exact folder paths already saved in Quick
+  Folders. They do not recurse and never read outside those saved folders.
+- Vault preview requests include only the URL. Never add username/password
+  fields to the preview IPC payload.
+
+Fallback behavior:
+- Links/Vault: rich image -> favicon -> local placeholder.
+- Parking Lot: favicon -> local letter placeholder.
+- Quick Folders: newest direct child image -> folder icon placeholder.
+
+Regression guards:
+- test/site-preview.test.js checks metadata parsing, safe schemes, YouTube URL
+  handling, and image signature validation.
+- scripts/ui-smoke.js checks preview hydration in Links, Vault, and Folders.
+
+LINK PREVIEW CARD LAYOUT — EDIT #183
+====================================
+
+- Link preview images now cover the complete card instead of occupying a
+  separate top strip.
+- Link information sits over a dark bottom fade so titles, paths, dates, and
+  badges remain readable without hiding most of the image.
+- Favicon and missing-image fallbacks keep the same full-card dimensions.
+
+COMPACT LINK PREVIEW CARDS — EDIT #184
+======================================
+
+- Reduced full-cover Link cards from 215 px to 178 px after the user's visual
+  test while keeping the title, path, date, and category indicators readable.
+- Do not add Reddit-specific scraping as an API workaround. Use only preview
+  metadata Reddit normally exposes; reliable Reddit post/media data requires
+  Reddit approval under its current Responsible Builder Policy.
+
+
+PARKING BATCH AND SETTINGS — EDIT #185
+======================================
+
+- Added one-request Park All batches through the extension, authenticated
+  localhost bridge, and renderer. The renderer saves and acknowledges the
+  whole batch once.
+- Fixed categorized parked links, especially YouTube, leaking into Links.
+  Category and module ownership are now independent.
+- Clicking anywhere on the Complete animation dismisses it immediately.
+- Added a title-bar gear and full Settings panel. General behavior, device
+  search, Parking Lot commands, extension setup, Screenies, Console help,
+  backup, restore, and update actions are clickable there.
+- Console commands remain available for compatibility. Settings calls the
+  same underlying functions instead of duplicating behavior.
+- Automated result: 64/64 tests passed and git diff check passed.
+- Electron UI smoke could not load index.html because the Windows GPU process
+  exited with the already-recorded missing-DLL error. This was an environment
+  failure before SINRAD assertions ran.
+- Packaged test build completed and app.asar was checked for edit #185,
+  Settings UI, click-to-dismiss animation, batch bridge, parked-link helper,
+  and extension 1.1.7. Real Opera Park All testing is still required.
+
+
+UI HIERARCHY CLEANUP — EDIT #186
+================================
+
+- Cause: Settings used a subtitle under nearly every action, uppercase micro
+  labels, bordered mini-cards, and an outlined gear. This gave secondary text
+  and containers the same weight as the actual controls.
+- Simplified Settings rows to one operational label plus its control. Removed
+  the decorative Settings kicker and replaced row boxes with spacing and thin
+  dividers.
+- Moved the borderless gear to the far right while preserving the existing
+  Offline and Monitor button positions.
+- Global search remains visible in Offline and Monitoring modes. Opening a
+  result exits the dedicated mode first, then navigates to the real card.
+- Future UI work must stay content-first: one clear accent, plain labels,
+  familiar functional icons, restrained borders, and no explanatory text
+  unless the user needs it to act safely or understand an unusual control.
+- Research references: Apple HIG, GitHub Primer content, Carbon buttons, and
+  Fluent toolbars reinforce hierarchy, concise labels, restrained icon use,
+  and keeping primary commands relevant to the current task.
+- Automated result: 65/65 tests passed and git diff check passed.
+- Electron UI smoke was blocked before app assertions by the known Windows
+  GPU/missing-DLL failure. Packaged test build completed and app.asar verified
+  edit #186, header order, borderless gear, simplified Settings, persistent
+  search CSS, and special-mode search navigation.
+
+
+FOCUSED SETTINGS AND EDITABLE HOTKEYS — EDIT #187
+=================================================
+
+- Removed the Search tab because search already has dedicated app surfaces.
+- Parking Settings now displays existing stack names and counts only. It no
+  longer duplicates park, import, stack-size, open, or edit actions.
+- Tools now contains only the browser extension and four editable shortcuts:
+  Global search, Commands, Undo, and Quick save.
+- Defaults remain Ctrl+Shift+F, Ctrl+Shift+P, Ctrl+Z, and Ctrl+Alt+P.
+- Shortcut changes are stored in state.settings.hotkeys and apply immediately.
+  Duplicate shortcuts are rejected.
+- Main-process interception follows the configured Commands shortcut, and the
+  system-wide Quick save shortcut is safely unregistered while a shortcut field
+  is recording so the old shortcut cannot fire during editing.
+- The UI-smoke runner now isolates appData, userData, sessionData, and its
+  working directory under dist-verify so Chromium test files do not appear at
+  the repository root.
+- Automated result: 65/65 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the known Windows
+  GPU/missing-DLL failure. The packaged build completed and app.asar verified
+  edit #187, three Settings tabs, stacks-only Parking, focused Tools, and both
+  sides of the hotkey bridge.
+
+
+WARM EDITORIAL ARCHIVE UI — EDIT #188
+=====================================
+
+- Applied the user-approved warm archive / desktop workbench visual system to
+  the actual app, not only the design previews.
+- Replaced the blue/cyan dashboard palette with warm near-black surfaces,
+  amber interaction states, muted warm text, and quiet neutral dividers.
+- Reduced the base type scale and heading weight. Active navigation, mode tabs,
+  and Settings tabs now use thin 1 px amber selection lines.
+- Changed normal navigation into a compact fixed library rail, kept the gear
+  borderless at the far right, and preserved the title-bar positions of global
+  search, Offline, and Monitor.
+- Kept link/media cards image-first with a bottom information fade, shortened
+  card copy, moderate 7 px corners, and no floating glass treatment.
+- Restyled Offline Reader and Monitoring with the same palette and density.
+  Offline items now read as vertical archive cards instead of side-by-side
+  dashboard rows.
+- Settings now fills the app workspace below the title bar with a fixed left
+  tab rail. Its contents remain General, stacks-only Parking, and Tools with
+  the extension plus four editable hotkeys.
+- Existing update-animation phase placement was left intact; only its surface
+  colors were brought into the new system.
+- Automated result: 65/65 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the known
+  Windows GPU/missing-DLL startup failure (ERR_FAILED loading index.html).
+- Packaged test build completed. app.asar was checked for edit #188, the warm
+  archive CSS marker, amber palette, and Library navigation label.
+
+
+NAVIGATION AND CATEGORY POLISH — EDIT #189
+==========================================
+
+- Removed every border, background box, radius, and shadow from the sidebar
+  navigation icons, including the old special Parking Lot icon treatment.
+- Removed the amber line on the left of the selected module. Selection now uses
+  only a quiet warm background plus softened text and icon color.
+- Mixed category colors toward the warm neutral palette, lowered saturation,
+  removed glow, and kept a restrained underline for active categories.
+- Automated result: 65/65 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the existing
+  Windows GPU/missing-DLL startup failure.
+- Packaged test build completed. app.asar verified edit #189, bare navigation
+  icons, muted category styling, and removal of the active-navigation line.
+
+
+MONITORING CARD ACTION CLEANUP — EDIT #190
+==========================================
+
+- Removed the repeated Open and Read/Unread buttons from Monitoring activity
+  cards. Clicking anywhere on a card now opens its source and marks it read.
+- The existing All, Unread, and Mark all read toolbar controls remain because
+  they filter or operate on the whole feed rather than duplicate card actions.
+- Offline and Monitor title-bar labels no longer grow into “Exit Offline” or
+  “Exit Monitor.” Their active state is shown only through styling.
+- Added a regression test preventing the card buttons and changing mode labels
+  from returning.
+- Automated result: 66/66 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the existing
+  Windows GPU/missing-DLL startup failure.
+- Packaged test build completed. app.asar verified edit #190, card-level open,
+  absent Open/Unread buttons, fixed mode labels, and the compact card CSS.
+
+
+ARTIST WATCHLIST AND SETTINGS CLEANUP — EDIT #191
+=================================================
+
+- Rebuilt watcher entries as artist-profile cards: a full-width banner, large
+  avatar, artist name, platform, watching state, interval, and last check.
+- Clicking a watcher opens the artist page. Pause/Resume, Check now, and Remove
+  are available only from the card’s right-click menu.
+- Removed the repeated Notifications button above the watchlist. Windows
+  notifications now live in the Monitoring section of General Settings.
+- Replaced the native single/double-click dropdown with a compact “Open cards
+  with one click” switch so Windows does not show an off-theme blue menu.
+- Removed the old watchlist “Later enhancement” note from the visible UI.
+- Added regression coverage for profile markup, missing per-card controls,
+  notification placement, the open-mode switch, and watcher context actions.
+- Automated result: 67/67 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the existing
+  Windows GPU/missing-DLL startup failure.
+- Packaged test build completed. app.asar verified edit #191, profile cards,
+  right-click actions, moved notifications, switch UI, and final CSS marker.
+
+
+FINAL UI AND PLAYER CLEANUP — EDIT #192
+=======================================
+
+- Changed the default interval for newly created watchers from one hour to
+  daily in both Monitoring storage and the Add watcher form. Existing watcher
+  intervals are preserved.
+- Removed the music player end to end: sidebar markup, renderer audio state and
+  actions, Settings/console controls, preload/main IPC, CSS, and build packaging.
+  Existing audio files on disk were left untouched but are no longer used or
+  included in new builds.
+- Replaced the footer wall clock with SESSION and persisted TOTAL app-open
+  timers, and enlarged the footer enough to read without becoming a toolbar.
+- Removed the letter badge from link context-menu headers.
+- Removed forced Monitoring card heights, aligned cards to the top, and clamped
+  long titles and summaries to two lines so cards stay compact independently.
+- Replaced remaining bright Parking Lot titles, counts, borders, and hover
+  treatments with the approved warm neutral controls.
+- Added regression coverage for daily defaults, full player removal, persistent
+  timers, compact Monitoring cards, badge removal, and quiet Parking controls.
+- Automated result: 70/70 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the existing
+  Windows GPU/missing-DLL startup failure.
+- Packaged test build completed. app.asar verified edit #192, daily defaults,
+  SESSION/TOTAL timers, absent player wiring and audio packaging, and all 341
+  packaged entries. No release was made.
+
+
+MODE AND WEBSITE ICON CLEANUP — EDIT #193
+=========================================
+
+- Removed the amber active underline from Offline and Monitor. Active state is
+  now shown only with a quiet warm background and text color.
+- Replaced Parking Lot letter boxes with the website favicon. SINRAD tries the
+  site favicon and declared icon first, then uses the Google favicon endpoint
+  when the site blocks both. The loading/missing state is a bare neutral globe,
+  not another badge or boxed letter.
+- Removed the border and filled background from Parking favicon containers.
+- Strengthened the product rules against decorative badges, boxed glyphs,
+  icon containers, status chips, and other repeated badge-like UI.
+- Automated result: 71/71 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the existing
+  Windows GPU/missing-DLL startup failure.
+- Packaged test build completed. app.asar verified edit #193, the favicon
+  fallback, bare globe, absent mode underline, and unboxed Parking icons.
+  No release was made.
+
+
+COMPACT UI, SETTINGS, AND PAGE COUNTER — EDIT #194
+==================================================
+
+- Moved the Settings gear from the title bar to the footer. The same gear now
+  toggles Settings open and closed; Escape and outside-click dismissal remain.
+- Removed the separate Settings title/header row and duplicate close X.
+- Reworked Settings switches with larger, softer controls and visible thumb
+  motion. Added restrained animation to Norma and Screenies controls.
+- Made Norma's floating placeholder the same compact height as its docked card,
+  shortened its message, and hid horizontal overflow in the sidebar/navigation.
+- Removed the decorative processing/think bar and replaced it with a local
+  Danbooru cat-girl digit counter showing visible cards on the current page.
+  Bundled all ten digit images and the required Danbooru Project attribution.
+- Removed the oversized Screenies information banner. Kept only quiet count,
+  page, and size controls in the existing filter toolbar.
+- Added a plain Recently visited label to Links opened in the last 30 days and
+  sorted all visited links ahead of unvisited links by last-opened time. The
+  marker has no border or badge container.
+- Added regression coverage for Settings placement/toggle/Escape, removed UI,
+  compact dock sizing, all ten counter assets, and recent-link ordering.
+- Automated result: 74/74 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the existing
+  Windows GPU/missing-DLL startup failure.
+- Packaged test build completed. app.asar verified edit #194, all ten digit
+  sprites and attribution, footer Settings, Escape handling, recent-link logic,
+  and absent Settings header, think bar, and Screenies banner. No release was
+  made.
+
+
+UI REFINEMENT AND MODE SWITCHING — EDIT #195
+=============================================
+
+- Softened Link title/category/recent-visit accents so cards no longer use
+  intense site colors for large text.
+- Restored a taller 180 px docked Norma area and matched the floating outline
+  to the same height.
+- Moved the visible-item sprite counter out of the footer and into each module,
+  Offline, and Monitoring header. Its sprites are large enough to read.
+- Removed Undo, Duplicates, Smart rules, and Check links from the Links header.
+  Undo stays on Ctrl+Z; the three important maintenance tools live in Settings.
+- Settings toggles no longer rebuild their DOM immediately after a click. This
+  preserves the thumb travel animation and adds a restrained press response.
+- Clicking Offline or Monitor always closes Settings first, then changes mode.
+- Regression coverage protects all behavior above.
+
+
+MEDIA FOLDERS IN SETTINGS — EDIT #196
+=====================================
+
+- Settings > Tools includes direct folder buttons for Intro videos and App
+  animations. The Browser extension folder remains separate.
+- Intro videos use the existing per-user boot folder and supported video list.
+- App animations use a per-user animations folder with exact filenames:
+  norma.gif, checking.gif, updating.gif, and complete.gif.
+- Missing defaults are copied from the packaged app. User replacements are not
+  overwritten. Animation changes apply after restarting SINRAD.
+- The main process owns these fixed folders. Renderer code cannot supply an
+  arbitrary path through this bridge.
+- Automated result: 77/77 tests passed and git diff check passed.
+- Electron UI smoke remained blocked before app assertions by the existing
+  Windows GPU/missing-DLL startup failure.
+- Packaged test build dist-verify/ui-refine-196 completed. app.asar verified
+  edit #196, mode dismissal, media folder bridge, taller Norma, larger counter,
+  soft Link text, animated switches, and all counter sprites. No release was
+  made.
+
+
+TESTING CHECKLIST
+=================
+
+Before saying a change is fixed:
+1. Run npm run check.
+2. Run npm run test:ui for UI or interaction changes.
+3. Run git diff --check.
+4. Package a test build into a new dist-verify subfolder.
+5. Verify the packaged app.asar contains the expected edit count and files.
+6. Close older SINRAD processes before opening the packaged test build.
+7. Confirm the bottom bar shows the new edit count.
+8. Test the exact user action, not only the internal function.
+
+High-risk regression checks:
+- Add in Vault, Links, and Folders.
+- Save different pages from the same website.
+- Extension Quick Save and both bulk actions.
+- Taskbar grouping after an installed update.
+- Update animations for checking, updating, and complete.
+- Ctrl+Z after deleting a link.
+- Ctrl+Shift+P from a focused input.
+- Global search must not find a password.
+- Enter and exit Offline Mode.
+- Enter and exit Monitoring Mode; Offline and Monitoring must not overlap.
+- Add the same Pawchive creator through Bakemono and confirm it is rejected.
+- Confirm a new watcher creates a quiet baseline before any alert.
+- Disconnect network after a feed sync and read cached items and images.
+
+
+BUILD AND RELEASE WORKFLOW
+==========================
+
+Fast development test:
+test-app.bat
+
+This runs development mode and uses Sinrad-Dev data.
+It may have a separate taskbar identity by design.
+
+Packaged test:
+npm run pack -- --config.directories.output=dist-verify/<feature-name>
+
+Run:
+dist-verify/<feature-name>/win-unpacked/Sinrad.exe
+
+Close every other SINRAD process first.
+
+Release:
+1. User explicitly says to release.
+2. Review changes and update this memory file.
+3. Run all checks.
+4. Commit the intended feature/fix changes.
+5. Confirm git status is clean on main.
+6. Run release.bat.
+7. Confirm the GitHub Actions build and release artifacts.
+
+
+CURRENT ROADMAP
+===============
+
+Next verification work:
+- User tests Offline Reader UI and mode switching.
+- User creates/obtains Reddit Data API client access.
+- Complete one real subreddit sync.
+- Disconnect internet and verify text, cached images, comments, search,
+  unread state, favorites, and retention.
+- User tests Monitoring Mode with a Pawchive/Bakemono creator URL.
+- User tests whether their F95zone thread permits automatic public checks.
+
+Planned source adapters:
+1. YouTube metadata, thumbnails, descriptions, and transcripts using
+   supported access methods. Video downloads are a separate decision.
+2. X/Twitter only where supported access and terms allow it.
+
+Other future work mentioned by the user:
+- Toolbox module for small portable utilities bundled with SINRAD.
+- User-added toolbox programs.
+- Future visual refreshes without losing established behavior.
+- Broader backup support for Offline Reader sources and content.
+- Persistent undo if the user wants undo across restarts.
+- Misskey-inspired visual refresh after monitoring behavior is proven;
+  preserve established workflows rather than copying branding directly.
+- F95zone reply classification for likely mod/file updates versus chatter.
+- Related themes can later branch from the approved warm archive baseline by
+  changing accent, density, navigation, or card layout without replacing the
+  interaction model. Candidate relatives: neutral Hydrus workbench, muted
+  burgundy archive, or a denser amber terminal-library variant.
+
+
+UPDATE LOG FOR THIS MEMORY
+==========================
+
+2026-08-31
+- Created the maintenance memory.
+- Documented released history through v2.0.28.
+- Documented current unreleased work through edit #181.
+- Added the first Offline Reader and Reddit adapter design record.
+- Added recurring bug causes, fixes, regression guards, and test workflow.
+- Added Monitoring Mode with Pawchive/Bakemono and F95zone watchers.
+- Verified the live Pawchive posts/profile endpoints for the supplied creator.
+- Confirmed 55/55 automated tests, the Electron UI smoke test, diff check,
+  and packaged app.asar contents.
+- Added cached creator artwork and image-first Monitoring activity cards.
+- Edit #182 added secure, cached, lazy previews to Links and Vault, local
+  image previews to Quick Folders, and favicon-only Parking Lot rows.
+- Confirmed 60/60 automated tests, diff check, packaged test creation, edit
+  marker #182, preview renderer code, and lib/site-preview.js inside app.asar.
+- On this run the hidden Electron UI smoke process could not load index.html
+  because its GPU process exited with a Windows DLL error. The packaged test
+  built correctly, but the preview layout still needs the user's visual check.
+- Edit #183 changed Links to full-cover preview cards with a readable bottom
+  information fade, following the user's visual test feedback.
+- Edit #184 shortened those cards to 178 px and recorded the Reddit preview
+  limitation so future work does not bypass denied API access with scraping.
+
+2026-09-01
+- Edit #185 added one-request Park All batches, strict Parking Lot isolation,
+  click-to-dismiss completion animation, and the gear Settings panel.
+- Confirmed 64/64 automated tests, diff check, packaged test creation, and
+  the expected files and markers inside app.asar.
+- Recorded the known Windows GPU/DLL UI-smoke runner failure and left the
+  exact Opera workflow for user verification before calling it fully fixed.
+- Edit #186 simplified Settings hierarchy, moved the borderless gear to the
+  far right, preserved Offline/Monitor placement, and kept global search usable
+  in both dedicated modes.
+- Confirmed 65/65 automated tests, diff check, packaged test creation, and
+  the expected edit/header/search markers inside app.asar. The Electron UI
+  smoke remains blocked by the known Windows GPU/DLL runner failure.
+- Edit #187 removed Search from Settings, reduced Parking to its stack list,
+  reduced Tools to the extension and hotkeys, and made all four app shortcuts
+  editable with duplicate protection and immediate runtime updates.
+- Confirmed 65/65 automated tests, diff check, packaged test creation, and the
+  expected Settings and hotkey markers inside app.asar. No release was made.
+- Recorded the user's rejection of rounded, floating, Apple/macOS-like UI.
+  Reworked the proposed overhaul into Archive, Deck, and Workbench directions
+  with sharper edges, denser content, fixed navigation, and fewer floating
+  surfaces. No SINRAD application code or release was changed for this study.
+- Edit #188 implemented the approved warm editorial archive / desktop
+  workbench system across the main shell, modules, Offline Reader, Monitoring,
+  Settings, dialogs, and update surfaces. Confirmed 65/65 tests, diff check,
+  packaged build creation, and expected markers inside app.asar. The known
+  Windows GPU/DLL fault still prevents the hidden Electron UI smoke runner from
+  loading index.html. No release was made.
+- Edit #189 removed navigation icon containers and the selected-module left
+  line, then softened category colors and active styling. Confirmed 65/65
+  tests, diff check, and the final packaged app.asar markers. No release was
+  made.
+- Edit #190 removed repeated Monitoring card actions, made the card itself open
+  and mark read, and kept Offline/Monitor labels fixed while active. Confirmed
+  66/66 tests, diff check, regression coverage, and packaged app.asar markers.
+  No release was made.
+- Edit #191 changed the watchlist into artist-profile cards, moved watcher
+  actions to right-click, moved notifications to General Settings, and replaced
+  the native open-mode dropdown with a switch. Confirmed 67/67 tests, diff
+  check, regression coverage, and packaged app.asar markers. No release was
+  made.
+
+2026-09-02
+- Edit #192 set new watchers to Daily, removed the player end to end, added
+  SESSION/TOTAL open-time tracking, compacted Monitoring cards, removed the
+  link-menu letter badge, and calmed Parking Lot controls. Confirmed 70/70
+  tests, diff check, and packaged app.asar markers. The known GPU/DLL issue
+  still blocks the hidden UI smoke runner. No release was made.
+- Edit #193 removed the Offline/Monitor underline, replaced Parking letter
+  badges with favicons and a bare globe fallback, and recorded the permanent
+  no-badge/no-boxed-icon UI rule. Confirmed 71/71 tests, diff check, and the
+  packaged app.asar markers. No release was made.
+- Edit #194 moved the Settings gear to the footer and made it a toggle, removed
+  the Settings header/X, added animated softer switches, compacted Norma's
+  floating placeholder, removed horizontal/decorative bars and the Screenies
+  banner, added the attributed local Danbooru visible-item counter, and surfaced
+  recently visited Links first with a plain label. Confirmed 74/74 tests, diff
+  check, and packaged app.asar markers. The known GPU/DLL issue still blocks
+  the hidden UI smoke runner. No release was made.
+- Edit #195 softened Links, made Norma tall again, enlarged and relocated the
+  item counter, moved maintenance actions into Settings, preserved switch
+  animation DOM, and made Offline/Monitor dismiss Settings before switching.
+- Edit #196 added functional Intro videos and App animations folder controls to
+  Settings. Confirmed 77/77 tests, diff check, and packaged app.asar markers.
+  The known GPU/DLL issue still blocks the hidden UI smoke runner. No release
+  was made.
+- Edit #197 added browser-native MHTML page capture to the included extension
+  and stores snapshots under private hash-only Offline Reader references. The
+  authenticated bridge accepts ordered binary chunks with a 256 MB cap. The
+  saved-page viewer disables JavaScript, blocks network requests, denies
+  navigation, and removes capture files when their Offline items are pruned.
+- Edit #197 also added an internal Pawchive post reader with full safe plain
+  text, Pawchive-only image/video/audio streaming, and individual or batch file
+  downloads. Stored monitor context and strict hashed file paths are validated
+  again in the main process. F95 activity remains external because of its
+  sign-in and anti-bot behavior.
+- This first capture version uses Chromium `pageCapture` and does not copy or
+  require WebScrapBook. It gives SINRAD a self-contained MHTML workflow now;
+  extreme shadow-DOM pages may need a specialized capture engine later without
+  changing the Offline storage model.
+- Keep Monitoring cards themselves as the open action. Necessary download
+  controls belong only inside the post reader, not repeated on every card.
+- Confirmed 82/82 automated tests, diff check, and packaged build
+  `dist-verify/offline-monitor-197`; app.asar and the unpacked extension contain
+  the expected #197 reader, capture, download, protocol, and extension 1.2.0
+  markers. The known Windows GPU/DLL fault still blocks the hidden UI smoke
+  runner from loading index.html. No release was made.
+- Edit #198 fixed Pawchive reader images that appeared broken or indefinitely
+  loading. The reported post contained five 12–18 MB PNG originals, so loading
+  every original at once was the cause. The reader now fetches Pawchive's
+  allowlisted 20–40 KB thumbnails in the main process, validates them, passes
+  them as local data previews, and keeps a bounded in-memory preview cache.
+- Edit #198 removed all visible reader action buttons and flattened the post
+  and media gallery: no outer post panel, nested file cards, or repeated media
+  borders. Right-clicking a media item offers its download action; right-click
+  on the post background keeps Open original and Download all available.
+  Escape returns from the reader to Monitoring Activity.
+- Confirmed 83/83 automated tests, diff check, the full Electron UI smoke test
+  including the new reader interactions, and packaged build
+  `dist-verify/monitor-reader-198`. app.asar contains the expected #198 preview,
+  context-menu, Escape, and flat-layout markers. No release was made.
+- Edit #199 makes the startup intro skip immediately on a guarded click; the
+  existing completion overlay remains click-to-dismiss.
+- Monitor now returns from a Pawchive post to the full Monitoring Activity feed
+  before it exits Monitoring Mode. Pending post requests are invalidated so a
+  reader cannot reopen after Escape, Monitor, or another mode closes it.
+- Pawchive attachments use a three-column grid that fills left to right and
+  then wraps downward. They keep uniform previews without nested borders.
+- Edit #200 retired the visible Console UI while its replacement is undecided.
+  The dock is intentionally blank except for a quiet Work in progress marker;
+  old log text, search, input, Clear, and Auto Scroll controls are not rendered.
+- Edit #200 also gave every app context menu a shared desktop-style treatment:
+  calm outline icons, plain state labels, soft grouped separators, restrained
+  warm hover motion, and one rounded outer surface without boxed icon badges.
+- Confirmed 87/87 automated tests, diff check, the full Electron UI smoke test,
+  and packaged build `dist-verify/click-monitor-ui-200`. Packaged app.asar has
+  the expected #200 intro click, Monitor return, media-row, console placeholder,
+  and context-menu markers. No release was made.
+- Edit #201 fixed generic or apparently empty browser saves in Offline Reader.
+  The included extension now extracts the visible Reddit post metadata before
+  capturing MHTML; the authenticated desktop bridge sanitizes it, downloads one
+  allowlisted Reddit preview locally, and stores both with the Offline item.
+  Re-saving the same URL updates one card without losing Read/Favorite state and
+  cleans up the superseded capture and preview.
+- Confirmed 88/88 automated tests, diff check, the full Electron UI smoke test
+  with a captured Reddit-style card and reader, and packaged build
+  `dist-verify/offline-capture-metadata-201`. Packaged app.asar and extension
+  contain the expected #201 metadata pipeline and extension 1.2.1 markers. No
+  release was made.
+- Edit #202 expanded browser saves to 20 ordered Reddit gallery images and 80
+  currently loaded comments. The Offline detail view now has a large carousel,
+  score/comment counts, and flat indented comment threads. Pawchive media fills
+  left to right before wrapping downward. Link and Norma right-click menus are
+  smaller and tighter, with the category-leading colored dots removed.
+- Confirmed 88/88 automated tests, diff check, the full Electron UI smoke test
+  including three-image gallery navigation and nested comments, and packaged
+  build `dist-verify/offline-reddit-menu-202`. Packaged app.asar and bundled
+  extension contain the expected #202 reader, 20-image/80-comment, compact-menu,
+  Pawchive grid, extension 1.2.2, and smaller Norma markers. No release was made.
+- Edit #203 superseded the #202 Pawchive three-column grid after user testing.
+  Reader attachments now use one 920 px-wide item per row, stack vertically,
+  and preserve each image's natural height instead of forcing a 4:3 frame.
+  Confirmed 88/88 automated tests, diff check, the full Electron UI smoke test,
+  and packaged build `dist-verify/pawchive-large-stack-203`; app.asar contains
+  the expected #203 single-column and natural-height markers. No release was
+  made.
+- Edit #204 added locally cached Reddit MP4/WebM playback through a private
+  range-capable media protocol. The extension prefers Reddit's playable 720p
+  packaged MP4 instead of mistaking its poster for the post media. Approved
+  video files are limited to 96 MB and remain usable offline.
+- Reddit author flair is now stored separately and shown beside the author;
+  empty video posts no longer use the page description/flair as body text.
+  Saved rich text uses sanitized structured blocks for headings, bold/italic,
+  lists, quotes, and code. The reader media has one clean outer border.
+- Confirmed the reported post exposed a valid 1.8 MB 720p Reddit MP4. Confirmed
+  89/89 automated tests, diff check, the full Electron UI smoke test, and
+  packaged build `dist-verify/offline-video-richtext-204`. Packaged app.asar
+  and extension contain the expected #204 video, flair, rich-text, border,
+  extension 1.2.3, and local media protocol markers. No release was made.
+- Edit #205 separated subreddit post flair from author flair and body text.
+  A strict Reddit body selector prevents labels such as `Datamined` from being
+  saved as the post body. The reader now shows post flair near the title while
+  author flair remains beside the username.
+- Browser saves now copy approved Reddit author/comment avatars and up to four
+  inline media items per loaded comment, with a 40-comment-media total cap.
+  Images, GIFs, and direct MP4/WebM clips are stored locally, rendered inline,
+  deduplicated by URL during capture, and cleaned up with their saved post.
+- Confirmed 89/89 automated tests, diff check, the full Electron UI smoke test,
+  and packaged build `dist-verify/offline-comment-media-205`. Packaged app.asar
+  and extension contain the expected #205 post-flair, avatar, comment-media,
+  cleanup, strict-body, extension 1.2.4, and allowlist markers. No release was
+  made.
+- Edit #206 adds a compact `Back` context-menu action when right-clicking empty
+  space in an open Offline Reader post. Interactive controls, links, images,
+  videos, and audio are excluded so their existing right-click behavior is not
+  intercepted. Confirmed 89/89 automated tests, diff check, the full Electron
+  UI smoke test including menu navigation back to the feed, and packaged build
+  `dist-verify/offline-rightclick-back-206`. Packaged app.asar contains the
+  expected #206 scoped context-menu markers. No release was made.
+- Edit #207 changes Monitor video and audio attachments from metadata-only
+  loading to automatic preload so Pawchive playback can buffer ahead before the
+  user presses Play. This reduces startup pauses but cannot remove delays caused
+  by the remote host or connection.
+- Production inspection showed the reported missing Reddit comment image/GIF
+  came from the older 2026-09-02 20:58 capture: it has no post flair, avatar,
+  or comment-media references. The stable extension folder is already 1.2.4;
+  the browser extension must be reloaded and that page saved again to apply
+  edit #205 capture fields.
+- Confirmed 89/89 automated tests, diff check, the full Electron UI smoke test
+  with an auto-preloading Monitor video, and packaged build
+  `dist-verify/monitor-preload-207`. Packaged app.asar contains the expected
+  #207 preload markers. No release was made.
+- Edit #208 restyled Norma's floating popup to the warm compact UI and removed
+  Vault, Links, Folders, and Screenies. Dock, recent folders, and Arm remain.
+  The in-app Norma fallback menu now exposes only Dock.
+- Edit #209 gives packaged installs a dedicated `Documents/Sinrad Offline`
+  library. Settings shows the active path and can open or change it. Switching
+  folders copies the existing library without deleting the old copy. New media
+  and page captures are grouped into per-post folders while legacy flat files
+  remain readable.
+- Reddit comment capture now preserves safe paragraph, quote, list, emphasis,
+  heading, and code blocks. The offline reader renders quote bars and spacing
+  instead of flattening everything into plain text. Bundled extension version
+  is 1.2.5; browsers must reload the unpacked extension before re-saving a post.
+- Confirmed 91/91 automated tests, diff check, the full Electron UI smoke test,
+  and packaged build `dist-verify/offline-storage-209-final`. Packaged app.asar
+  contains the expected #209 storage, comment-formatting, and Norma markers.
+  No release was made.
+- Edit #210 moves the Offline post actions and Settings maintenance/folder
+  actions into compact right-click menus. Those menus include Back. Visible Back
+  navigation now exists in Settings, Offline Feed, Offline posts, Monitoring,
+  and opened Monitoring posts. Monitoring file/post context menus also include
+  Back.
+- Settings rows and hotkey boxes are shorter and tighter. The Offline folder
+  chooser keeps Settings open on cancel and refreshes the path after success.
+  Library migration now copies asynchronously, avoiding the main-window freeze
+  caused by a large synchronous folder copy.
+- Confirmed 92/92 automated tests, the full Electron UI smoke test including
+  context Back actions, compact Settings, and safe folder-picker cancellation,
+  and packaged build `dist-verify/context-navigation-210`. Packaged app.asar
+  contains the expected #210 navigation, menu, compact Settings, and async
+  folder-migration markers. No release was made.
+- Edit #211 moves the Settings gear from the footer back to the far-right side
+  of the title bar, beside the window controls. Its toggle, Escape, outside-click,
+  and Settings Back behavior are unchanged. Confirmed 92/92 automated tests,
+  the full Electron UI smoke test, and packaged build
+  `dist-verify/top-settings-211`. Packaged app.asar contains one Settings gear
+  in the title bar and the #211 marker. No release was made.
+- Edit #212 adds `Edit check time` to every Watchlist card's right-click menu.
+  Pawchive artist cards now open an internal, paginated library containing all
+  works returned by the source; posts open in the existing reader and Back
+  returns to the artist before returning to Watchlist.
+- The artist page right-click menu can download every source-exposed file.
+  Downloads include ZIP and other attachment types, remain unextracted, and are
+  organized as artist/post/file folders under a user-selected destination.
+  The operation never attempts to bypass unavailable or paywalled content.
+- Confirmed Pawchive's live creator API pages in 50-post offset batches.
+  Confirmed 93/93 automated tests, the full Electron UI smoke test, and packaged
+  build `dist-verify/watchlist-artist-212-final`. Packaged app.asar contains the #212
+  artist library, interval editor, paging, download, and protocol markers. No
+  release was made.
+- Edit #213 adds inclusive From/To date controls to Pawchive artist pages and
+  downloads every source-exposed attachment or ZIP from matching works. Full
+  downloads are organized as artist/date-title-post/file and keep archives
+  unextracted.
+- Monitoring downloads now default to Electron's Windows Downloads folder.
+  Settings shows that output path and can open or change it; a changed path is
+  saved for future downloads and canceling the picker leaves the app and path
+  unchanged.
+- Confirmed 95/95 automated tests, diff check, the full Electron UI smoke test
+  including date-range downloads and safe output-folder cancellation, and
+  packaged build `dist-verify/monitor-date-output-213-final`. Packaged app.asar
+  contains the expected #213 date filter, Downloads default, output setting,
+  and organized artist-path markers. No release was made.
+
+2026-09-03
+- Edit #214 completed a navigation and workspace audit before the planned Ideas
+  work. The retired Console placeholder no longer consumes the right side of
+  normal pages, so the active library fills the available window.
+- Sidebar entries are semantic keyboard-accessible buttons. The title-bar
+  command control now uses a neutral list icon, and its palette groups commands
+  into Navigate, Create, and Actions so it remains usable as SINRAD grows.
+- Screenies pagination moved beside the page count at the top. Changing pages
+  returns the content area to the top instead of leaving the user at the end of
+  the previous page.
+- Confirmed 96/96 automated tests, diff check, the full Electron UI smoke test,
+  and packaged build `dist-verify/navigation-cleanup-214`. Packaged app.asar
+  contains the expected #214 navigation, full-width workspace, and grouped
+  command markers. No release was made.

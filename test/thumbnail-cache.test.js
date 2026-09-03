@@ -32,3 +32,15 @@ test("thumbnail cache pruning keeps the newest files within limits", async funct
   assert.equal(remaining.length, 2);
   assert.equal(fs.existsSync(path.join(root, "unrelated.txt")), true);
 });
+
+test("thumbnail cache pruning removes stale files even below size limits", async function (t) {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), "sinrad-thumbs-age-"));
+  t.after(function () { fs.rmSync(root, { recursive: true, force: true }); });
+  const stale=path.join(root,"b".repeat(64)+".jpg"),fresh=path.join(root,"c".repeat(64)+".jpg");
+  fs.writeFileSync(stale,"old");fs.writeFileSync(fresh,"new");
+  const old=new Date(Date.now()-10*24*60*60*1000);fs.utimesSync(stale,old,old);
+  const result=await pruneThumbnailCache(root,{maxFiles:50,maxBytes:1024,maxAgeMs:24*60*60*1000});
+  assert.equal(result.removed,1);
+  assert.equal(fs.existsSync(stale),false);
+  assert.equal(fs.existsSync(fresh),true);
+});

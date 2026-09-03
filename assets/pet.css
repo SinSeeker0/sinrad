@@ -1,13 +1,13 @@
 html,body{margin:0;height:100%;background:transparent;overflow:hidden;
     font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;-webkit-user-select:none;user-select:none;}
   #stage{position:relative;width:100%;height:100%}
-  #menu{position:absolute;right:10px;bottom:10px;top:auto;transform:none;width:176px;left:auto;background:#15151d;border:1px solid #272733;border-radius:6px;
-    padding:6px;box-shadow:none;display:none;z-index:10}
-  #menu.show{display:block}
-  #menu .mi{padding:8px 10px;border-radius:4px;font-size:12.5px;font-weight:600;color:#cfd3dc;display:flex;gap:9px;align-items:center;cursor:pointer}
-  #menu .mi:hover{background:#1e1e27;color:#fff}
-  #menu .mi[data-nav="vault"]{padding-right:10px}
-  #menu .dv{height:1px;background:#1a1a23;margin:5px 4px}
+  #menu{position:absolute;right:10px;bottom:10px;top:auto;transform:none;width:160px;left:auto;background:linear-gradient(155deg,rgba(31,29,25,.98),rgba(21,20,17,.98));border:1px solid #4a453b;border-radius:9px;
+    padding:5px;box-shadow:0 18px 48px rgba(0,0,0,.66),inset 0 1px rgba(255,255,255,.035);display:none;z-index:10;backdrop-filter:blur(18px)}
+  #menu.show{display:block;animation:menuIn .14s cubic-bezier(.2,.85,.3,1.08)}
+  @keyframes menuIn{from{opacity:0;transform:translateY(3px) scale(.985)}to{opacity:1;transform:none}}
+  #menu .mi{min-height:27px;padding:3px 7px;border-radius:5px;font-size:10.5px;font-weight:600;color:#c4bdb2;display:flex;gap:7px;align-items:center;cursor:pointer;transition:background .13s ease,color .13s ease,transform .13s ease}
+  #menu .mi:hover{background:linear-gradient(90deg,rgba(242,170,0,.115),rgba(242,170,0,.035));color:#f5f0e8;transform:translateX(2px)}
+  #menu .dv{height:1px;background:#3a362f;margin:4px 6px}
   /* NO box / outline — just the gif; size is set to the image aspect at runtime */
   #pet{position:absolute;left:10px;bottom:10px;top:auto;transform:none;width:120px;height:120px;
     background:transparent;display:grid;place-items:center;cursor:grab;z-index:1;border:none;border-radius:0;overflow:visible;box-shadow:none}
@@ -15,41 +15,29 @@ html,body{margin:0;height:100%;background:transparent;overflow:hidden;
   #pet img{width:100%;height:100%;object-fit:fill;display:block;pointer-events:none;-webkit-user-drag:none}
   #pet .emo{font-size:62px;line-height:1}
 
-  #menu .mi svg{width:15px;height:15px;flex:0 0 auto}
+  #menu .mi svg{width:14px;height:14px;flex:0 0 auto;color:#9f927b}
   #slogan{
-    padding:7px 8px;
-    font-size:8.5px;
+    padding:5px 6px;
+    font-size:7.5px;
     letter-spacing:.65px;
     font-weight:800;
     text-transform:uppercase;
     line-height:1.35;
-    background-image:linear-gradient(90deg,#ff4d8d,#ffb020,#fff6a8,#33d17a,#27b4ff,#b14bff,#ff4d8d);
-    background-size:200% 100%;
-    background-repeat:repeat;
-    -webkit-background-clip:text;
-    background-clip:text;
-    color:transparent;
-    -webkit-text-fill-color:transparent;
-    animation:sloganShift 5.5s linear infinite;
-    filter:drop-shadow(0 0 6px rgba(255,77,141,.35));
+    color:#d6ad54;
   }
-  @keyframes sloganShift{
-    from{background-position:0% 50%}
-    to{background-position:200% 50%}
-  }
-  #menu .mi[data-pin]{color:#ff79c6}
-  #menu .mi[data-pin]:hover{background:rgba(255,77,141,.12);color:#ff9ad4}
+  #menu .mi[data-pin]{color:#e4ddd2}
+  #menu .mi[data-pin]:hover{color:#f5f0e8}
 
-  .rf-head{padding:6px 10px 2px;font-size:9px;letter-spacing:.7px;font-weight:700;color:#ff79c6;text-transform:uppercase}
-  .rf-list{display:flex;flex-direction:column;gap:1px;padding:0 4px 4px}
-  .rf-empty{padding:4px 8px 6px;font-size:11px;color:#5c6070}
-  .rf-item{display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:4px;font-size:12px;font-weight:600;color:#cfd3dc;cursor:pointer;min-width:0}
-  .rf-item:hover{background:#1e1e27;color:#fff}
+  .rf-head{padding:5px 7px 2px;font-size:7.5px;letter-spacing:.7px;font-weight:700;color:#a98b48;text-transform:uppercase}
+  .rf-list{display:flex;flex-direction:column;gap:0;padding:0 3px 3px}
+  .rf-empty{padding:3px 6px 5px;font-size:10px;color:#746d62}
+  .rf-item{display:flex;align-items:center;gap:5px;padding:4px 5px;border-radius:5px;font-size:10.5px;font-weight:600;color:#c4bdb2;cursor:pointer;min-width:0;transition:background .13s ease,color .13s ease,transform .13s ease}
+  .rf-item:hover{background:linear-gradient(90deg,rgba(242,170,0,.115),rgba(242,170,0,.035));color:#f5f0e8;transform:translateX(2px)}
   .rf-item .rf-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .rf-pin{flex:0 0 auto;display:inline-flex;color:#ff79c6}
+  .rf-pin{flex:0 0 auto;display:inline-flex;color:#d6ad54}
   .rf-pin svg{width:12px;height:12px}
-  .kill-wrap{padding:4px 0 0;margin:2px -6px -6px}
-  .pet-kill{width:100%;height:26px;border:1px solid #ff5470;border-left:none;border-right:none;border-bottom:none;border-radius:0 0 5px 5px;background:#1a0c10;color:#ff5470;font-size:11px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px}
+  .kill-wrap{padding:3px 0 0;margin:2px -4px -4px}
+  .pet-kill{width:100%;height:25px;border:1px solid #68404a;border-left:none;border-right:none;border-bottom:none;border-radius:0 0 7px 7px;background:#211215;color:#d76b7c;font-size:9.5px;font-weight:800;letter-spacing:.4px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px}
   .pet-kill svg{width:13px;height:13px;flex:0 0 auto}
   .pet-kill:hover{background:rgba(255,84,112,.16);color:#ff8a9c}
   .pet-kill.armed{background:#ff5470;color:#fff;animation:killPulse 1.6s ease-in-out infinite}

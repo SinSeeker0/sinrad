@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const { savedUrlIdentity, normalizeVaultDraft, automaticLinkCategory, automaticLinkCategories, primarySelection, globalSearch } = require("../assets/shared.js");
+const { savedUrlIdentity, normalizeVaultDraft, automaticLinkCategory, automaticLinkCategories, smartLinkCategories, exactDuplicateGroups, mergeExactDuplicates, primarySelection, removeLinkCategory, isParkedLink, buildGlobalSearchIndex, searchGlobalIndex, globalSearch } = require("../assets/shared.js");
 
 test("different paths on the same site are not duplicates", function () {
   const listing = "https://example.test/?tags=popular&tab=explore";
@@ -36,10 +36,38 @@ test("YouTube links automatically use the YouTube category", function () {
   assert.deepEqual(automaticLinkCategories("https://youtube.com/watch?v=abc","Guides"),{main:"YouTube",all:["YouTube","Guides"]});
 });
 
+test("smart category rules preserve YouTube as the primary category", function () {
+  const rules=[{pattern:"docs.example.com",category:"Guides"},{pattern:"youtube.com",category:"Interesting"}];
+  assert.deepEqual(smartLinkCategories("https://docs.example.com/start","",rules),{main:"Guides",all:["Guides"]});
+  assert.deepEqual(smartLinkCategories("https://youtube.com/watch?v=1","Check out",rules),{main:"YouTube",all:["YouTube","Interesting","Check out"]});
+});
+
+test("duplicate review only merges exact URLs and preserves useful metadata", function () {
+  const links=[
+    {id:"new",url:"https://example.com/page?a=1",category:"Guides",categories:["Guides"],favorite:false,note:"",opens:2},
+    {id:"old",url:"https://example.com/page?a=1",category:"Interesting",categories:["Interesting"],favorite:true,note:"keep me",opens:3},
+    {id:"different",url:"https://example.com/page?a=2",category:"",categories:[]}
+  ];
+  assert.equal(exactDuplicateGroups(links).length,1);
+  const result=mergeExactDuplicates(links);
+  assert.equal(result.removed,1);assert.equal(result.links.length,2);
+  assert.deepEqual(result.links[0].categories,["Guides","Interesting"]);
+  assert.equal(result.links[0].favorite,true);assert.equal(result.links[0].note,"keep me");assert.equal(result.links[0].opens,5);
+});
+
 test("folder Add safely chooses the first selected category", function () {
   assert.equal(primarySelection(["Mods","Games"]),"Mods");
   assert.equal(primarySelection([]),"");
   assert.equal(primarySelection(null),"");
+});
+
+test("deleting a category removes it from primary and secondary link tags", function () {
+  const primary={category:"Guides",categories:["Guides","Interesting"]};
+  const secondary={category:"YouTube",categories:["YouTube","Guides"]};
+  removeLinkCategory(primary,"Guides");
+  removeLinkCategory(secondary,"Guides");
+  assert.deepEqual(primary,{category:"Interesting",categories:["Interesting"]});
+  assert.deepEqual(secondary,{category:"YouTube",categories:["YouTube"]});
 });
 
 test("global search spans modules without exposing or searching vault passwords", function () {
@@ -53,4 +81,17 @@ test("global search spans modules without exposing or searching vault passwords"
   const results=globalSearch(state,"animation");
   assert.deepEqual(results.map(function(item){return item.view;}).sort(),["folders","links","lot","shots"]);
   assert.equal(results.some(function(item){return Object.prototype.hasOwnProperty.call(item,"password");}),false);
+  assert.deepEqual(searchGlobalIndex(buildGlobalSearchIndex(state),"animation"),results);
+});
+
+test("parked links stay in Parking Lot even when automatically categorized", function () {
+  const parked={id:"youtube-parked",title:"Saved for later",url:"https://youtube.com/watch?v=1",src:"park",category:"YouTube",categories:["YouTube"],inLinks:false};
+  assert.equal(isParkedLink(parked),true);
+  const result=globalSearch({links:[parked]},"saved for later");
+  assert.equal(result.length,1);
+  assert.equal(result[0].kind,"Parking Lot");
+  assert.equal(result[0].view,"lot");
+  parked.inLinks=true;
+  assert.equal(isParkedLink(parked),false);
+  assert.equal(globalSearch({links:[parked]},"saved for later")[0].view,"links");
 });

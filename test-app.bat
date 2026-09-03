@@ -10,7 +10,7 @@ if errorlevel 1 (
 )
 
 echo Starting S.I.R in test mode...
-call npm start
+call npm run dev
 
 if errorlevel 1 (
   echo.

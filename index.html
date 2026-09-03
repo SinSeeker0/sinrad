@@ -4,7 +4,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>S.I.R</title>
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file:; media-src 'self' blob: file:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; worker-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: file: sinrad-monitor: sinrad-offline:; media-src 'self' blob: file: sinrad-monitor: sinrad-offline:; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'">
 <link rel="stylesheet" href="assets/index.css">
 </head>
 <body>
@@ -17,7 +17,11 @@
         <kbd>Ctrl Shift F</kbd>
         <div class="global-results" id="globalSearchResults" role="listbox"></div>
       </div>
+      <button type="button" class="offline-toggle" id="offlineToggle" data-action="offline-mode" title="Switch to the Offline Reader"><span class="offline-toggle-dot"></span><b>Offline</b></button>
+      <button type="button" class="monitoring-toggle" id="monitoringToggle" data-action="monitoring-mode" title="Switch to Monitoring Mode"><span class="monitoring-toggle-dot"></span><b>Monitor</b></button>
+      <button type="button" class="cmd-open" data-action="command-open" title="Navigate and commands · Ctrl+Shift+P" aria-label="Open navigation and commands"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 6h16M4 12h16M4 18h16"/></svg></button>
       <div class="spacer"></div>
+      <button type="button" class="settings-open" id="settingsToggle" data-action="settings-open" title="Settings" aria-label="Open settings" aria-expanded="false"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 0 0 .3 1.9l.1.1-2.8 2.8-.1-.1a1.7 1.7 0 0 0-1.9-.3 1.7 1.7 0 0 0-1 1.6v.2h-4V21a1.7 1.7 0 0 0-1-1.6 1.7 1.7 0 0 0-1.9.3l-.1.1L4.2 17l.1-.1a1.7 1.7 0 0 0 .3-1.9A1.7 1.7 0 0 0 3 14H2.8v-4H3a1.7 1.7 0 0 0 1.6-1 1.7 1.7 0 0 0-.3-1.9L4.2 7 7 4.2l.1.1A1.7 1.7 0 0 0 9 4.6a1.7 1.7 0 0 0 1-1.6v-.2h4V3a1.7 1.7 0 0 0 1 1.6 1.7 1.7 0 0 0 1.9-.3l.1-.1L19.8 7l-.1.1a1.7 1.7 0 0 0-.3 1.9 1.7 1.7 0 0 0 1.6 1h.2v4H21a1.7 1.7 0 0 0-1.6 1z"/></svg></button>
       <div class="winctl">
         <button data-action="win-min" title="Minimize"><svg viewBox="0 0 12 12"><line x1="2" y1="6" x2="10" y2="6" stroke="currentColor" stroke-width="1.6"/></svg></button>
         <button data-action="win-max" title="Maximize"><svg viewBox="0 0 12 12"><rect x="2.4" y="2.4" width="7.2" height="7.2" fill="none" stroke="currentColor" stroke-width="1.4"/></svg></button>
@@ -27,7 +31,7 @@
     <div class="body">
       <div class="panel panel-main">
       <aside class="sidebar">
-        <div class="side-label">MODULES</div>
+        <div class="side-label">LIBRARY</div>
         <nav class="nav" id="nav"></nav>
         <div class="norma" id="norma">
           <div class="norma-head">
@@ -37,19 +41,18 @@
             <span class="norma-think"><i></i><i></i><i></i></span>
             <button class="norma-min" data-action="norma-min" title="Send floating">–</button>
           </div>
-          <div class="norma-float-msg" style="display:none;align-items:center;justify-content:center;gap:8px;padding:8px;color:var(--pink);font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg> Norma is floating — right-click to dock <span class="norma-clock" id="normaFloatClock"></span></div><div class="norma-hint">Minimize (–) to send her floating on your desktop.<br>Right-click her (or the floating pet) for quick access · Pin to dock.</div>
-          <div class="norma-music"><div class="nm-trackrow"><div class="nm-disc" id="nm-disc"></div><div class="nm-track" id="nm-track">No tracks</div><button class="nm-btn nm-folder" data-action="music-open-folder" title="Open music folder"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" width="13" height="13"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg></button></div><div class="nm-controls"><button class="nm-btn" data-action="music-prev" title="Previous"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M6 6h2v12H6zM20 6v12l-9-6z"/></svg></button><button class="nm-btn nm-play" data-action="music-toggle" title="Play / Pause" id="nm-play"></button><button class="nm-btn" data-action="music-next" title="Next"><svg viewBox="0 0 24 24" fill="currentColor" width="14" height="14"><path d="M16 6h2v12h-2zM4 6l9 6-9 6z"/></svg></button></div></div>
+          <div class="norma-stage" aria-hidden="true"><img class="norma-dock-gif" src="norma.gif" alt="" draggable="false"></div>
+          <div class="norma-float-msg" style="display:none;align-items:center;justify-content:center;gap:8px;padding:8px;color:var(--pink);font-size:11px;font-weight:600"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 17v5"/><path d="M9 3h6l-1 6 3 3H7l3-3z"/></svg>Norma floating<span class="norma-clock" id="normaFloatClock"></span></div><div class="norma-hint">Minimize (–) to send her floating on your desktop.<br>Right-click her (or the floating pet) for quick access · Pin to dock.</div>
         </div>
       </aside>
       <main class="content" id="content"></main>
       </div>
-      <aside class="console-dock" id="consoleDock"></aside>
     </div>
     <div class="statusbar">
       <span class="dot"></span><span class="ready">READY</span>
       <span class="sep">|</span><span id="appver">v1.0.0</span>
       <span class="sep">|</span><span id="appedits" class="edits">#0 edits</span>
-      <div class="thinkbar" id="thinkbar" title="processing"><div class="tb-wave" id="tbWave"></div></div>
+      <span class="status-spacer"></span>
       <button class="upd-pill" data-action="update-check" title="Check for updates"><span class="upd-ico" aria-hidden="true"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 2v6h-6"/><path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M3 22v-6h6"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/></svg></span> Check Update</button>
       <button class="gh-btn" data-action="open-github" title="Open GitHub repository"><svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg></button>
       <span class="upd-sep"></span>
@@ -63,9 +66,9 @@
           <button data-action="backup-import"><span class="store-action-icon">↑</span><span><b>Restore backup</b><small>Import a .sirbackup file</small></span></button>
         </div>
       </div>
-      <span id="uptime" title="Time S.I.R has been open">UP 00:00:00</span>
+      <span id="uptime" title="Time SINRAD has been open this session">SESSION 00:00:00</span>
       <span class="sep">|</span>
-      <span id="clock">--:--:--</span>
+      <span id="clock" title="Total time SINRAD has been open">TOTAL 00:00:00</span>
       <button type="button" class="kill-btn" id="killBtn" data-action="kill-toggle" title="Sleep timer — shut down this PC in 30 minutes"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v10"/><path d="M6.3 6.3a8 8 0 1 0 11.4 0"/></svg><span class="kill-min"></span></button>
       
     </div>
@@ -74,7 +77,7 @@
   <div id="norma-bubble" title="Norma (preview) — click/right-click for menu"><span class="norma-clock" id="nbKillClock"></span><img id="normaGif" src="" alt="Norma" draggable="false" /></div>
   <div id="ctxmenu"></div>
 
-  <div id="celebrate">
+  <div id="celebrate" title="Click to close" role="button" aria-label="Completion animation. Click to close.">
     <div class="cel-stage">
       <div class="cel-word" data-text="Complete">Complete</div>
       <div class="cel-card"><img id="celImg" src="" alt="mission complete" /></div>
@@ -114,6 +117,18 @@
         <div class="um-foot"><button class="btn ghost" id="um-later" data-action="update-later">Later</button><button class="btn primary" id="um-go" data-action="update-go"><span>Update now</span><b>→</b></button></div>
       </div>
     </div>
+  </div>
+  <div class="command-palette" id="commandPalette" aria-hidden="true">
+    <div class="cp-box" role="dialog" aria-label="Command palette">
+      <div class="cp-search"><span>›</span><input id="commandInput" placeholder="Find a page or command…" autocomplete="off" spellcheck="false" aria-label="Find a page or command"><kbd>Esc</kbd></div>
+      <div class="cp-list" id="commandList"></div>
+    </div>
+  </div>
+  <div class="settings-panel" id="settingsPanel" aria-hidden="true">
+    <section class="settings-card" role="dialog" aria-modal="true" aria-label="Settings">
+      <nav class="settings-tabs" id="settingsTabs"></nav>
+      <div class="settings-body" id="settingsBody"></div>
+    </section>
   </div>
   <div id="toasts"></div>
 

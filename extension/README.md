@@ -23,10 +23,11 @@ One-click save any web page or link to S.I.R through an authenticated local conn
 - **Click the toolbar icon** → saves current page to Links [Check out]
 - **Right-click a page, link, or selected URL** → open the S.I.R menu
 - **S.I.R Quick Save → Links** → saves the current page, link, or selected URL
+- **Save page for offline use** → captures the rendered page as one MHTML file and keeps formatted post text, separate author/post flair, Reddit galleries or video, plus locally saved avatars and currently loaded comment images/GIFs
 - **Bulk commands in the same menu** → save all tabs to Parking Lot, optionally closing saved tabs
 - **Park all tabs** → waits for acknowledgements; the close option leaves failed tabs open
 
 ## Requirements
 
 - The S.I.R desktop app must be running (it hosts an extension-only localhost bridge)
-- That's it. No account, no internet, no config.
+- That's it. No second archiving extension, account, or config.
