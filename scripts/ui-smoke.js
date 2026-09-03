@@ -129,9 +129,15 @@ async function run(){
     const monitoringIntervalEdited=!!document.querySelector('.mon-watch-meta')&&document.querySelector('.mon-watch-meta').textContent.includes('Every 1h');
     click('[data-action="monitoring-monitor-open"]');await pause(80);
     const monitoringArtist=!!document.querySelector('.mon-artist')&&!!document.querySelector('.mon-artist-grid .mon-artist-post')&&document.querySelector('.mon-artist').textContent.includes('Smoke Creator');
-    const monitoringDateRange=!!document.querySelector('#mon_range_from[type="range"]')&&!!document.querySelector('#mon_range_to[type="range"]')&&!document.querySelector('.mon-artist-range input[type="date"],#mon_range_year')&&!!document.querySelector('[data-action="monitoring-artist-download-range"]');
-    click('[data-action="monitoring-artist-range-year"]');await pause(25);
-    const monitoringDateFilter=document.querySelectorAll('.mon-artist-post').length===1&&document.querySelector('.mon-range-years .active')&&document.querySelector('.mon-range-title').textContent.includes('1 of 2 shown');
+    const monitoringDateRange=document.querySelectorAll('[data-action="monitoring-artist-date-open"]').length===2&&!document.querySelector('.mon-artist-range input, .mon-artist-range select')&&!!document.querySelector('[data-action="monitoring-artist-download-range"]');
+    click('[data-action="monitoring-artist-date-open"][data-side="from"]');await pause(20);
+    const pickerYears=document.querySelectorAll('[data-action="monitoring-artist-date-year"]'),pickerYearOnlyPosts=pickerYears.length===2;
+    click('[data-action="monitoring-artist-date-year"]');await pause(20);
+    const pickerMonthOnlyPosts=document.querySelectorAll('[data-action="monitoring-artist-date-month"]').length===1;
+    click('[data-action="monitoring-artist-date-month"]');await pause(20);
+    const pickerDateOnlyPosts=document.querySelectorAll('[data-action="monitoring-artist-date-pick"]').length===1;
+    click('[data-action="monitoring-artist-date-pick"]');await pause(25);
+    const monitoringDateFilter=document.querySelectorAll('.mon-artist-post').length===1&&document.querySelector('.mon-range-title').textContent.includes('1 of 2 shown')&&pickerYearOnlyPosts&&pickerMonthOnlyPosts&&pickerDateOnlyPosts;
     click('[data-action="monitoring-artist-range-reset"]');await pause(25);
     click('[data-action="monitoring-artist-download-range"]');await pause(20);click('#modal-confirm');await pause(50);
     const monitoringRangeDownload=Array.from(document.querySelectorAll('.toast')).some(el=>el.textContent.includes('Downloaded 1 files from 1 works'));

@@ -398,10 +398,11 @@ test("watchlist uses artist profiles and keeps controls out of every card", func
   assert.match(renderer,/type==="monitor"[\s\S]*monitoring-monitor-interval/);
   assert.match(renderer,/function viewMonitoringArtist[\s\S]*class="mon-artist-grid"/);
   assert.match(renderer,/type==="monitor-artist"[\s\S]*Download everything/);
-  assert.match(renderer,/id="mon_range_from" type="range"[\s\S]*id="mon_range_to" type="range"[\s\S]*monitoring-artist-download-range/);
+  assert.match(renderer,/data-action="monitoring-artist-date-open" data-side="from"[\s\S]*data-action="monitoring-artist-date-open" data-side="to"[\s\S]*monitoring-artist-download-range/);
   assert.match(renderer,/function monitoringArtistRangeInfo[\s\S]*No works match this date range/);
-  assert.match(renderer,/class="mon-range-years"[\s\S]*monitoring-artist-range-year[\s\S]*monitoring-artist-range-reset/);
-  assert.doesNotMatch(renderer,/id="mon_range_(?:from|to)" type="date"|id="mon_range_year"/);
+  assert.match(renderer,/function monitoringArtistDatePicker[\s\S]*monitoring-artist-date-year[\s\S]*monitoring-artist-date-month[\s\S]*monitoring-artist-date-pick/);
+  assert.match(renderer,/monitoringArtistPostDays[\s\S]*new Set/);
+  assert.doesNotMatch(renderer,/id="mon_range_(?:from|to)" type="(?:date|range)"|id="mon_range_year"/);
   assert.match(renderer,/Only the works inside the selected dates are shown below/);
   assert.match(renderer,/Monitoring downloads[\s\S]*monitoring-output/);
   assert.match(css,/\.mon-artist-grid\{display:grid/);

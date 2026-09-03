@@ -107,7 +107,7 @@ function handleSet(inner,push){
   push('> usage: '+state.radCmd+' set <name>  toggles · names: autostart, hotkey, intro, hidden, autoscroll, click, pet   (add on|off to force)');
 }
 let STORE_MODE="Memory";
-const EDIT_COUNT = 216;
+const EDIT_COUNT = 217;
 const APP_OPENED_AT = Date.now();
 let TOTAL_OPEN_BASE = 0;
 let APP_VERSION="0.0.0";
@@ -130,7 +130,7 @@ let offlineMode=false,offlineTab="feed",offlineFilter="all",offlineQuery="",offl
 let offlineData={settings:{retentionDays:30,maxItems:2000},sources:[],items:[],updatedAt:0,storagePath:""};
 let offlineAuth={connected:false,username:"",clientId:"",secure:false};
 const offlineMediaCache=new Map();
-let monitoringMode=false,monitoringTab="activity",monitoringFilter="all",monitoringQuery="",monitoringLoading=false,monitoringSyncing=false,monitoringFocusId="",monitoringDetail=null,monitoringDetailLoading=false,monitoringDetailRequest=0,monitoringArtist=null,monitoringArtistLoading=false,monitoringArtistRequest=0,monitoringArtistRange={monitorId:"",from:"",to:""};
+let monitoringMode=false,monitoringTab="activity",monitoringFilter="all",monitoringQuery="",monitoringLoading=false,monitoringSyncing=false,monitoringFocusId="",monitoringDetail=null,monitoringDetailLoading=false,monitoringDetailRequest=0,monitoringArtist=null,monitoringArtistLoading=false,monitoringArtistRequest=0,monitoringArtistRange={monitorId:"",from:"",to:""},monitoringDatePicker={side:"",level:"year",year:0,month:-1};
 let monitoringData={settings:{notifications:true,defaultIntervalMinutes:1440,retentionDays:90,maxEvents:2000,downloadFolder:""},monitors:[],events:[],updatedAt:0};
 const monitoringMediaCache=new Map();
 let searchTerms={};
@@ -572,17 +572,26 @@ function monitoringArtistRangeInfo(artist){
   const valid=Number.isFinite(fromTime)&&Number.isFinite(toTime)&&fromTime<=toTime;
   return {all:all,posts:valid?all.filter(function(post){return post.date>=fromTime&&post.date<=toTime;}):[],oldest:monitoringDateInput(oldest),newest:monitoringDateInput(newest),valid:valid};
 }
-function monitoringArtistTimeline(artist,info){
-  const dates=(artist.posts||[]).slice().sort(function(a,b){return a.date-b.date;}),fromTime=new Date(monitoringArtistRange.from+'T00:00:00').getTime(),toTime=new Date(monitoringArtistRange.to+'T23:59:59.999').getTime();
-  let fromIndex=dates.findIndex(function(post){return post.date>=fromTime;}),toIndex=-1;for(let index=dates.length-1;index>=0;index--){if(dates[index].date<=toTime){toIndex=index;break;}}
-  if(fromIndex<0)fromIndex=Math.max(0,dates.length-1);if(toIndex<0)toIndex=0;
-  const years=Array.from(new Set(dates.map(function(post){return new Date(post.date).getFullYear();}))).sort(function(a,b){return b-a;}),activeYear=years.find(function(year){return monitoringArtistRange.from===year+'-01-01'&&monitoringArtistRange.to===year+'-12-31';});
-  return {dates:dates,fromIndex:fromIndex,toIndex:toIndex,years:years,activeYear:activeYear,fromLabel:dates[fromIndex]?monitoringDate(dates[fromIndex].date):info.oldest,toLabel:dates[toIndex]?monitoringDate(dates[toIndex].date):info.newest};
+function monitoringRangeDateLabel(value){const date=new Date(String(value||'')+'T12:00:00');return Number.isFinite(date.getTime())?date.toLocaleDateString([],{month:'short',day:'numeric',year:'numeric'}):'Choose date';}
+function monitoringArtistPostDays(artist){
+  const days=new Map();(artist.posts||[]).forEach(function(post){const iso=monitoringDateInput(post.date),item=days.get(iso)||{iso:iso,date:new Date(iso+'T12:00:00'),count:0};item.count++;days.set(iso,item);});return Array.from(days.values()).sort(function(a,b){return b.date-a.date;});
+}
+function monitoringArtistDatePicker(artist){
+  if(!monitoringDatePicker.side)return '';
+  const days=monitoringArtistPostDays(artist),side=monitoringDatePicker.side==='to'?'To':'From',head='<div class="mon-date-picker-head"><b>Choose '+side+' date</b>'+(monitoringDatePicker.level==='year'?'':'<button type="button" data-action="monitoring-artist-date-back">← Back</button>')+'</div>';let options='';
+  if(monitoringDatePicker.level==='year'){
+    const years=Array.from(new Set(days.map(function(item){return item.date.getFullYear();})));options='<div class="mon-date-options years">'+years.map(function(year){const count=days.filter(function(item){return item.date.getFullYear()===year;}).reduce(function(total,item){return total+item.count;},0);return '<button type="button" data-action="monitoring-artist-date-year" data-year="'+year+'"><b>'+year+'</b><small>'+count+' work'+(count===1?'':'s')+'</small></button>';}).join('')+'</div>';
+  }else if(monitoringDatePicker.level==='month'){
+    const months=Array.from(new Set(days.filter(function(item){return item.date.getFullYear()===monitoringDatePicker.year;}).map(function(item){return item.date.getMonth();})));options='<div class="mon-date-options months">'+months.map(function(month){const matching=days.filter(function(item){return item.date.getFullYear()===monitoringDatePicker.year&&item.date.getMonth()===month;}),count=matching.reduce(function(total,item){return total+item.count;},0),label=new Date(2000,month,1).toLocaleDateString([],{month:'long'});return '<button type="button" data-action="monitoring-artist-date-month" data-month="'+month+'"><b>'+esc(label)+'</b><small>'+count+' work'+(count===1?'':'s')+'</small></button>';}).join('')+'</div>';
+  }else{
+    const matching=days.filter(function(item){return item.date.getFullYear()===monitoringDatePicker.year&&item.date.getMonth()===monitoringDatePicker.month;});options='<div class="mon-date-options days">'+matching.map(function(item){return '<button type="button" data-action="monitoring-artist-date-pick" data-date="'+item.iso+'"><b>'+item.date.getDate()+'</b><span>'+esc(item.date.toLocaleDateString([],{weekday:'short'}))+'</span><small>'+item.count+' post'+(item.count===1?'':'s')+'</small></button>';}).join('')+'</div>';
+  }
+  return '<div class="mon-date-picker">'+head+options+'</div>';
 }
 function viewMonitoringArtist(artist){
   const avatar=monitoringMediaTag(artist.avatarRef,"mon-artist-avatar-img",artist.label),banner=monitoringMediaTag(artist.bannerRef,"mon-artist-banner","");
   const info=monitoringArtistRangeInfo(artist),posts=info.posts,cards=posts.length?'<div class="mon-artist-grid">'+posts.map(monitoringArtistPostCard).join('')+'</div>':emptyState("◎",info.valid?"No works match this date range.":"Choose a valid From and To date.");
-  const timeline=monitoringArtistTimeline(artist,info),range='<div class="mon-artist-range"><div class="mon-range-head"><div class="mon-range-title"><b>Filter works by date</b><span>'+esc(posts.length)+' of '+esc(info.all.length)+' shown</span></div><div class="mon-range-years"><button type="button" data-action="monitoring-artist-range-reset"'+(!timeline.activeYear?' class="active"':'')+'>All</button>'+timeline.years.map(function(year){return '<button type="button" data-action="monitoring-artist-range-year" data-year="'+year+'"'+(year===timeline.activeYear?' class="active"':'')+'>'+year+'</button>';}).join('')+'</div></div><div class="mon-range-sliders"><label><span><b>From</b><output id="mon_range_from_value">'+esc(timeline.fromLabel)+'</output></span><input id="mon_range_from" type="range" min="0" max="'+Math.max(0,timeline.dates.length-1)+'" value="'+timeline.fromIndex+'" aria-label="First shown post"></label><label><span><b>To</b><output id="mon_range_to_value">'+esc(timeline.toLabel)+'</output></span><input id="mon_range_to" type="range" min="0" max="'+Math.max(0,timeline.dates.length-1)+'" value="'+timeline.toIndex+'" aria-label="Last shown post"></label><button class="btn primary" data-action="monitoring-artist-download-range"'+(!posts.length||!info.valid?' disabled':'')+'>Download shown ('+esc(posts.length)+')</button></div></div>';
+  const range='<div class="mon-artist-range"><div class="mon-range-title"><b>Filter works by date</b><span>'+esc(posts.length)+' of '+esc(info.all.length)+' shown</span></div><div class="mon-range-fields"><button type="button" class="mon-range-date'+(monitoringDatePicker.side==='from'?' active':'')+'" data-action="monitoring-artist-date-open" data-side="from"><small>From</small><b>'+esc(monitoringRangeDateLabel(monitoringArtistRange.from))+'</b></button><span>→</span><button type="button" class="mon-range-date'+(monitoringDatePicker.side==='to'?' active':'')+'" data-action="monitoring-artist-date-open" data-side="to"><small>To</small><b>'+esc(monitoringRangeDateLabel(monitoringArtistRange.to))+'</b></button><button class="btn" data-action="monitoring-artist-range-reset">Show all</button><button class="btn primary" data-action="monitoring-artist-download-range"'+(!posts.length||!info.valid?' disabled':'')+'>Download shown ('+esc(posts.length)+')</button></div>'+monitoringArtistDatePicker(artist)+'</div>';
   return '<div class="mon-artist" data-ctx="monitor-artist" data-id="'+esc(artist.monitorId)+'"><button type="button" class="mode-back" data-action="monitoring-artist-back">← Back</button><section class="mon-artist-hero">'+(banner||'<div class="mon-watch-banner-fallback"></div>')+'<div class="mon-artist-shade"></div><span class="mon-artist-avatar"><i>'+esc((artist.label||'P').charAt(0))+'</i>'+avatar+'</span><div class="mon-artist-title"><span>'+esc(String(artist.service||'Pawchive').toUpperCase())+'</span><h1>'+esc(artist.label)+'</h1><p>'+esc(info.all.length)+' works · checked every '+esc(monitoringInterval(artist.intervalMinutes))+'</p></div></section>'+range+'<div class="mon-artist-note">Only the works inside the selected dates are shown below. Right-click this page for more options.</div>'+cards+'</div>';
 }
 function monitoringFilePreview(file){
@@ -1231,11 +1240,15 @@ document.addEventListener("click",async(ev)=>{
     case "monitoring-tab": monitoringTab=t.dataset.tab==="watchlist"?"watchlist":"activity";monitoringFocusId="";monitoringDetail=null;monitoringArtist=null;renderView();break;
     case "monitoring-filter": monitoringFilter=t.dataset.filter==="unread"?"unread":"all";monitoringFocusId="";renderView();break;
     case "monitoring-add": monitoringAddModal();break;
-    case "monitoring-monitor-open": {const monitor=monitoringMonitor(id);if(!monitor)break;if(monitor.kind!=="pawchive"||!E||!E.monitoringArtistDetail){if(monitor.url)openTarget(monitor.url,"url");break;}const requestId=++monitoringArtistRequest;monitoringArtistLoading=true;monitoringArtistRange={monitorId:"",from:"",to:""};renderView();const result=await E.monitoringArtistDetail(id);if(requestId!==monitoringArtistRequest)break;monitoringArtistLoading=false;if(result&&result.ok){monitoringArtist=result.artist;renderView();}else{renderView();toast(result&&result.error||"Could not load that artist","err");}break;}
+    case "monitoring-monitor-open": {const monitor=monitoringMonitor(id);if(!monitor)break;if(monitor.kind!=="pawchive"||!E||!E.monitoringArtistDetail){if(monitor.url)openTarget(monitor.url,"url");break;}const requestId=++monitoringArtistRequest;monitoringArtistLoading=true;monitoringArtistRange={monitorId:"",from:"",to:""};monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();const result=await E.monitoringArtistDetail(id);if(requestId!==monitoringArtistRequest)break;monitoringArtistLoading=false;if(result&&result.ok){monitoringArtist=result.artist;renderView();}else{renderView();toast(result&&result.error||"Could not load that artist","err");}break;}
     case "monitoring-monitor-interval": monitoringIntervalModal(id);break;
     case "monitoring-artist-original": if(monitoringArtist&&monitoringArtist.url)openTarget(monitoringArtist.url,"url");break;
-    case "monitoring-artist-range-reset": if(monitoringArtist){monitoringArtistRange={monitorId:"",from:"",to:""};renderView();}break;
-    case "monitoring-artist-range-year": if(monitoringArtist&&t.dataset.year){monitoringArtistRange={monitorId:monitoringArtist.monitorId,from:t.dataset.year+'-01-01',to:t.dataset.year+'-12-31'};renderView();}break;
+    case "monitoring-artist-range-reset": if(monitoringArtist){monitoringArtistRange={monitorId:"",from:"",to:""};monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();}break;
+    case "monitoring-artist-date-open": if(monitoringArtist){const side=t.dataset.side==='to'?'to':'from';monitoringDatePicker={side:monitoringDatePicker.side===side?'':side,level:"year",year:0,month:-1};renderView();}break;
+    case "monitoring-artist-date-year": if(monitoringArtist&&monitoringDatePicker.side){monitoringDatePicker.level="month";monitoringDatePicker.year=Number(t.dataset.year);renderView();}break;
+    case "monitoring-artist-date-month": if(monitoringArtist&&monitoringDatePicker.side){monitoringDatePicker.level="day";monitoringDatePicker.month=Number(t.dataset.month);renderView();}break;
+    case "monitoring-artist-date-back": if(monitoringArtist&&monitoringDatePicker.side){if(monitoringDatePicker.level==="day")monitoringDatePicker.level="month";else monitoringDatePicker.level="year";renderView();}break;
+    case "monitoring-artist-date-pick": if(monitoringArtist&&monitoringDatePicker.side&&t.dataset.date){const side=monitoringDatePicker.side,date=t.dataset.date;if(side==="from"){monitoringArtistRange.from=date;if(new Date(date)>new Date(monitoringArtistRange.to))monitoringArtistRange.to=date;}else{monitoringArtistRange.to=date;if(new Date(date)<new Date(monitoringArtistRange.from))monitoringArtistRange.from=date;}monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();}break;
     case "monitoring-artist-post-open": {if(!monitoringArtist||!E||!E.monitoringArtistPostDetail)break;const requestId=++monitoringDetailRequest;monitoringDetailLoading=true;renderView();const result=await E.monitoringArtistPostDetail(monitoringArtist.monitorId,id);if(requestId!==monitoringDetailRequest)break;monitoringDetailLoading=false;if(result&&result.ok){monitoringDetail=result.detail;renderView();}else{renderView();toast(result&&result.error||"Could not open that post","err");}break;}
     case "monitoring-artist-download-range": {if(!monitoringArtist||!E||!E.monitoringArtistDownloadAll)break;const from=monitoringArtistRange.from,to=monitoringArtistRange.to,fromTime=new Date(from+"T00:00:00").getTime(),toTime=new Date(to+"T23:59:59.999").getTime();if(!from||!to||!Number.isFinite(fromTime)||!Number.isFinite(toTime)||fromTime>toTime){toast("Choose a valid From and To date","warn");break;}const selected=(monitoringArtist.posts||[]).filter(function(post){return post.date>=fromTime&&post.date<=toTime;}).length;if(!selected){toast("No works are inside that date range","warn");break;}const approved=await confirmModal("Download available files from "+selected+" works to the Monitoring output folder?",false,{title:"Download date range",go:"Download"});if(!approved)break;toast("Date-range download started — keep SINRAD open","ok");const result=await E.monitoringArtistDownloadAll(monitoringArtist.monitorId,from,to);if(result&&result.ok)toast("Downloaded "+result.count+" files from "+result.postCount+" works"+(result.failed?" · "+result.failed+" skipped":""),result.failed?"warn":"ok");else toast(result&&result.error||"Date-range download failed","err");break;}
     case "monitoring-artist-download-all": {if(!monitoringArtist||!E||!E.monitoringArtistDownloadAll)break;const approved=await confirmModal("Download every available file from "+monitoringArtist.posts.length+" works to the Monitoring output folder? This may use a lot of storage.",false,{title:"Download artist",go:"Download"});if(!approved)break;toast("Artist download started — keep SINRAD open","ok");const result=await E.monitoringArtistDownloadAll(monitoringArtist.monitorId,"","");if(result&&result.ok)toast("Downloaded "+result.count+" files from "+result.postCount+" works"+(result.failed?" · "+result.failed+" skipped":""),result.failed?"warn":"ok");else toast(result&&result.error||"Artist download failed","err");break;}
@@ -1361,17 +1374,6 @@ document.addEventListener("input",function(ev){
   const position=ev.target.value.length;offlineQuery=ev.target.value;
   if(_searchRenderTimer)clearTimeout(_searchRenderTimer);
   _searchRenderTimer=setTimeout(function(){_searchRenderTimer=null;renderView();const input=$("#offlineSearch");if(input){input.focus();try{input.setSelectionRange(position,position);}catch(_){}}},140);
-});
-document.addEventListener("change",function(ev){
-  if(!monitoringArtist||!ev.target)return;
-  if(ev.target.id!=="mon_range_from"&&ev.target.id!=="mon_range_to")return;
-  const ordered=(monitoringArtist.posts||[]).slice().sort(function(a,b){return a.date-b.date;}),fromInput=$("#mon_range_from"),toInput=$("#mon_range_to");if(!ordered.length||!fromInput||!toInput)return;
-  let fromIndex=Number(fromInput.value),toIndex=Number(toInput.value);if(fromIndex>toIndex){if(ev.target.id==="mon_range_from")toIndex=fromIndex;else fromIndex=toIndex;}
-  monitoringArtistRange={monitorId:monitoringArtist.monitorId,from:monitoringDateInput(ordered[fromIndex].date),to:monitoringDateInput(ordered[toIndex].date)};renderView();
-});
-document.addEventListener("input",function(ev){
-  if(!monitoringArtist||!ev.target||(ev.target.id!=="mon_range_from"&&ev.target.id!=="mon_range_to"))return;
-  const ordered=(monitoringArtist.posts||[]).slice().sort(function(a,b){return a.date-b.date;}),post=ordered[Number(ev.target.value)],output=$("#"+ev.target.id+"_value");if(post&&output)output.textContent=monitoringDate(post.date);
 });
 document.addEventListener("input",function(ev){
   if(!ev.target||ev.target.id!=="monitoringSearch")return;

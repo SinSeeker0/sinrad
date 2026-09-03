@@ -1572,3 +1572,13 @@ UPDATE LOG FOR THIS MEMORY
 - Confirmed 96/96 automated tests, diff check, the full Electron UI smoke test
   including Feed-to-artist navigation and timeline filtering, and packaged
   build `dist-verify/artist-navigation-range-216`. No release was made.
+- Edit #217 replaces the artist timeline sliders from #216 with two clear From
+  and To boxes. Each opens a SINRAD-owned post-aware picker that drills through
+  year, month, then exact date.
+- The picker derives every option from the loaded artist works. Years without
+  posts, empty months, and dates without posts are never shown. Each option also
+  states how many works/posts it contains, and the chosen boundary immediately
+  updates the visible artist cards and download count.
+- Confirmed 96/96 automated tests, diff check, the full Electron UI smoke test
+  across the year/month/date drill-down, and packaged build
+  `dist-verify/post-aware-calendar-217`. No release was made.
