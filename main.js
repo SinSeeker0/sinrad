@@ -27,8 +27,7 @@ const { checkLink } = require("./lib/link-health.js");
 const SitePreview = require("./lib/site-preview.js");
 const { OfflineFeedStore } = require("./lib/offline-feed.js");
 const RedditSource = require("./lib/reddit-source.js");
-const { MonitoringStore } = require("./lib/monitoring-store.js");
-const MonitoringSources = require("./lib/monitoring-sources.js");
+const { MonitoringStore, Sources: MonitoringSources, MonitoringDownloadQueue } = require("./lib/monitoring/index.js");
 let autoUpdater=null; try{ autoUpdater=require("electron-updater").autoUpdater; }catch(_e){ try{ console.error("[sinrad] electron-updater unavailable:", _e&&_e.message); }catch(_){} }
 
 const DATA_DIR = app.getPath("userData");
@@ -549,6 +548,10 @@ async function _writePawchiveDownload(file,destination){
     const waitDrain=function(){return new Promise(function(resolve,reject){const done=function(){stream.off("error",failed);resolve();},failed=function(error){stream.off("drain",done);reject(error);};stream.once("drain",done);stream.once("error",failed);});};
     const reader=response.body.getReader();while(true){const part=await reader.read();if(part.done)break;total+=part.value.byteLength;if(total>4*1024*1024*1024){try{await reader.cancel();}catch(_){}throw new Error("That file is larger than 4 GB");}if(!stream.write(Buffer.from(part.value)))await waitDrain();}
     await new Promise(function(resolve,reject){stream.end(resolve);stream.once("error",reject);});
+    if(declared&&total!==declared)throw new Error("The download ended early (received "+total+" of "+declared+" bytes)");
+    if(path.extname(destination).toLowerCase()===".zip"){
+      const handle=await fs.promises.open(temp,"r");try{const stat=await handle.stat();if(stat.size<22)throw new Error("The downloaded ZIP is incomplete");const first=Buffer.alloc(4);await handle.read(first,0,4,0);const signature=first.readUInt32LE(0);if(signature!==0x04034b50&&signature!==0x06054b50&&signature!==0x08074b50)throw new Error("The server did not return a valid ZIP file");const tailSize=Math.min(stat.size,65557),tail=Buffer.alloc(tailSize);await handle.read(tail,0,tailSize,stat.size-tailSize);if(tail.lastIndexOf(Buffer.from([0x50,0x4b,0x05,0x06]))<0)throw new Error("The downloaded ZIP is incomplete");}finally{await handle.close();}
+    }
     await fs.promises.copyFile(temp,destination);await fs.promises.unlink(temp);return total;
   }catch(error){try{stream.destroy();}catch(_){}try{if(fs.existsSync(temp))fs.unlinkSync(temp);}catch(_){}throw error;}
 }
@@ -562,34 +565,34 @@ function _postDownloadFolder(root,detail,index,artistName){
   return path.join(artist,_safeDownloadName(stamp+" - "+(detail.title||"Untitled post")+" - "+(detail.postId||"post"),index||0));
 }
 
-async function _downloadDetailFiles(detail){
+async function _downloadDetailFiles(detail,report){
   if(!detail.files.length)throw new Error("This post has no downloadable attachments");
-  const postFolder=_postDownloadFolder(await _monitoringOutputFolder(),detail,0);await fs.promises.mkdir(postFolder,{recursive:true,mode:0o700});let bytes=0;
-  for(let index=0;index<detail.files.length;index++){const file=detail.files[index],target=await _availableDownloadPath(postFolder,_safeDownloadName(file.name,index));bytes+=await _writePawchiveDownload(file,target);}
+  const postFolder=_postDownloadFolder(await _monitoringOutputFolder(),detail,0);await fs.promises.mkdir(postFolder,{recursive:true,mode:0o700});let bytes=0;if(report)report({label:detail.creator+" · "+detail.title,total:detail.files.length,done:0,files:0});
+  for(let index=0;index<detail.files.length;index++){const file=detail.files[index],target=await _availableDownloadPath(postFolder,_safeDownloadName(file.name,index));bytes+=await _writePawchiveDownload(file,target);if(report)report({done:index+1,files:index+1});}
   return {ok:true,count:detail.files.length,bytes:bytes,folder:postFolder};
 }
 
-async function _downloadPawchiveFile(eventId,fileIndex){
+async function _downloadPawchiveFile(eventId,fileIndex,report){
   const detail=await _pawchivePostDetail(eventId,false),index=Number(fileIndex),file=detail.files[index];if(!file)throw new Error("That attachment was not found");
   const picked=await dialog.showSaveDialog(mainWin,{title:"Save Pawchive attachment",defaultPath:path.join(await _monitoringOutputFolder(),_safeDownloadName(file.name,index))});if(picked.canceled||!picked.filePath)return {ok:false,canceled:true};
-  const bytes=await _writePawchiveDownload(file,picked.filePath);return {ok:true,count:1,bytes:bytes};
+  if(report)report({label:file.name,total:1,done:0,files:0});const bytes=await _writePawchiveDownload(file,picked.filePath);if(report)report({done:1,files:1});return {ok:true,count:1,bytes:bytes};
 }
 
-async function _downloadAllPawchiveFiles(eventId){return _downloadDetailFiles(await _pawchivePostDetail(eventId,false));}
+async function _downloadAllPawchiveFiles(eventId,report){return _downloadDetailFiles(await _pawchivePostDetail(eventId,false),report);}
 
-async function _downloadArtistPostFile(monitorId,postId,fileIndex){
+async function _downloadArtistPostFile(monitorId,postId,fileIndex,report){
   const detail=await _pawchiveArtistPostDetail(monitorId,postId,false),index=Number(fileIndex),file=detail.files[index];if(!file)throw new Error("That attachment was not found");
   const picked=await dialog.showSaveDialog(mainWin,{title:"Save Pawchive attachment",defaultPath:path.join(await _monitoringOutputFolder(),_safeDownloadName(file.name,index))});if(picked.canceled||!picked.filePath)return {ok:false,canceled:true};
-  const bytes=await _writePawchiveDownload(file,picked.filePath);return {ok:true,count:1,bytes:bytes};
+  if(report)report({label:file.name,total:1,done:0,files:0});const bytes=await _writePawchiveDownload(file,picked.filePath);if(report)report({done:1,files:1});return {ok:true,count:1,bytes:bytes};
 }
 
-async function _downloadArtistPostFiles(monitorId,postId){return _downloadDetailFiles(await _pawchiveArtistPostDetail(monitorId,postId,false));}
+async function _downloadArtistPostFiles(monitorId,postId,report){return _downloadDetailFiles(await _pawchiveArtistPostDetail(monitorId,postId,false),report);}
 
-async function _downloadPawchiveArtist(monitorId,fromDate,toDate){
+async function _downloadPawchiveArtist(monitorId,fromDate,toDate,report){
   const monitor=_pawchiveMonitorContext(monitorId),allPosts=await _pawchiveAllPosts(monitor),posts=fromDate||toDate?MonitoringSources.filterPostsByDate(allPosts,fromDate,toDate):allPosts;if(!posts.length)throw new Error("No works were found in that date range");
   const outputRoot=await _monitoringOutputFolder(),artistFolder=path.join(outputRoot,_safeDownloadName(monitor.label||"Pawchive artist",0));await fs.promises.mkdir(artistFolder,{recursive:true,mode:0o700});
   let bytes=0,count=0,postCount=0,failed=0;
-  const progress=function(done){try{if(mainWin&&!mainWin.isDestroyed())mainWin.webContents.send("monitoring-download-progress",{monitorId:monitor.id,done:done,total:posts.length,files:count,failed:failed});}catch(_){}};progress(0);
+  const progress=function(done){if(report)report({label:monitor.label,total:posts.length,done:done,files:count,failed:failed});};progress(0);
   for(let postIndex=0;postIndex<posts.length;postIndex++){
     const post=posts[postIndex];try{
       const detail=await _pawchivePostDetailForMonitor(monitor,post.meta.postId,false);if(!detail.files.length)continue;
@@ -659,6 +662,11 @@ function syncBrowserExtension(){
 }
 
 let mainWin = null;
+const monitoringDownloads=new MonitoringDownloadQueue({
+  onUpdate:function(progress){try{if(mainWin&&!mainWin.isDestroyed())mainWin.webContents.send("monitoring-download-progress",progress);}catch(_){}},
+  onComplete:function(progress,result,error){try{const NotificationClass=require("electron").Notification;if(!NotificationClass.isSupported())return;const failed=progress.status==="failed",body=failed?String(error&&error.message||"The download could not finish").slice(0,400):(String(result&&result.count||progress.files||0)+" item"+(Number(result&&result.count||progress.files||0)===1?"":"s")+" saved to Monitoring downloads");new NotificationClass({title:failed?"Monitoring download failed":"Monitoring download complete",body:body,silent:true}).show();}catch(_){}
+  }
+});
 let petWin = null;
 
 function createWindow(){
@@ -1074,13 +1082,13 @@ ipcMain.handle("monitoring-media",async(e,ref)=>{
   try{const media=await monitoringStore.readMedia(ref);if(!media)return "";const mime={".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",".gif":"image/gif"}[media.extension]||"application/octet-stream";return "data:"+mime+";base64,"+media.bytes.toString("base64");}catch(_){return "";}
 });
 ipcMain.handle("monitoring-post-detail",async(e,id)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return {ok:true,detail:await _pawchivePostDetail(String(id||""))};}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
-ipcMain.handle("monitoring-download",async(e,id,index)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await _downloadPawchiveFile(String(id||""),index);}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
-ipcMain.handle("monitoring-download-all",async(e,id)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await _downloadAllPawchiveFiles(String(id||""));}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
+ipcMain.handle("monitoring-download",async(e,id,index)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await monitoringDownloads.enqueue("Monitoring attachment",1,function(report){return _downloadPawchiveFile(String(id||""),index,report);});}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
+ipcMain.handle("monitoring-download-all",async(e,id)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await monitoringDownloads.enqueue("Monitoring post",0,function(report){return _downloadAllPawchiveFiles(String(id||""),report);});}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
 ipcMain.handle("monitoring-artist-detail",async(e,id)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return {ok:true,artist:await _pawchiveArtistDetail(String(id||""))};}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
 ipcMain.handle("monitoring-artist-post-detail",async(e,monitorId,postId)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return {ok:true,detail:await _pawchiveArtistPostDetail(String(monitorId||""),String(postId||""))};}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
-ipcMain.handle("monitoring-artist-download",async(e,monitorId,postId,index)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await _downloadArtistPostFile(String(monitorId||""),String(postId||""),index);}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
-ipcMain.handle("monitoring-artist-post-download-all",async(e,monitorId,postId)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await _downloadArtistPostFiles(String(monitorId||""),String(postId||""));}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
-ipcMain.handle("monitoring-artist-download-all",async(e,monitorId,fromDate,toDate)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await _downloadPawchiveArtist(String(monitorId||""),String(fromDate||""),String(toDate||""));}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
+ipcMain.handle("monitoring-artist-download",async(e,monitorId,postId,index)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await monitoringDownloads.enqueue("Monitoring attachment",1,function(report){return _downloadArtistPostFile(String(monitorId||""),String(postId||""),index,report);});}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
+ipcMain.handle("monitoring-artist-post-download-all",async(e,monitorId,postId)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await monitoringDownloads.enqueue("Monitoring post",0,function(report){return _downloadArtistPostFiles(String(monitorId||""),String(postId||""),report);});}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
+ipcMain.handle("monitoring-artist-download-all",async(e,monitorId,fromDate,toDate)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await monitoringDownloads.enqueue("Monitoring artist",0,function(report){return _downloadPawchiveArtist(String(monitorId||""),String(fromDate||""),String(toDate||""),report);});}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
 function _backupEncrypt(data,password){
   const clean=_validStore(JSON.parse(JSON.stringify(data)));
   if(!clean) throw new Error("Invalid S.I.R data");

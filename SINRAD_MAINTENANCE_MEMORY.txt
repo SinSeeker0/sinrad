@@ -1582,3 +1582,22 @@ UPDATE LOG FOR THIS MEMORY
 - Confirmed 96/96 automated tests, diff check, the full Electron UI smoke test
   across the year/month/date drill-down, and packaged build
   `dist-verify/post-aware-calendar-217`. No release was made.
+- Edit #218 adds Earliest to the From calendar and Latest to the To calendar;
+  both jump to real boundary post dates and close the picker.
+- Monitoring downloads now use a single sequential queue. The bottom status bar
+  remains visible across pages and reports current item progress plus queued
+  jobs; clicking it opens the Monitoring output folder. Completion or failure
+  produces a Windows notification, and cancellation does not produce a false
+  completion notice.
+- Monitoring implementation modules now live behind `lib/monitoring/index.js`
+  in one folder (`store`, `sources`, and `download-queue`). Source failures stay
+  contained to Monitoring and its cached state remains under the existing
+  user-data `monitoring` folder, making a future source adapter replaceable.
+- ZIP transfers now require a complete response length, valid ZIP signature,
+  and end-of-central-directory record before the final file is published. The
+  user's reported 128,263,788-byte Japanese ZIP was inspected directly: its ZIP
+  header is valid and Windows read all 8 entries. Its plain white Explorer icon
+  is therefore an OS ZIP-association issue rather than missing download bytes.
+- Confirmed 99/99 automated tests, diff check, the full Electron UI smoke test
+  including boundary shortcuts and global download status, and packaged build
+  `dist-verify/monitor-download-queue-218`. No release was made.

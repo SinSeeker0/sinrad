@@ -5,7 +5,7 @@ const assert = require("node:assert/strict");
 const fs = require("node:fs");
 const os = require("node:os");
 const path = require("node:path");
-const { MonitoringStore } = require("../lib/monitoring-store.js");
+const { MonitoringStore } = require("../lib/monitoring/store.js");
 
 function withStore(run){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"sinrad-monitor-test-"));

@@ -2,7 +2,7 @@
 
 const test = require("node:test");
 const assert = require("node:assert/strict");
-const Sources = require("../lib/monitoring-sources.js");
+const Sources = require("../lib/monitoring/sources.js");
 
 test("monitoring accepts Pawchive and Bakemono creator links as one source", function(){
   const paw=Sources.parseTarget("https://pawchive.pw/patreon/user/52511814");

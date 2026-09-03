@@ -16,7 +16,8 @@ const splashCss = fs.readFileSync(path.join(root, "assets", "splash.css"), "utf8
 const petCss = fs.readFileSync(path.join(root, "assets", "pet.css"), "utf8");
 const extension = fs.readFileSync(path.join(root, "extension", "background.js"), "utf8");
 const offlineFeed = fs.readFileSync(path.join(root, "lib", "offline-feed.js"), "utf8");
-const monitoringStore = fs.readFileSync(path.join(root, "lib", "monitoring-store.js"), "utf8");
+const monitoringStore = fs.readFileSync(path.join(root, "lib", "monitoring", "store.js"), "utf8");
+const monitoringQueue = fs.readFileSync(path.join(root, "lib", "monitoring", "download-queue.js"), "utf8");
 const packageFile = fs.readFileSync(path.join(root, "package.json"), "utf8");
 const testLauncher = fs.readFileSync(path.join(root, "test-app.bat"), "utf8");
 
@@ -401,6 +402,9 @@ test("watchlist uses artist profiles and keeps controls out of every card", func
   assert.match(renderer,/data-action="monitoring-artist-date-open" data-side="from"[\s\S]*data-action="monitoring-artist-date-open" data-side="to"[\s\S]*monitoring-artist-download-range/);
   assert.match(renderer,/function monitoringArtistRangeInfo[\s\S]*No works match this date range/);
   assert.match(renderer,/function monitoringArtistDatePicker[\s\S]*monitoring-artist-date-year[\s\S]*monitoring-artist-date-month[\s\S]*monitoring-artist-date-pick/);
+  assert.match(renderer,/data-action="monitoring-artist-date-edge" data-edge=/);
+  assert.match(renderer,/edge==='latest'\?'Latest':'Earliest'/);
+  assert.match(renderer,/case "monitoring-artist-date-edge"[\s\S]*days\[0\][\s\S]*days\[days\.length-1\]/);
   assert.match(renderer,/monitoringArtistPostDays[\s\S]*new Set/);
   assert.doesNotMatch(renderer,/id="mon_range_(?:from|to)" type="(?:date|range)"|id="mon_range_year"/);
   assert.match(renderer,/Only the works inside the selected dates are shown below/);
@@ -408,4 +412,15 @@ test("watchlist uses artist profiles and keeps controls out of every card", func
   assert.match(css,/\.mon-artist-grid\{display:grid/);
   assert.match(css,/button\.nav-item\{[^}]*background:transparent/);
   assert.match(css,/\.shot-grid\.size-s\{grid-template-columns:repeat\(auto-fill,minmax\(210px,1fr\)\)/);
+});
+
+test("Monitoring downloads are queued, visible globally and ZIP checked",function(){
+  assert.match(main,/require\("\.\/lib\/monitoring\/index\.js"\)/);
+  assert.match(main,/new MonitoringDownloadQueue/);
+  assert.match(main,/The downloaded ZIP is incomplete/);
+  assert.match(main,/tail\.lastIndexOf\(Buffer\.from\(\[0x50,0x4b,0x05,0x06\]\)\)/);
+  assert.match(html,/id="monitorDownloadStatus"[\s\S]*aria-live="polite"/);
+  assert.match(renderer,/function paintMonitoringDownload/);
+  assert.match(renderer,/case "monitoring-output-open"/);
+  assert.match(monitoringQueue,/class MonitoringDownloadQueue[\s\S]*this\.pending[\s\S]*_pump/);
 });

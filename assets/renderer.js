@@ -107,7 +107,7 @@ function handleSet(inner,push){
   push('> usage: '+state.radCmd+' set <name>  toggles · names: autostart, hotkey, intro, hidden, autoscroll, click, pet   (add on|off to force)');
 }
 let STORE_MODE="Memory";
-const EDIT_COUNT = 217;
+const EDIT_COUNT = 218;
 const APP_OPENED_AT = Date.now();
 let TOTAL_OPEN_BASE = 0;
 let APP_VERSION="0.0.0";
@@ -578,7 +578,7 @@ function monitoringArtistPostDays(artist){
 }
 function monitoringArtistDatePicker(artist){
   if(!monitoringDatePicker.side)return '';
-  const days=monitoringArtistPostDays(artist),side=monitoringDatePicker.side==='to'?'To':'From',head='<div class="mon-date-picker-head"><b>Choose '+side+' date</b>'+(monitoringDatePicker.level==='year'?'':'<button type="button" data-action="monitoring-artist-date-back">← Back</button>')+'</div>';let options='';
+  const days=monitoringArtistPostDays(artist),side=monitoringDatePicker.side==='to'?'To':'From',edge=monitoringDatePicker.side==='to'?'latest':'earliest',head='<div class="mon-date-picker-head"><b>Choose '+side+' date</b><div><button type="button" data-action="monitoring-artist-date-edge" data-edge="'+edge+'">'+(edge==='latest'?'Latest':'Earliest')+'</button>'+(monitoringDatePicker.level==='year'?'':'<button type="button" data-action="monitoring-artist-date-back">← Back</button>')+'</div></div>';let options='';
   if(monitoringDatePicker.level==='year'){
     const years=Array.from(new Set(days.map(function(item){return item.date.getFullYear();})));options='<div class="mon-date-options years">'+years.map(function(year){const count=days.filter(function(item){return item.date.getFullYear()===year;}).reduce(function(total,item){return total+item.count;},0);return '<button type="button" data-action="monitoring-artist-date-year" data-year="'+year+'"><b>'+year+'</b><small>'+count+' work'+(count===1?'':'s')+'</small></button>';}).join('')+'</div>';
   }else if(monitoringDatePicker.level==='month'){
@@ -645,7 +645,14 @@ function monitoringIntervalModal(id){
 }
 if(E&&E.onMonitoringChanged)E.onMonitoringChanged(function(data){if(data)monitoringData=data;monitoringLoading=false;monitoringSyncing=false;if(monitoringMode)renderView();});
 if(E&&E.onMonitoringOpenEvent)E.onMonitoringOpenEvent(function(id){monitoringFocusId=String(id||"");monitoringTab="activity";monitoringFilter="all";setMonitoringMode(true);});
-if(E&&E.onMonitoringDownloadProgress)E.onMonitoringDownloadProgress(function(progress){if(!monitoringArtist||!progress||progress.monitorId!==monitoringArtist.monitorId)return;const note=document.querySelector('.mon-artist-note');if(note)note.textContent='Downloading '+progress.done+' / '+progress.total+' works · '+progress.files+' files saved'+(progress.failed?' · '+progress.failed+' skipped':'');});
+let monitoringDownloadHideTimer=null;
+function paintMonitoringDownload(progress){
+  const status=$("#monitorDownloadStatus"),text=$("#monitorDownloadText");if(!status||!text||!progress)return;clearTimeout(monitoringDownloadHideTimer);status.classList.add("show");status.classList.toggle("done",progress.status==="done");status.classList.toggle("failed",progress.status==="failed");
+  if(progress.status==="active")text.textContent="Downloading "+progress.done+" / "+(progress.total||"?")+(progress.queued?" · "+progress.queued+" queued":"");else if(progress.status==="done")text.textContent="Download complete · "+(progress.files||progress.done||0)+" saved";else if(progress.status==="failed")text.textContent="Download failed · click to open folder";else{text.textContent="Download canceled";monitoringDownloadHideTimer=setTimeout(function(){status.classList.remove("show");},1800);}
+  if(progress.status==="done"||progress.status==="failed")monitoringDownloadHideTimer=setTimeout(function(){status.classList.remove("show");},6000);
+  if(monitoringArtist&&progress.status==="active"){const note=document.querySelector('.mon-artist-note');if(note)note.textContent='Downloading '+progress.done+' / '+(progress.total||'?')+' works · '+progress.files+' files saved'+(progress.failed?' · '+progress.failed+' skipped':'');}
+}
+if(E&&E.onMonitoringDownloadProgress)E.onMonitoringDownloadProgress(paintMonitoringDownload);
 
 function fmtDate(ts){ if(!ts) return ''; var d=new Date(ts); var t=d.toLocaleTimeString([],{hour12:false,hour:'2-digit',minute:'2-digit'}); var now=new Date(); var sameDay=d.toDateString()===now.toDateString(); if(sameDay) return '['+t+'] Today'; var yesterday=new Date(now); yesterday.setDate(now.getDate()-1); if(d.toDateString()===yesterday.toDateString()) return '['+t+'] Yesterday'; return '['+t+'] '+d.toLocaleDateString('en-US',{month:'short',day:'numeric'}); }
 const _modulePreviewCache=new Map(),_modulePreviewPending=new Map();
@@ -1227,6 +1234,7 @@ document.addEventListener("click",async(ev)=>{
     case "settings-offline-open": await openOfflineStorageFolder();break;
     case "settings-offline-change": await chooseOfflineStorageFolder();break;
     case "settings-monitoring-output-open": await openMonitoringOutputFolder();break;
+    case "monitoring-output-open": await openMonitoringOutputFolder();break;
     case "settings-monitoring-output-change": await chooseMonitoringOutputFolder();break;
     case "settings-media-intros": await openSettingsMediaFolder("intros");break;
     case "settings-media-animations": await openSettingsMediaFolder("animations");break;
@@ -1248,6 +1256,7 @@ document.addEventListener("click",async(ev)=>{
     case "monitoring-artist-date-year": if(monitoringArtist&&monitoringDatePicker.side){monitoringDatePicker.level="month";monitoringDatePicker.year=Number(t.dataset.year);renderView();}break;
     case "monitoring-artist-date-month": if(monitoringArtist&&monitoringDatePicker.side){monitoringDatePicker.level="day";monitoringDatePicker.month=Number(t.dataset.month);renderView();}break;
     case "monitoring-artist-date-back": if(monitoringArtist&&monitoringDatePicker.side){if(monitoringDatePicker.level==="day")monitoringDatePicker.level="month";else monitoringDatePicker.level="year";renderView();}break;
+    case "monitoring-artist-date-edge": if(monitoringArtist&&monitoringDatePicker.side){const days=monitoringArtistPostDays(monitoringArtist),side=monitoringDatePicker.side,item=t.dataset.edge==="latest"?days[0]:days[days.length-1];if(item){if(side==="from"){monitoringArtistRange.from=item.iso;if(new Date(item.iso)>new Date(monitoringArtistRange.to))monitoringArtistRange.to=item.iso;}else{monitoringArtistRange.to=item.iso;if(new Date(item.iso)<new Date(monitoringArtistRange.from))monitoringArtistRange.from=item.iso;}}monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();}break;
     case "monitoring-artist-date-pick": if(monitoringArtist&&monitoringDatePicker.side&&t.dataset.date){const side=monitoringDatePicker.side,date=t.dataset.date;if(side==="from"){monitoringArtistRange.from=date;if(new Date(date)>new Date(monitoringArtistRange.to))monitoringArtistRange.to=date;}else{monitoringArtistRange.to=date;if(new Date(date)<new Date(monitoringArtistRange.from))monitoringArtistRange.from=date;}monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();}break;
     case "monitoring-artist-post-open": {if(!monitoringArtist||!E||!E.monitoringArtistPostDetail)break;const requestId=++monitoringDetailRequest;monitoringDetailLoading=true;renderView();const result=await E.monitoringArtistPostDetail(monitoringArtist.monitorId,id);if(requestId!==monitoringDetailRequest)break;monitoringDetailLoading=false;if(result&&result.ok){monitoringDetail=result.detail;renderView();}else{renderView();toast(result&&result.error||"Could not open that post","err");}break;}
     case "monitoring-artist-download-range": {if(!monitoringArtist||!E||!E.monitoringArtistDownloadAll)break;const from=monitoringArtistRange.from,to=monitoringArtistRange.to,fromTime=new Date(from+"T00:00:00").getTime(),toTime=new Date(to+"T23:59:59.999").getTime();if(!from||!to||!Number.isFinite(fromTime)||!Number.isFinite(toTime)||fromTime>toTime){toast("Choose a valid From and To date","warn");break;}const selected=(monitoringArtist.posts||[]).filter(function(post){return post.date>=fromTime&&post.date<=toTime;}).length;if(!selected){toast("No works are inside that date range","warn");break;}const approved=await confirmModal("Download available files from "+selected+" works to the Monitoring output folder?",false,{title:"Download date range",go:"Download"});if(!approved)break;toast("Date-range download started — keep SINRAD open","ok");const result=await E.monitoringArtistDownloadAll(monitoringArtist.monitorId,from,to);if(result&&result.ok)toast("Downloaded "+result.count+" files from "+result.postCount+" works"+(result.failed?" · "+result.failed+" skipped":""),result.failed?"warn":"ok");else toast(result&&result.error||"Date-range download failed","err");break;}
