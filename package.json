@@ -1,7 +1,7 @@
 {
   "name": "sinrad",
   "productName": "Sinrad",
-  "version": "2.0.28",
+  "version": "2.0.29",
   "description": "S.I.R — an evolving personal desktop workspace.",
   "main": "main.js",
   "repository": {
