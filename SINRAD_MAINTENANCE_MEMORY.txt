@@ -24,14 +24,14 @@ HOW TO USE THIS FILE
 
 CURRENT SNAPSHOT — 2026-09-02
 -----------------------------
-Released version: 2.0.30
-Released Git commit: ef0a4a6
+Released version: 2.0.31
+Released Git commit: 44437c0
 Current edit counter in the working tree: #241
 
-Important: the working tree contains unreleased work after v2.0.28.
-Do not discard, reset, or overwrite it.
+The feature batch through edit #241 was released in v2.0.31.
+Do not discard, reset, or overwrite later user work.
 
-Current unreleased work includes:
+Release v2.0.31 includes:
 - Undo history and Ctrl+Z improvements.
 - Command palette and Ctrl+Shift+P desktop interception.
 - Exact duplicate review.
@@ -1929,3 +1929,7 @@ UPDATE LOG FOR THIS MEMORY
 - Verified 119 automated tests, lint, full Electron UI smoke, packaged marker
   inspection, and isolated packaged startup at
   `dist-verify/sankaku-native-preview-241/win-unpacked/Sinrad.exe`. No release.
+- Released v2.0.31 on 2026-09-05 at commit `44437c0`. GitHub Actions run
+  `33945805010` passed its checks plus Windows and Linux builds. The public
+  release contains the Windows installer, AppImage, Debian package, update
+  metadata, and Windows blockmap.
