@@ -107,7 +107,7 @@ function handleSet(inner,push){
   push('> usage: '+state.radCmd+' set <name>  toggles · names: autostart, hotkey, intro, hidden, autoscroll, click, pet   (add on|off to force)');
 }
 let STORE_MODE="Memory";
-const EDIT_COUNT = 218;
+const EDIT_COUNT = 239;
 const APP_OPENED_AT = Date.now();
 let TOTAL_OPEN_BASE = 0;
 let APP_VERSION="0.0.0";
@@ -126,15 +126,15 @@ const FAV_COLOR="#f5a623", PRI_COLOR="#ff4d8d", ALL_COLOR="#27b4ff";
 
 const revealed=new Set();
 let currentView="vault";
-let offlineMode=false,offlineTab="feed",offlineFilter="all",offlineQuery="",offlineSelectedId="",offlineLoading=false,offlineSyncing=false;
-let offlineData={settings:{retentionDays:30,maxItems:2000},sources:[],items:[],updatedAt:0,storagePath:""};
-let offlineAuth={connected:false,username:"",clientId:"",secure:false};
+let offlineMode=false,offlineTab="feed",offlineFilter="unread",offlineQuery="",offlineSelectedId="",offlineBrowseIds=[],offlineReturnAnchor=null,offlineLoading=false,offlineSyncing=false;
+let offlineData={settings:{retentionDays:30,maxItems:2000,historyCleanupMode:"manual",historyRetentionHours:24,historyStorageMB:1024,freshnessDays:3,feedLayout:"cards"},sources:[],items:[],updatedAt:0,storagePath:"",storage:{bytes:0,files:0},sync:{active:false,queued:false}};
+let offlineExtension={connected:false,lastSeen:0,version:"",method:"browser-extension"};
 const offlineMediaCache=new Map();
-let monitoringMode=false,monitoringTab="activity",monitoringFilter="all",monitoringQuery="",monitoringLoading=false,monitoringSyncing=false,monitoringFocusId="",monitoringDetail=null,monitoringDetailLoading=false,monitoringDetailRequest=0,monitoringArtist=null,monitoringArtistLoading=false,monitoringArtistRequest=0,monitoringArtistRange={monitorId:"",from:"",to:""},monitoringDatePicker={side:"",level:"year",year:0,month:-1};
+let monitoringMode=false,monitoringTab="activity",monitoringFilter="all",monitoringQuery="",monitoringLoading=false,monitoringSyncing=false,monitoringFocusId="",monitoringDetail=null,monitoringDetailLoading=false,monitoringDetailRequest=0,monitoringArtist=null,monitoringArtistLoading=false,monitoringArtistRequest=0,monitoringArtistRange={monitorId:"",from:"",to:""},monitoringDatePicker={side:"",level:"year",year:0,month:-1},monitoringReturnScroll=0,monitoringReturnId="",monitoringReturnAnchor=null,monitoringArtistReturnAnchor=null;
 let monitoringData={settings:{notifications:true,defaultIntervalMinutes:1440,retentionDays:90,maxEvents:2000,downloadFolder:""},monitors:[],events:[],updatedAt:0};
 const monitoringMediaCache=new Map();
 let searchTerms={};
-let vaultFilter="all", folderFilter="all";
+let vaultFilter="all", folderFilter="all", ideaFilter="all", ideaGroupFilter="all", ideaPane="import", ideaViewingId="", ideaReturnAnchor=null, ideaImportText="", ideaImportPreview=[], ideaImportMedia=[], ideaEditMedia=[];
 let linkCats=[], linkFav=false, linkDrill=null, folderCats=[]; let shotFilter="inbox", shotOpenId=null;
 let modalOnConfirm=null, modalOnCancel=null;
 
@@ -160,9 +160,10 @@ const MODULES=[
   {id:"lot",ico:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="4" y="4" width="16" height="16" rx="3"/><path d="M10 16V8h3a2.5 2.5 0 0 1 0 5h-3"/></svg>',name:"Parking Lot",sub:"Parked stacks"},
   {id:"folders",ico:ICO_FOLDER,name:"Folders",sub:"Quick access"},
   {id:"shots",ico:'<svg viewBox="0 0 24 24" fill="none" stroke="#27b4ff" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 8h3l2-3h6l2 3h3a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/><circle cx="12" cy="13" r="3.2"/></svg>',name:"Screenies",sub:"Inbox"},
+  {id:"ideas",ico:'<svg viewBox="0 0 24 24" fill="none" stroke="#d7ac45" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18h6"/><path d="M10 22h4"/><path d="M8.2 14.5A7 7 0 1 1 15.8 14.5C14.6 15.4 14 16.3 14 18h-4c0-1.7-.6-2.6-1.8-3.5z"/></svg>',name:"Ideas",sub:"Build notes"},
 ];
 
-function defaultState(){ return { vault:[], links:[], folders:[], console:[], radCmd:"rad", scanRoots:[], scanDepth:4, scanSkipHidden:true, petRecents:[], petPins:[], shots:[], shotWatch:[], shotCollections:null }; }
+function defaultState(){ return { vault:[], links:[], folders:[], ideas:[], console:[], radCmd:"rad", scanRoots:[], scanDepth:4, scanSkipHidden:true, petRecents:[], petPins:[], shots:[], shotWatch:[], shotCollections:null }; }
 let state=defaultState();
 const HOTKEY_DEFAULTS={globalSearch:"Ctrl+Shift+F",commandPalette:"Ctrl+Shift+P",undo:"Ctrl+Z",quickSave:"Ctrl+Alt+P"};
 function normalizeHotkey(value,fallback){
@@ -178,11 +179,12 @@ function hotkeyDisplay(value){return String(value||"").replace(/\+/g," + ");}
 function paintHotkeyLabels(){const hotkeys=currentHotkeys(),searchKey=document.querySelector("#globalSearch>kbd"),commands=document.querySelector(".cmd-open");if(searchKey)searchKey.textContent=hotkeyDisplay(hotkeys.globalSearch);if(commands)commands.title="Commands · "+hotkeyDisplay(hotkeys.commandPalette);}
 const undoStack=[];
 function undoSnapshot(){
-  return JSON.parse(JSON.stringify({vault:state.vault||[],links:state.links||[],folders:state.folders||[],shots:state.shots||[],categories:state.categories||{},folderCategories:state.folderCategories||{},shotCollections:state.shotCollections||{},linkRules:(state.settings&&state.settings.linkRules)||[]}));
+  return JSON.parse(JSON.stringify({vault:state.vault||[],links:state.links||[],folders:state.folders||[],ideas:state.ideas||[],shots:state.shots||[],categories:state.categories||{},folderCategories:state.folderCategories||{},shotCollections:state.shotCollections||{},linkRules:(state.settings&&state.settings.linkRules)||[]}));
 }
 function rememberUndo(label){undoStack.push({label:String(label||"Changed data"),at:Date.now(),data:undoSnapshot()});if(undoStack.length>20)undoStack.shift();}
-function restoreUndoSnapshot(data){state.vault=data.vault||[];state.links=data.links||[];state.folders=data.folders||[];state.shots=data.shots||[];state.categories=data.categories||{};state.folderCategories=data.folderCategories||{};state.shotCollections=data.shotCollections||{};if(!state.settings)state.settings={};state.settings.linkRules=data.linkRules||[];refreshCatColors();refreshFolderCats();}
-async function undoLastChange(){const entry=undoStack.pop();if(!entry){toast("Nothing to undo yet","warn");return false;}const current=undoSnapshot();restoreUndoSnapshot(entry.data);const saved=await flushSave();if(!saved){restoreUndoSnapshot(current);toast("Undo could not be saved","err");return false;}renderView();renderTermBody();toast("Undid: "+entry.label,"ok");return true;}
+function rememberOfflineUndo(label,token){if(!token)return;undoStack.push({label:String(label||"Deleted offline post"),at:Date.now(),kind:"offline",token:String(token)});if(undoStack.length>20)undoStack.shift();}
+function restoreUndoSnapshot(data){state.vault=data.vault||[];state.links=data.links||[];state.folders=data.folders||[];state.ideas=data.ideas||[];state.shots=data.shots||[];state.categories=data.categories||{};state.folderCategories=data.folderCategories||{};state.shotCollections=data.shotCollections||{};if(!state.settings)state.settings={};state.settings.linkRules=data.linkRules||[];refreshCatColors();refreshFolderCats();}
+async function undoLastChange(){const entry=undoStack.pop();if(!entry){toast("Nothing to undo yet","warn");return false;}const anchor=captureListPosition();if(entry.kind==="offline"){const result=E&&E.offlineItemRestore?await E.offlineItemRestore(entry.token):null;if(!result||!result.ok){toast(result&&result.error||"That offline undo is no longer available","err");return false;}await loadOfflineData(anchor);toast("Undid: "+entry.label,"ok");return true;}const current=undoSnapshot();restoreUndoSnapshot(entry.data);const saved=await flushSave();if(!saved){restoreUndoSnapshot(current);toast("Undo could not be saved","err");return false;}renderViewAnchored(anchor,false);renderTermBody();toast("Undid: "+entry.label,"ok");return true;}
 function undoHistoryModal(){const rows=undoStack.slice().reverse();const body=rows.length?'<div class="history-list">'+rows.map(function(entry,index){return '<div class="history-row"><b>'+esc(entry.label)+'</b><small>'+esc(new Date(entry.at).toLocaleTimeString([],{hour:"2-digit",minute:"2-digit"}))+'</small></div>';}).join("")+'</div>':'<p style="color:var(--muted);margin:0">No changes to undo this session.</p>';openModal("Undo history",body,rows.length?"Undo latest":"Close",function(){if(!rows.length){closeModal();return;}closeModal();undoLastChange();});const cancel=$("#modalCancelBtn");if(cancel)cancel.classList.toggle("hidden",!rows.length);}
 function currentLinkRules(){return (state.settings&&Array.isArray(state.settings.linkRules))?state.settings.linkRules:[];}
 function smartCategories(url,fallback){return SinradShared.smartLinkCategories(url,fallback,currentLinkRules());}
@@ -312,12 +314,13 @@ const celebrateOverlay=$("#celebrate");if(celebrateOverlay)celebrateOverlay.addE
 function renderNav(){ $("#nav").innerHTML=MODULES.map(m=>`<button type="button" class="nav-item ${m.id===currentView?"active":""}" data-action="nav" data-nav="${m.id}"${m.id===currentView?' aria-current="page"':""}><span class="nav-ico">${m.ico}</span><span class="nav-txt"><b>${esc(m.name)}</b><span>${esc(m.sub)}</span></span></button>`).join(""); }
 let globalSearchItems=[],globalSearchActive=-1;
 let _globalWorker=null,_globalRevision=0,_globalIndexedRevision=-1,_globalIndexingRevision=-1,_globalQueryId=0,_globalQueuedQuery=null,_globalIndexTimer=null;
-const GLOBAL_SEARCH_COLORS={Vault:"#ff79c6",Links:"#27b4ff","Parking Lot":"#f5a623",Folders:"#33d17a",Screenies:"#7c5cff"};
+const GLOBAL_SEARCH_COLORS={Vault:"#ff79c6",Links:"#27b4ff","Parking Lot":"#f5a623",Folders:"#33d17a",Screenies:"#7c5cff",Ideas:"#d7ac45"};
 function globalSearchSnapshot(){
   return {
     vault:(state.vault||[]).map(function(v){return {id:v.id,name:v.name,url:v.url,username:v.username,created:v.created};}),
     links:(state.links||[]).map(function(l){return {id:l.id,title:l.title,url:l.url,note:l.note,category:l.category,categories:l.categories,src:l.src,inLinks:l.inLinks,created:l.created};}),
     folders:(state.folders||[]).map(function(f){return {id:f.id,name:f.name,path:f.path,category:f.category,created:f.created};}),
+    ideas:(state.ideas||[]).map(function(i){return {id:i.id,title:i.title,details:i.details,original:i.original,references:i.references,type:i.type,status:i.status,group:i.group,attachments:i.attachments,importKey:i.importKey,reviewNote:i.reviewNote,reviewedAt:i.reviewedAt,created:i.created,updated:i.updated};}),
     shots:(state.shots||[]).map(function(s){return {id:s.id,name:s.name,path:s.path,collection:s.collection,created:s.created||s.added};})
   };
 }
@@ -344,7 +347,7 @@ function paintGlobalSearchResults(results){
   globalSearchItems=Array.isArray(results)?results:[];globalSearchActive=-1;
   if(!globalSearchItems.length){panel.innerHTML='<div class="gs-empty">No matches across S.I.R</div>';panel.classList.add("show");return;}
   const groups={};globalSearchItems.forEach(function(item,index){(groups[item.kind]=groups[item.kind]||[]).push({item:item,index:index});});
-  panel.innerHTML=["Vault","Links","Parking Lot","Folders","Screenies"].filter(function(kind){return groups[kind]&&groups[kind].length;}).map(function(kind){return '<div class="gs-group">'+esc(kind)+'</div>'+groups[kind].map(function(entry){const item=entry.item,color=GLOBAL_SEARCH_COLORS[kind]||"#27b4ff";return '<button type="button" class="gs-result" role="option" data-action="global-result" data-index="'+entry.index+'" style="--gs-color:'+color+'"><span class="gs-dot"></span><span class="gs-copy"><b>'+esc(item.title)+'</b><small>'+esc(item.detail||"")+'</small></span><span class="gs-kind">'+esc(kind)+'</span></button>';}).join("");}).join("");
+  panel.innerHTML=["Vault","Links","Parking Lot","Folders","Screenies","Ideas"].filter(function(kind){return groups[kind]&&groups[kind].length;}).map(function(kind){return '<div class="gs-group">'+esc(kind)+'</div>'+groups[kind].map(function(entry){const item=entry.item,color=GLOBAL_SEARCH_COLORS[kind]||"#27b4ff";return '<button type="button" class="gs-result" role="option" data-action="global-result" data-index="'+entry.index+'" style="--gs-color:'+color+'"><span class="gs-dot"></span><span class="gs-copy"><b>'+esc(item.title)+'</b><small>'+esc(item.detail||"")+'</small></span><span class="gs-kind">'+esc(kind)+'</span></button>';}).join("");}).join("");
   panel.classList.add("show");
 }
 function initGlobalSearchWorker(){
@@ -391,7 +394,11 @@ function renameStack(coll){
   setTimeout(function(){ var i=document.getElementById("rs_name"); if(i){ i.focus(); i.select(); } },30);
 }
 
-function renderView(){ if(monitoringMode){renderMonitoringView();return;} if(offlineMode){renderOfflineView();return;} if(currentView!=="lot"){ lotSelLinks={}; lotSelColls={}; } if(currentView!=="links"){ linkSelLinks={}; } const c=$("#content"); try{ c.parentElement.classList.toggle("lot-active", currentView==="lot"); }catch(_){} switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "lot":c.innerHTML=viewLot();break; case "folders":c.innerHTML=viewFolders();break; case "shots":c.innerHTML=viewShots(); shotsHydrateThumbs(); break; default:c.innerHTML=viewVault(); } hydrateModulePreviews(); }
+function renderView(){ if(monitoringMode){renderMonitoringView();return;} if(offlineMode){renderOfflineView();return;} if(currentView!=="lot"){ lotSelLinks={}; lotSelColls={}; } if(currentView!=="links"){ linkSelLinks={}; } const c=$("#content"); try{ c.parentElement.classList.toggle("lot-active", currentView==="lot"); }catch(_){} switch(currentView){ case "vault":c.innerHTML=viewVault();break; case "links":c.innerHTML=viewLinks();break; case "lot":c.innerHTML=viewLot();break; case "folders":c.innerHTML=viewFolders();break; case "shots":c.innerHTML=viewShots(); shotsHydrateThumbs(); break; case "ideas":c.innerHTML=viewIdeas();break; default:c.innerHTML=viewVault(); } hydrateModulePreviews(); }
+const LIST_ANCHOR_SELECTOR=".of-card,.mon-event,.mon-watch,.mon-artist-post,.idea-list-card,.vault-card,.link-card,.folder-row,.shot-card,.lot-row,.lot-item";
+function captureListPosition(preferredId){const content=$("#content");if(!content)return null;const rows=Array.from(content.querySelectorAll(LIST_ANCHOR_SELECTOR)),contentRect=content.getBoundingClientRect();let row=preferredId?rows.find(function(node){return node.dataset.id===String(preferredId);}):null;if(!row)row=rows.find(function(node){return node.getBoundingClientRect().bottom>contentRect.top+1;})||rows[rows.length-1];return {id:row&&row.dataset.id||"",ids:rows.map(function(node){return node.dataset.id||"";}).filter(Boolean),offset:row?row.getBoundingClientRect().top-contentRect.top:0,top:content.scrollTop};}
+function restoreListPosition(anchor,focus){if(!anchor)return;const apply=function(){const content=$("#content");if(!content)return;const ids=anchor.ids||[],index=ids.indexOf(anchor.id),order=[anchor.id].concat(index>=0?ids.slice(index+1):[],index>0?ids.slice(0,index).reverse():[]).filter(Boolean),rows=Array.from(content.querySelectorAll(LIST_ANCHOR_SELECTOR));let row=null;for(const id of order){row=rows.find(function(node){return node.dataset.id===id;});if(row)break;}if(row){const delta=row.getBoundingClientRect().top-content.getBoundingClientRect().top-anchor.offset;content.scrollTop=Math.max(0,content.scrollTop+delta);if(focus){row.classList.add("list-return-focus");setTimeout(function(){row.classList.remove("list-return-focus");},900);}}else content.scrollTop=Math.max(0,anchor.top||0);};requestAnimationFrame(apply);setTimeout(apply,120);}
+function renderViewAnchored(anchor,focus){renderView();restoreListPosition(anchor,focus);}
 function pageItemCount(){
   const content=$("#content");if(!content)return 0;
   if(offlineMode){if(content.querySelector(".of-reader"))return 1;return content.querySelectorAll(offlineTab==="sources"?".of-source":".of-card").length;}
@@ -413,34 +420,49 @@ function emptyState(i,m){ return `<div class="empty"><div class="e-ico">${i}</di
 
 function offlineDate(ts){if(!ts)return "Never";return new Date(ts).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});}
 function offlineItem(id){return (offlineData.items||[]).find(function(item){return item.id===id;});}
-async function loadOfflineData(){
+async function loadOfflineData(anchor){
   if(!E||!E.offlineLoad){toast("Offline Reader needs the desktop build","warn");return;}
   offlineLoading=true;renderView();
-  try{const result=await Promise.all([E.offlineLoad(),E.offlineAuthStatus()]);if(result[0])offlineData=result[0];if(result[1])offlineAuth=result[1];}
+  try{const result=await Promise.all([E.offlineLoad(),E.offlineExtensionStatus()]);if(result[0])offlineData=result[0];if(result[1])offlineExtension=result[1];offlineSyncing=!!(offlineData.sync&&(offlineData.sync.active||offlineData.sync.queued));}
   catch(error){toast("Could not load Offline Reader","err");}
-  offlineLoading=false;renderView();
+  offlineLoading=false;renderViewAnchored(anchor,false);
 }
 function setOfflineMode(enabled,quiet){
   closeSettings();
   if(enabled&&monitoringMode)setMonitoringMode(false,true);
-  offlineMode=!!enabled;offlineSelectedId="";
+  offlineMode=!!enabled;offlineSelectedId="";offlineBrowseIds=[];offlineReturnAnchor=null;
   const win=$("#window"),button=$("#offlineToggle");if(win)win.classList.toggle("offline-mode",offlineMode);
   if(button){button.classList.toggle("active",offlineMode);const label=button.querySelector("b");if(label)label.textContent="Offline";button.title=offlineMode?"Return to normal SINRAD":"Switch to the Offline Reader";}
   if(offlineMode)loadOfflineData();else if(!quiet){renderNav();renderView();}
 }
 function offlineFilteredItems(){
   const query=offlineQuery.trim().toLowerCase();
-  return (offlineData.items||[]).filter(function(item){
-    if(offlineFilter==="unread"&&item.read)return false;if(offlineFilter==="favorite"&&!item.favorite)return false;
+  const filtered=(offlineData.items||[]).filter(function(item){
+    if(offlineFilter==="unread"&&(item.read||item.favorite))return false;if(offlineFilter==="history"&&(!item.read||item.favorite))return false;if(offlineFilter==="favorite"&&!item.favorite)return false;
     return !query||[item.title,item.author,item.content,item.community,item.platform].some(function(value){return String(value||"").toLowerCase().includes(query);});
   });
+  return offlineMixSources(filtered);
+}
+function offlineMixSources(items){
+  const pools=new Map(),order=[];(Array.isArray(items)?items:[]).forEach(function(item){const key=String(item.sourceId||item.community||item.platform||item.id);if(!pools.has(key)){pools.set(key,[]);order.push(key);}pools.get(key).push(item);});
+  const mixed=[],active=order.slice();while(active.length){for(let index=0;index<active.length;){const pool=pools.get(active[index]);if(pool&&pool.length)mixed.push(pool.shift());if(!pool||!pool.length)active.splice(index,1);else index++;}}return mixed;
 }
 function offlineSourceName(item){const source=(offlineData.sources||[]).find(function(entry){return entry.id===item.sourceId;});return source?source.label:(item.community||item.platform);}
+function offlineRedditName(item){const match=String(item&&item.community||"").match(/^r\/([A-Za-z0-9_]{2,21})$/i);return match?match[1]:"";}
+function offlineRedditSource(item){const name=offlineRedditName(item).toLowerCase();return name?(offlineData.sources||[]).find(function(source){return source.platform==="reddit"&&String(source.handle||"").toLowerCase()===name;}):null;}
+function offlineItemMenu(item,includeBack){
+  let menu=includeBack?mi("offline-item-back","","Back",null,false,CTX_ICON.back):mi("offline-item-open",item.id,"Open post",null,false,"↗");
+  if(includeBack){const neighbors=offlinePostNeighbors(item.id);menu+='<div class="cdiv"></div>';if(neighbors.previous)menu+=mi("offline-item-nav",neighbors.previous.id,"Previous post",null,false,"←");if(neighbors.next)menu+=mi("offline-item-nav",neighbors.next.id,"Next post",null,false,"→");}
+  const reddit=offlineRedditName(item),source=offlineRedditSource(item);
+  if(reddit)menu+='<div class="cdiv"></div>'+(source?mi("offline-source-refresh",source.id,"Sync r/"+reddit+" now",null,false,"↻"):mi("offline-source-follow",item.id,"Add r/"+reddit+" to Offline",null,false,CTX_ICON.download));
+  return menu+'<div class="cdiv"></div>'+(item.read?mi("offline-item-unread",item.id,"Mark as unread",null,false,"○"):"")+mi("offline-item-favorite",item.id,item.favorite?"Remove favorite":"Favorite",null,false,CTX_ICON.star)+mi("offline-original",item.id,"Open original")+mi("offline-item-remove",item.id,"Delete post","#ff5470",true,CTX_ICON.delete)+(offlineFilter==="history"?mi("offline-history-clear","","Clear all history","#ff5470",true,CTX_ICON.delete):"");
+}
+function offlinePostNeighbors(id){const ids=offlineBrowseIds.includes(id)?offlineBrowseIds:offlineFilteredItems().map(function(item){return item.id;}),index=ids.indexOf(id);return {previous:index>0?offlineItem(ids[index-1]):null,next:index>=0&&index<ids.length-1?offlineItem(ids[index+1]):null};}
 function offlineMediaKind(ref){return /\.(?:mp4|webm)$/i.test(String(ref||""))?"video":"image";}
 function offlineMediaUrl(ref){const match=String(ref||"").replace(/\\/g,"/").match(/^media\/((?:[a-f0-9]{24}\/)?[a-f0-9]{64}\.(?:mp4|webm))$/i);return match?"sinrad-offline://media/"+match[1].split("/").map(encodeURIComponent).join("/"):"";}
 function offlineAvatar(ref,label){return ref?'<img class="of-avatar" data-offline-media="'+esc(ref)+'" alt="'+esc(label||'User avatar')+'" loading="lazy">':'<span class="of-avatar fallback" aria-hidden="true">u/</span>';}
-function offlineCommentMedia(comment){return (Array.isArray(comment.media)?comment.media:[]).map(function(ref,index){if(offlineMediaKind(ref)==="video")return '<video class="of-comment-media" src="'+esc(offlineMediaUrl(ref))+'" autoplay loop muted playsinline controls aria-label="Comment video '+(index+1)+'"></video>';return '<img class="of-comment-media" data-offline-media="'+esc(ref)+'" alt="Comment image '+(index+1)+'" loading="lazy">';}).join("");}
-function offlineMediaTag(item,detail){const refs=Array.isArray(item.media)?item.media:[],ref=refs.find(function(value){return offlineMediaKind(value)==="image";});return ref?'<img class="of-media'+(detail?' detail':'')+'" data-offline-media="'+esc(ref)+'" alt="" loading="lazy">':"";}
+function offlineCommentMedia(comment){const gifs=new Set(Array.isArray(comment.gifMedia)?comment.gifMedia:[]);return (Array.isArray(comment.media)?comment.media:[]).map(function(ref,index){if(offlineMediaKind(ref)==="video"){const gif=gifs.has(ref);return '<video class="of-comment-media'+(gif?' gif':'')+'" src="'+esc(offlineMediaUrl(ref))+'" autoplay loop muted playsinline '+(gif?'':'controls ')+'aria-label="Comment '+(gif?'GIF ':'video ')+(index+1)+'"></video>';}return '<img class="of-comment-media" data-offline-media="'+esc(ref)+'" alt="Comment image '+(index+1)+'" loading="lazy">';}).join("");}
+function offlineMediaTag(item,detail){const refs=Array.isArray(item.media)?item.media:[],ref=refs.find(function(value){return offlineMediaKind(value)==="video";})||refs.find(function(value){return offlineMediaKind(value)==="image";});if(!ref)return "";if(offlineMediaKind(ref)==="video")return '<video class="of-media'+(detail?' detail':'')+' of-video-preview" src="'+esc(offlineMediaUrl(ref))+'" autoplay muted loop playsinline preload="metadata" data-preview-loop="5" aria-label="Video preview"></video>';return '<img class="of-media'+(detail?' detail':'')+'" data-offline-media="'+esc(ref)+'" alt="" loading="lazy">';}
 function offlineGallery(item){
   const refs=Array.isArray(item.media)?item.media.filter(Boolean):[];if(!refs.length)return "";
   const images=refs.map(function(ref,index){const active=index===0?' active':'',position=' data-gallery-image="'+index+'"';if(offlineMediaKind(ref)==="video")return '<video class="of-gallery-video'+active+'"'+position+' src="'+esc(offlineMediaUrl(ref))+'" controls preload="metadata" playsinline aria-label="Post video '+(index+1)+' of '+refs.length+'"></video>';return '<img class="of-gallery-image'+active+'" data-offline-media="'+esc(ref)+'"'+position+' alt="Post image '+(index+1)+' of '+refs.length+'" loading="lazy">';}).join("");
@@ -456,7 +478,8 @@ function offlinePostBody(item){
 function offlineFeedCard(item){
   const author=item.author?'<span>u/'+esc(item.author)+'</span>':'<span>Offline snapshot</span>';
   const postStats=item.platform==="reddit"?'<span>▲ '+esc(item.score)+'</span><span>◌ '+esc(item.commentCount)+'</span>':'<span>'+esc(Math.max(1,Math.round((item.captureSize||0)/1024)))+' KB</span><span>MHTML</span>';
-  return '<article class="of-card'+(item.read?' read':'')+(item.captureRef?' captured':'')+'" data-action="offline-item-open" data-id="'+esc(item.id)+'">'+offlineMediaTag(item,false)+'<div class="of-card-copy"><div class="of-card-meta"><b>'+esc(item.platform.toUpperCase())+'</b><span>'+esc(offlineSourceName(item))+'</span><time>'+esc(offlineDate(item.date))+'</time></div><h2>'+esc(item.title)+'</h2><p>'+esc(item.content||((item.media&&item.media.length)?"Media post":"Open to read the saved post"))+'</p><div class="of-card-foot">'+author+postStats+'<button type="button" data-action="offline-item-favorite" data-id="'+esc(item.id)+'" title="Favorite">'+(item.favorite?'★':'☆')+'</button></div></div></article>';
+  const score=Number(item.score)||0,comments=Number(item.commentCount)||0,interest=item.platform!=="reddit"?"":(score>=500||comments>=80?'<span class="of-interest popular">Popular</span>':(score>=75||comments>=20?'<span class="of-interest">Interesting</span>':""));
+  return '<article class="of-card'+(item.read?' read':'')+(item.captureRef?' captured':'')+'" data-action="offline-item-open" data-ctx="offline-item" data-id="'+esc(item.id)+'">'+offlineMediaTag(item,false)+'<div class="of-card-copy"><div class="of-card-meta"><b>'+esc(item.platform.toUpperCase())+'</b><span>'+esc(offlineSourceName(item))+'</span>'+interest+'<time>'+esc(offlineDate(item.date))+'</time></div><h2>'+esc(item.title)+'</h2><p>'+esc(item.content||((item.media&&item.media.length)?"Media post":"Open to read the saved post"))+'</p><div class="of-card-foot">'+author+postStats+'<button type="button" data-action="offline-item-favorite" data-id="'+esc(item.id)+'" title="Favorite">'+(item.favorite?'★':'☆')+'</button></div></div></article>';
 }
 function viewOfflineDetail(item){
   const savedComments=item.comments||[];
@@ -464,22 +487,22 @@ function viewOfflineDetail(item){
   const flair=item.authorFlair?'<span class="of-author-flair">'+esc(item.authorFlair)+'</span>':'';
   const byline=(item.author?'u/'+esc(item.author)+flair+' · ':'')+'cached '+esc(offlineDate(item.downloadedAt)),postFlair=item.postFlair?'<span class="of-post-flair">'+esc(item.postFlair)+'</span>':'';
   const stats=item.platform==="reddit"?'<div class="of-post-stats"><span>▲ '+esc(item.score)+'</span><span>◌ '+esc(item.commentCount)+' comments</span></div>':'';
-  return '<div class="of-reader"><button type="button" class="mode-back" data-action="offline-item-back">← Back</button><article class="of-article"><div class="of-post-head"><div class="of-kicker">'+esc(item.platform.toUpperCase())+' · '+esc(offlineSourceName(item))+' · '+esc(offlineDate(item.date))+'</div><h1>'+esc(item.title)+'</h1><div class="of-author-row">'+offlineAvatar(item.authorAvatar,'u/'+(item.author||'[deleted]'))+'<div><div class="of-byline">'+byline+'</div>'+postFlair+'</div></div></div>'+offlineGallery(item)+offlinePostBody(item)+stats+comments+'</article></div>';
+  return '<div class="of-reader" data-ctx="offline-item" data-id="'+esc(item.id)+'"><button type="button" class="mode-back" data-action="offline-item-back">← Back</button><article class="of-article"><div class="of-post-head"><div class="of-kicker">'+esc(item.platform.toUpperCase())+' · '+esc(offlineSourceName(item))+' · '+esc(offlineDate(item.date))+'</div><h1>'+esc(item.title)+'</h1><div class="of-author-row">'+offlineAvatar(item.authorAvatar,'u/'+(item.author||'[deleted]'))+'<div><div class="of-byline">'+byline+'</div>'+postFlair+'</div></div></div>'+offlineGallery(item)+offlinePostBody(item)+stats+comments+'</article></div>';
 }
 function viewOfflineSources(){
-  const auth=offlineAuth.connected?'<div class="of-connect connected"><span class="of-source-icon reddit">r/</span><div><b>Reddit connected</b><small>u/'+esc(offlineAuth.username)+' · credentials '+(offlineAuth.secure?'encrypted':'protected locally')+'</small></div><button class="btn sm ghost" data-action="offline-reddit-disconnect">Disconnect</button></div>':'<div class="of-connect"><span class="of-source-icon reddit">r/</span><div><b>Connect Reddit</b><small>Uses Reddit OAuth and its official Data API.</small></div><button class="btn sm primary" data-action="offline-reddit-connect">Connect</button></div>';
-  const sources=(offlineData.sources||[]).length?'<div class="of-source-list">'+offlineData.sources.map(function(source){return '<article class="of-source"><span class="of-source-icon reddit">r/</span><div><b>'+esc(source.label)+'</b><small>'+esc(source.sort)+' '+esc(source.limit)+' posts · every '+esc(source.intervalHours)+'h'+(source.topComments?' · '+esc(source.topComments)+' comments':'')+'</small><small class="'+(source.lastError?'error':'')+'">'+(source.lastError?esc(source.lastError):'Last sync: '+esc(offlineDate(source.lastSync)))+'</small></div><button class="btn sm ghost" data-action="offline-source-refresh" data-id="'+esc(source.id)+'">Sync</button><button class="btn sm danger" data-action="offline-source-remove" data-id="'+esc(source.id)+'">Remove</button></article>';}).join("")+'</div>':emptyState("r/","No Reddit feeds yet. Connect Reddit, then add a subreddit.");
-  return '<div class="of-sources">'+auth+'<div class="of-source-actions"><button class="btn primary" data-action="offline-source-add"'+(offlineAuth.connected?'':' disabled')+'>＋ Add subreddit</button><button class="btn ghost" data-action="offline-retention">Retention: '+esc(offlineData.settings.retentionDays)+' days</button></div>'+sources+'<div class="of-coming"><b>Adapter slots ready</b><span>YouTube transcripts and X/Twitter can plug into this same feed later.</span></div></div>';
+  const bridge=offlineExtension.connected?'<div class="of-connect connected"><span class="of-source-icon reddit">r/</span><div><b>Browser extension connected</b><small>Reddit pages are saved with your normal browser session. No Reddit API.</small></div></div>':'<div class="of-connect"><span class="of-source-icon reddit">r/</span><div><b>Browser extension not detected</b><small>Subscriptions can be added now, but downloads wait until the SINRAD extension is running.</small></div><button class="btn sm primary" data-action="offline-extension-open">Open extension folder</button></div>';
+  const sources=(offlineData.sources||[]).length?'<div class="of-source-list">'+offlineData.sources.map(function(source){return '<article class="of-source" data-ctx="offline-source" data-id="'+esc(source.id)+'"><span class="of-source-icon reddit">r/</span><div><b>'+esc(source.label)+'</b><small>Keeps '+esc(source.limit)+' unread posts · every '+esc(source.intervalHours)+'h</small><small class="'+(source.lastError?'error':'')+'">'+(source.lastError?esc(source.lastError):(source.syncRequestedAt?'Waiting for browser extension':'Last sync: '+esc(offlineDate(source.lastSync))))+'</small></div></article>';}).join("")+'</div>':emptyState("r/","No Reddit feeds yet. Add a subreddit and the browser extension will save new posts.");
+  return '<div class="of-sources">'+bridge+'<div class="of-source-actions"><button class="btn primary" data-action="offline-source-add">＋ Add subreddit</button></div>'+sources+'<div class="of-coming"><b>How it works</b><span>The extension opens new Reddit posts in inactive tabs, saves them like the manual offline action, then closes those tabs.</span></div></div>';
 }
 function renderOfflineView(){
   const content=$("#content");if(!content)return;
   if(offlineLoading){content.innerHTML='<div class="of-loading"><i></i><b>Loading Offline Reader…</b></div>';return;}
   const selected=offlineSelectedId&&offlineItem(offlineSelectedId);if(selected){content.innerHTML=viewOfflineDetail(selected);hydrateOfflineMedia();return;}
-  const items=offlineFilteredItems(),unread=(offlineData.items||[]).filter(function(item){return !item.read;}).length;
-  const nav='<header class="of-head"><div class="mode-heading"><button type="button" class="mode-back" data-action="offline-exit">← Back</button><div><span class="of-mode-mark"><i></i> OFFLINE READER</span><h1>Your cached feed</h1><p>Everything shown here remains available without internet.</p></div></div><div class="of-head-actions">'+pageCounterMarkup()+'<button class="btn ghost" data-action="offline-refresh"'+(offlineSyncing?' disabled':'')+'>'+(offlineSyncing?'Syncing…':'↻ Sync now')+'</button></div></header><nav class="of-tabs"><button class="'+(offlineTab==='feed'?'active':'')+'" data-action="offline-tab" data-tab="feed">Feed <b>'+esc(offlineData.items.length)+'</b></button><button class="'+(offlineTab==='sources'?'active':'')+'" data-action="offline-tab" data-tab="sources">Sources <b>'+esc(offlineData.sources.length)+'</b></button><span></span><small>'+esc(unread)+' unread · updated '+esc(offlineDate(offlineData.updatedAt))+'</small></nav>';
+  const items=offlineFilteredItems(),unread=(offlineData.items||[]).filter(function(item){return !item.read&&!item.favorite;}).length;
+  const storage=offlineData.storage||{bytes:0,files:0},nav='<header class="of-head"><div class="mode-heading"><button type="button" class="mode-back" data-action="offline-exit">← Back</button><div><span class="of-mode-mark"><i></i> OFFLINE READER</span><h1>Your cached feed</h1><p>Everything shown here remains available without internet.</p></div></div><div class="of-head-actions"><span class="of-storage">'+esc(offlineBytes(storage.bytes))+' · '+esc(storage.files||0)+' files</span>'+pageCounterMarkup()+'<button class="btn ghost of-sync-button" data-action="offline-refresh"'+(offlineSyncing?' disabled':'')+'>'+(offlineSyncing?'<i></i> Syncing':'↻ Sync now')+'</button></div></header><nav class="of-tabs"><button class="'+(offlineTab==='feed'?'active':'')+'" data-action="offline-tab" data-tab="feed">Feed <b>'+esc(offlineData.items.length)+'</b></button><button class="'+(offlineTab==='sources'?'active':'')+'" data-action="offline-tab" data-tab="sources">Sources <b>'+esc(offlineData.sources.length)+'</b></button><span></span><small>'+esc(unread)+' unread · updated '+esc(offlineDate(offlineData.updatedAt))+'</small></nav>';
   if(offlineTab==="sources"){content.innerHTML='<div class="offline-shell">'+nav+viewOfflineSources()+'</div>';return;}
-  const toolbar='<div class="of-toolbar"><input id="offlineSearch" value="'+esc(offlineQuery)+'" placeholder="Search downloaded posts…"><div><button class="'+(offlineFilter==='all'?'active':'')+'" data-action="offline-filter" data-filter="all">All</button><button class="'+(offlineFilter==='unread'?'active':'')+'" data-action="offline-filter" data-filter="unread">Unread</button><button class="'+(offlineFilter==='favorite'?'active':'')+'" data-action="offline-filter" data-filter="favorite">Favorites</button></div></div>';
-  const body=items.length?'<div class="of-feed">'+items.map(offlineFeedCard).join("")+'</div>':emptyState("◫",offlineData.items.length?"No downloaded posts match this filter.":"Your offline feed is empty. Add a source, then sync it while online.");
+  const layout=offlineData.settings&&offlineData.settings.feedLayout==="scroll"?"scroll":"cards",toolbar='<div class="of-toolbar"><input id="offlineSearch" value="'+esc(offlineQuery)+'" placeholder="Search downloaded posts…"><div><button class="'+(offlineFilter==='unread'?'active':'')+'" data-action="offline-filter" data-filter="unread">Unread</button><button class="'+(offlineFilter==='history'?'active':'')+'" data-action="offline-filter" data-filter="history">History</button><button class="'+(offlineFilter==='favorite'?'active':'')+'" data-action="offline-filter" data-filter="favorite">Favorites</button></div><div class="of-layout-switch"><button class="'+(layout==='cards'?'active':'')+'" data-action="offline-layout" data-layout="cards">Cards</button><button class="'+(layout==='scroll'?'active':'')+'" data-action="offline-layout" data-layout="scroll">Scroll</button></div></div>';
+  const body=items.length?'<div class="of-feed '+layout+'">'+items.map(offlineFeedCard).join("")+'</div>':emptyState("◫",offlineData.items.length?"Nothing is in "+(offlineFilter==="favorite"?"Favorites":offlineFilter.charAt(0).toUpperCase()+offlineFilter.slice(1))+".":"Your offline feed is empty. Add a source, then sync it while online.");
   content.innerHTML='<div class="offline-shell">'+nav+toolbar+body+'</div>';hydrateOfflineMedia();
 }
 function hydrateOfflineMedia(){
@@ -489,20 +512,24 @@ function hydrateOfflineMedia(){
     if(offlineMediaCache.has(ref)){image.src=offlineMediaCache.get(ref);return;}
     E.offlineMedia(ref).then(function(src){if(src){offlineMediaCache.set(ref,src);image.src=src;}else image.remove();}).catch(function(){image.remove();});
   });
+  document.querySelectorAll("video[data-preview-loop]").forEach(function(video){if(video.dataset.previewBound)return;video.dataset.previewBound="1";video.muted=true;video.addEventListener("timeupdate",function(){const limit=Number(video.dataset.previewLoop)||5;if(video.currentTime>=Math.min(limit,video.duration||limit)){video.currentTime=0;video.play().catch(function(){});}});video.play().catch(function(){});});
+  document.querySelectorAll("video.of-comment-media").forEach(function(video){if(video.dataset.gifCheck)return;video.dataset.gifCheck="1";const present=function(){if(video.classList.contains("gif")||(Number.isFinite(video.duration)&&video.duration>0&&video.duration<=6)){video.controls=false;video.muted=true;video.loop=true;video.classList.add("gif");video.play().catch(function(){});}};video.addEventListener("loadedmetadata",present,{once:true});present();});
 }
-function redditConnectModal(){
-  const body='<p class="of-modal-note">Create or request a Reddit Data API app, choose an installed app, and set this exact redirect URI:</p><div class="of-copyline">http://127.0.0.1:47821/reddit/callback</div><button type="button" class="btn sm ghost" data-action="offline-reddit-help">Open Reddit API setup ↗</button><div class="field"><label>Reddit client ID</label><input id="or_client" placeholder="Client ID"></div><div class="field"><label>Your Reddit username</label><input id="or_user" placeholder="without u/"></div>';
-  openModal("Connect Reddit",body,"Connect",async function(){const button=$("#modal-confirm");if(button){button.disabled=true;button.textContent="Opening Reddit…";}const result=await E.offlineRedditConnect({clientId:$("#or_client").value,username:$("#or_user").value});if(!result||!result.ok){if(button){button.disabled=false;button.textContent="Connect";}toast(result&&result.error||"Could not start Reddit connection","err");return;}closeModal();toast("Approve access in the Reddit tab","ok");});
-}
+function offlineBytes(bytes){const value=Math.max(0,Number(bytes)||0),units=["B","KB","MB","GB"];let size=value,index=0;while(size>=1024&&index<units.length-1){size/=1024;index++;}return (index?size.toFixed(size>=10?1:2):String(Math.round(size)))+" "+units[index];}
 function redditSourceModal(){
-  const body='<div class="field"><label>Subreddit</label><input id="ors_name" placeholder="e.g. AskReddit"></div><div class="field"><label>Posts per sync</label><input id="ors_limit" type="number" min="1" max="100" value="30"></div><div class="field"><label>Update every</label><select id="ors_interval"><option value="6">6 hours</option><option value="12">12 hours</option><option value="24" selected>Daily</option><option value="168">Weekly</option></select></div><div class="field"><label>Sort</label><select id="ors_sort"><option value="new">Newest</option><option value="hot">Hot</option><option value="top">Top</option></select></div><div class="field"><label>Useful top comments</label><select id="ors_comments"><option value="0">None — fastest</option><option value="3">Top 3</option><option value="5">Top 5</option></select></div>';
-  openModal("Add Reddit feed",body,"Add & sync",async function(){const button=$("#modal-confirm");if(button){button.disabled=true;button.textContent="Adding…";}const result=await E.offlineSourceAdd({platform:"reddit",handle:$("#ors_name").value,limit:Number($("#ors_limit").value),intervalHours:Number($("#ors_interval").value),sort:$("#ors_sort").value,topComments:Number($("#ors_comments").value)});if(!result||!result.ok){if(button){button.disabled=false;button.textContent="Add & sync";}toast(result&&result.error||"Could not add source","err");return;}closeModal();await loadOfflineData();toast("Reddit feed added — first sync started","ok");});
+  const body='<div class="field"><label>Subreddit</label><input id="ors_name" placeholder="e.g. AskReddit"></div><div class="field"><label>Unread posts to keep</label><input id="ors_limit" type="number" min="1" max="100" value="30"></div><div class="field"><label>Update every</label><select id="ors_interval"><option value="6">6 hours</option><option value="12">12 hours</option><option value="24" selected>Daily</option><option value="168">Weekly</option></select></div><div class="hint">Sync clears read posts that are not favorites, then refills the unread pool. No Reddit API is used.</div>';
+  openModal("Add Reddit feed",body,"Add to downloads",async function(){const button=$("#modal-confirm");if(button){button.disabled=true;button.textContent="Adding…";}const result=await E.offlineSourceAdd({platform:"reddit",handle:$("#ors_name").value,limit:Number($("#ors_limit").value),intervalHours:Number($("#ors_interval").value),sort:"new",topComments:0});if(!result||!result.ok){if(button){button.disabled=false;button.textContent="Add to downloads";}toast(result&&result.error||"Could not add source","err");return;}closeModal();await loadOfflineData();toast(offlineExtension.connected?"Reddit download queued":"Added — waiting for the browser extension",offlineExtension.connected?"ok":"warn");});
+}
+function offlineSourceLimitModal(source){const body='<div class="field"><label>Unread posts to keep for r/'+esc(source.handle)+'</label><input id="ofs_limit" type="number" min="1" max="100" value="'+esc(source.limit)+'"><div class="hint">Favorites are kept separately and never removed by Sync.</div></div>';openModal("Offline post limit",body,"Save",async function(){const result=await E.offlineSourceUpdate(source.id,{limit:Number($("#ofs_limit").value)});if(!result){toast("Could not change the post limit","err");return;}closeModal();await loadOfflineData();toast("Post limit updated","ok");});}
+function offlineExtensionRequiredModal(name){
+  const community=name?"r/"+name:"this community";
+  openModal("Browser extension not connected",'<div class="field"><b>'+esc(community)+' was added to downloads</b><div class="hint">SINRAD will start saving posts automatically when the browser extension connects. No Reddit API is needed.</div></div><div class="field"><label>Connection status</label><div>Not connected</div></div>',"Open extension folder",function(){closeModal();if(E&&E.extOpen)E.extOpen();});
 }
 function offlineRetentionModal(){
-  const body='<div class="field"><label>Keep downloaded posts for</label><input id="of_retention" type="number" min="1" max="3650" value="'+esc(offlineData.settings.retentionDays)+'"><div class="hint">Days. Favorites are always kept.</div></div><div class="field"><label>Maximum cached posts</label><input id="of_max" type="number" min="100" max="20000" value="'+esc(offlineData.settings.maxItems)+'"></div>';
-  openModal("Offline storage",body,"Save",async function(){const result=await E.offlineSettings({retentionDays:Number($("#of_retention").value),maxItems:Number($("#of_max").value)});if(result){offlineData=result;closeModal();renderView();toast("Offline retention updated","ok");}else toast("Could not save retention settings","err");});
+  const settings=offlineData.settings||{},body='<div class="field"><label>Refresh downloaded posts after</label><input id="of_fresh_days" type="number" min="1" max="30" value="'+esc(settings.freshnessDays||3)+'"><div class="hint">Days. Older non-favorites are removed and subscribed feeds refill with newer posts.</div></div><div class="field"><label>History cleanup</label><select id="of_history_mode"><option value="manual"'+(settings.historyCleanupMode==="manual"?' selected':'')+'>Manual only</option><option value="age"'+(settings.historyCleanupMode==="age"?' selected':'')+'>After a set time</option><option value="storage"'+(settings.historyCleanupMode==="storage"?' selected':'')+'>When storage reaches a limit</option></select></div><div class="field"><label>Delete history after</label><input id="of_history_hours" type="number" min="1" max="87600" value="'+esc(settings.historyRetentionHours||24)+'"><div class="hint">Hours after the post was read. Used only for timed cleanup.</div></div><div class="field"><label>Storage limit</label><input id="of_history_mb" type="number" min="100" max="102400" value="'+esc(settings.historyStorageMB||1024)+'"><div class="hint">MB. Oldest History posts are removed first; Favorites and Unread are protected.</div></div><div class="field"><label>Maximum cached posts</label><input id="of_max" type="number" min="100" max="20000" value="'+esc(settings.maxItems)+'"></div>';
+  openModal("Offline history",body,"Save",async function(){const result=await E.offlineSettings({freshnessDays:Number($("#of_fresh_days").value),historyCleanupMode:$("#of_history_mode").value,historyRetentionHours:Number($("#of_history_hours").value),historyStorageMB:Number($("#of_history_mb").value),maxItems:Number($("#of_max").value)});if(result){offlineData=result;closeModal();renderView();toast("Offline cleanup updated","ok");}else toast("Could not save offline settings","err");});
 }
-if(E&&E.onOfflineChanged)E.onOfflineChanged(function(data){if(data)offlineData=data;if(offlineMode){offlineLoading=false;offlineSyncing=false;E.offlineAuthStatus().then(function(status){offlineAuth=status;renderView();});}});
+if(E&&E.onOfflineChanged)E.onOfflineChanged(function(data){const anchor=offlineMode&&!offlineSelectedId?captureListPosition():null;if(data)offlineData=data;offlineSyncing=!!(offlineData.sync&&(offlineData.sync.active||offlineData.sync.queued));if(offlineMode){offlineLoading=false;E.offlineExtensionStatus().then(function(status){offlineExtension=status;renderViewAnchored(anchor,false);});}});
 
 function monitoringDate(ts){if(!ts)return "Never";return new Date(ts).toLocaleString([],{month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"});}
 function monitoringMonitor(id){return (monitoringData.monitors||[]).find(function(item){return item.id===id;});}
@@ -524,32 +551,47 @@ function hydrateMonitoringMedia(){
     E.monitoringMedia(ref).then(function(src){if(src){monitoringMediaCache.set(ref,src);image.src=src;}else image.remove();}).catch(function(){image.remove();});
   });
 }
-async function loadMonitoringData(){
+async function loadMonitoringData(anchor){
   if(!E||!E.monitoringLoad){toast("Monitoring Mode needs the desktop build","warn");return;}
   monitoringLoading=true;renderView();
   try{const result=await E.monitoringLoad();if(result)monitoringData=result;}catch(_){toast("Could not load Monitoring Mode","err");}
-  monitoringLoading=false;renderView();
+  monitoringLoading=false;renderViewAnchored(anchor,false);
 }
 function setMonitoringMode(enabled,quiet){
   closeSettings();
   if(enabled&&offlineMode)setOfflineMode(false,true);
-  monitoringMode=!!enabled;if(!monitoringMode){monitoringDetailRequest++;monitoringArtistRequest++;monitoringDetail=null;monitoringDetailLoading=false;monitoringArtist=null;monitoringArtistLoading=false;}const win=$("#window"),button=$("#monitoringToggle");if(win)win.classList.toggle("monitoring-mode",monitoringMode);
+  monitoringMode=!!enabled;if(!monitoringMode){monitoringDetailRequest++;monitoringArtistRequest++;monitoringDetail=null;monitoringDetailLoading=false;monitoringArtist=null;monitoringArtistLoading=false;monitoringReturnAnchor=null;monitoringArtistReturnAnchor=null;}const win=$("#window"),button=$("#monitoringToggle");if(win)win.classList.toggle("monitoring-mode",monitoringMode);
   if(button){button.classList.toggle("active",monitoringMode);const label=button.querySelector("b");if(label)label.textContent="Monitor";button.title=monitoringMode?"Return to normal SINRAD":"Switch to Monitoring Mode";}
   if(monitoringMode)loadMonitoringData();else if(!quiet){renderNav();renderView();}
 }
 function leaveMonitoringPost(){
   if(!monitoringMode||(!monitoringDetail&&!monitoringDetailLoading))return false;
-  monitoringDetailRequest++;monitoringDetail=null;monitoringDetailLoading=false;monitoringFocusId="";renderView();return true;
+  const anchor=monitoringReturnAnchor;monitoringDetailRequest++;monitoringDetail=null;monitoringDetailLoading=false;monitoringFocusId="";renderViewAnchored(anchor,true);return true;
 }
 function leaveMonitoringArtist(){
   if(!monitoringMode||(!monitoringArtist&&!monitoringArtistLoading))return false;
-  monitoringArtistRequest++;monitoringArtist=null;monitoringArtistLoading=false;monitoringFocusId="";renderView();return true;
+  const anchor=monitoringArtistReturnAnchor;monitoringArtistRequest++;monitoringArtist=null;monitoringArtistLoading=false;monitoringFocusId="";monitoringArtistReturnAnchor=null;renderViewAnchored(anchor,true);return true;
 }
 function toggleMonitoringMode(){closeSettings();if(!leaveMonitoringPost()&&!leaveMonitoringArtist())setMonitoringMode(!monitoringMode);}
 function monitoringEventCard(item){
   const monitor=monitoringMonitor(item.monitorId),source=item.kind==="f95"?"F95ZONE":"PAWCHIVE";
   const avatar=monitoringMediaTag(monitor&&monitor.avatarRef,"mon-event-avatar-img",monitor&&monitor.label),preview=monitoringMediaTag(item.mediaRef,"mon-event-preview",item.title);
   return '<article class="mon-event'+(item.mediaRef?' has-image':' text-only')+(item.read?' read':'')+(item.id===monitoringFocusId?' focused':'')+'" data-action="monitoring-event-open" data-id="'+esc(item.id)+'" title="Open update"><div class="mon-event-media">'+(preview||'<div class="mon-event-placeholder"><b>'+esc(source)+'</b><span>'+esc(item.kind==='f95'?'New thread reply':'New creator post')+'</span></div>')+'<span class="mon-source '+esc(item.kind)+'">'+source+'</span><span class="mon-event-avatar"><i>'+(item.kind==='f95'?'F':esc((monitor&&monitor.label||'P').charAt(0)))+'</i>'+avatar+'</span></div><div class="mon-event-copy"><div class="mon-event-meta"><b>'+esc(monitor&&monitor.label||source)+'</b><time>'+esc(monitoringDate(item.date))+'</time></div><h2>'+esc(item.title)+'</h2>'+(item.summary?'<p>'+esc(item.summary)+'</p>':'')+'</div></article>';
+}
+function rememberMonitoringReturn(id){const content=$("#content");monitoringReturnScroll=content?content.scrollTop:0;monitoringReturnId=String(id||"");monitoringReturnAnchor=captureListPosition(id);}
+function monitoringPostNeighbors(){
+  if(!monitoringDetail)return {previous:null,next:null};let items=[],current="",kind="";
+  if(monitoringDetail.eventId){kind="event";items=monitoringFilteredEvents().filter(function(item){return item.kind==="pawchive";}).map(function(item){return String(item.id);});current=String(monitoringDetail.eventId);}
+  else if(monitoringArtist&&monitoringDetail.postId){kind="artist";items=monitoringArtistRangeInfo(monitoringArtist).posts.map(function(item){return String(item.postId);});current=String(monitoringDetail.postId);}
+  const index=items.indexOf(current),make=function(target){return target==null?null:{kind:kind,id:target};};return {previous:index>0?make(items[index-1]):null,next:index>=0&&index<items.length-1?make(items[index+1]):null};
+}
+function monitoringPostNavigationMenu(){const neighbors=monitoringPostNeighbors();return (neighbors.previous?mi("monitoring-post-nav","previous","Previous post",null,false,"←"):"")+(neighbors.next?mi("monitoring-post-nav","next","Next post",null,false,"→"):"");}
+async function navigateMonitoringPost(direction){
+  const target=monitoringPostNeighbors()[direction];if(!target){toast(direction==="previous"?"No previous post":"No next post","warn");return;}
+  const requestId=++monitoringDetailRequest;monitoringDetailLoading=true;renderView();let result=null;
+  if(target.kind==="event"&&E&&E.monitoringPostDetail){const item=monitoringEvent(target.id);if(item&&!item.read&&E.monitoringEventUpdate){item.read=true;await E.monitoringEventUpdate(item.id,{read:true});}result=await E.monitoringPostDetail(target.id);}
+  else if(target.kind==="artist"&&monitoringArtist&&E&&E.monitoringArtistPostDetail)result=await E.monitoringArtistPostDetail(monitoringArtist.monitorId,target.id);
+  if(requestId!==monitoringDetailRequest)return;monitoringDetailLoading=false;if(result&&result.ok){monitoringDetail=result.detail;renderView();const content=$("#content");if(content)content.scrollTop=0;}else{renderView();toast(result&&result.error||"Could not open that post","err");}
 }
 function viewMonitoringWatchlist(){
   const monitors=monitoringData.monitors||[];
@@ -558,7 +600,7 @@ function viewMonitoringWatchlist(){
     const avatar=monitoringMediaTag(item.avatarRef,"mon-watch-avatar-img",item.label),banner=monitoringMediaTag(item.bannerRef,"mon-watch-banner","");
     return '<article class="mon-watch'+(item.enabled?'':' paused')+'" data-action="monitoring-monitor-open" data-ctx="monitor" data-id="'+esc(item.id)+'" title="Open artist · right-click for watcher options"><div class="mon-watch-hero">'+(banner||'<div class="mon-watch-banner-fallback"></div>')+'<span class="mon-watch-avatar '+esc(item.kind)+'"><i>'+(item.kind==='f95'?'F95':esc((item.label||'P').charAt(0)))+'</i>'+avatar+'</span><div class="mon-watch-identity"><b>'+esc(item.label)+'</b><span>'+esc(type)+' · '+(item.enabled?'Watching':'Paused')+'</span></div></div><div class="mon-watch-meta"><span>Every '+esc(monitoringInterval(item.intervalMinutes))+'</span><span class="'+(item.lastError?'error':'')+'">'+esc(status)+'</span></div></article>';
   }).join('')+'</div>':emptyState("◉","Nothing is being watched yet. Add a Pawchive, Bakemono or F95zone link.");
-  return '<div class="mon-watch-actions"><button class="btn primary" data-action="monitoring-add">＋ Add watcher</button></div>'+list;
+  return '<div class="mon-watchlist" data-ctx="monitor-watchlist" data-id="watchlist">'+list+'</div>';
 }
 function monitoringArtistPostCard(item){
   const preview=item.previewSrc?'<img class="mon-artist-preview" src="'+esc(item.previewSrc)+'" alt="" loading="lazy">':'<div class="mon-event-placeholder"><b>PAWCHIVE</b><span>Artist post</span></div>';
@@ -594,14 +636,14 @@ function viewMonitoringArtist(artist){
   const range='<div class="mon-artist-range"><div class="mon-range-title"><b>Filter works by date</b><span>'+esc(posts.length)+' of '+esc(info.all.length)+' shown</span></div><div class="mon-range-fields"><button type="button" class="mon-range-date'+(monitoringDatePicker.side==='from'?' active':'')+'" data-action="monitoring-artist-date-open" data-side="from"><small>From</small><b>'+esc(monitoringRangeDateLabel(monitoringArtistRange.from))+'</b></button><span>→</span><button type="button" class="mon-range-date'+(monitoringDatePicker.side==='to'?' active':'')+'" data-action="monitoring-artist-date-open" data-side="to"><small>To</small><b>'+esc(monitoringRangeDateLabel(monitoringArtistRange.to))+'</b></button><button class="btn" data-action="monitoring-artist-range-reset">Show all</button><button class="btn primary" data-action="monitoring-artist-download-range"'+(!posts.length||!info.valid?' disabled':'')+'>Download shown ('+esc(posts.length)+')</button></div>'+monitoringArtistDatePicker(artist)+'</div>';
   return '<div class="mon-artist" data-ctx="monitor-artist" data-id="'+esc(artist.monitorId)+'"><button type="button" class="mode-back" data-action="monitoring-artist-back">← Back</button><section class="mon-artist-hero">'+(banner||'<div class="mon-watch-banner-fallback"></div>')+'<div class="mon-artist-shade"></div><span class="mon-artist-avatar"><i>'+esc((artist.label||'P').charAt(0))+'</i>'+avatar+'</span><div class="mon-artist-title"><span>'+esc(String(artist.service||'Pawchive').toUpperCase())+'</span><h1>'+esc(artist.label)+'</h1><p>'+esc(info.all.length)+' works · checked every '+esc(monitoringInterval(artist.intervalMinutes))+'</p></div></section>'+range+'<div class="mon-artist-note">Only the works inside the selected dates are shown below. Right-click this page for more options.</div>'+cards+'</div>';
 }
-function monitoringFilePreview(file){
+function monitoringFilePreview(file,index){
   if(file.kind==='image')return '<div class="mon-media-frame image"><img class="mon-reader-media" src="'+esc(file.src)+'" alt="" loading="lazy"><span class="mon-media-state">Loading preview…</span></div>';
   if(file.kind==='video')return '<div class="mon-media-frame video"><video class="mon-reader-media" src="'+esc(file.src)+'" controls preload="auto" playsinline></video><span class="mon-media-state">Loading video…</span></div>';
   if(file.kind==='audio')return '<div class="mon-media-frame audio"><audio class="mon-reader-audio" src="'+esc(file.src)+'" controls preload="auto"></audio><span class="mon-media-state">Loading audio…</span></div>';
-  return '<div class="mon-media-file">Right-click to download</div>';
+  return '<button type="button" class="mon-media-file" data-action="monitoring-download" data-index="'+index+'" title="Download '+esc(file.name)+'"><span class="mon-media-file-icon">↓</span><b>'+esc(file.name)+'</b><small>Click to download</small></button>';
 }
 function viewMonitoringDetail(detail){
-  const files=(detail.files||[]),media=files.map(function(file,index){return '<figure class="mon-file" data-ctx="monitor-file" data-id="'+index+'" title="Right-click to download">'+monitoringFilePreview(file)+'<figcaption><b>'+esc(file.name)+'</b><small>'+esc(file.kind)+'</small></figcaption></figure>';}).join('');
+  const files=(detail.files||[]),media=files.map(function(file,index){const plain=file.kind!=="image"&&file.kind!=="video"&&file.kind!=="audio";return '<figure class="mon-file" data-ctx="monitor-file" data-id="'+index+'" title="'+(plain?'Click to download':'Right-click to download')+'">'+monitoringFilePreview(file,index)+(plain?'':'<figcaption><b>'+esc(file.name)+'</b><small>'+esc(file.kind)+'</small></figcaption>')+'</figure>';}).join('');
   const creator=detail.monitorId?'<button type="button" class="mon-reader-creator" data-action="monitoring-post-artist-open" data-id="'+esc(detail.monitorId)+'" title="Open '+esc(detail.creator)+' artist page">'+esc(detail.creator)+'</button>':esc(detail.creator);
   return '<div class="mon-reader"><button type="button" class="mode-back" data-action="monitoring-post-back">← Back</button><article class="mon-reader-post" data-ctx="monitor-post" data-id="current"><div class="mon-reader-kicker">PAWCHIVE · '+creator+' · '+esc(monitoringDate(detail.date))+'</div><h1>'+esc(detail.title)+'</h1>'+(detail.author?'<div class="mon-reader-byline">'+esc(detail.author)+'</div>':'')+'<div class="mon-reader-body">'+esc(detail.content||'This post contains no additional text.')+'</div>'+(files.length?'<section class="mon-files"><h2>Files · '+files.length+'</h2><div class="mon-file-row" data-count="'+Math.min(files.length,3)+'">'+media+'</div></section>':'<p class="mon-no-files">No downloadable files were listed for this post.</p>')+'</article></div>';
 }
@@ -622,7 +664,7 @@ function renderMonitoringView(){
   if(monitoringArtistLoading){content.innerHTML='<div class="mon-loading"><i></i><b>Loading all artist works…</b></div>';return;}
   if(monitoringArtist){content.innerHTML='<div class="monitoring-shell">'+viewMonitoringArtist(monitoringArtist)+'</div>';hydrateMonitoringMedia();return;}
   const unread=(monitoringData.events||[]).filter(function(item){return !item.read;}).length,events=monitoringFilteredEvents();
-  const head='<header class="mon-head"><div class="mode-heading"><button type="button" class="mode-back" data-action="monitoring-exit">← Back</button><div><span class="mon-mode-mark"><i></i> MONITORING MODE</span><h1>Your watch desk</h1><p>Quiet checks for new creator posts and thread replies.</p></div></div><div class="mon-head-actions">'+pageCounterMarkup()+'<button class="btn ghost" data-action="monitoring-refresh"'+(monitoringSyncing?' disabled':'')+'>'+(monitoringSyncing?'Checking…':'↻ Check now')+'</button><button class="btn primary" data-action="monitoring-add">＋ Add watcher</button></div></header>';
+  const head='<header class="mon-head"><div class="mode-heading"><button type="button" class="mode-back" data-action="monitoring-exit">← Back</button><div><span class="mon-mode-mark"><i></i> MONITORING MODE</span><h1>Your watch desk</h1><p>Quiet checks for new creator posts and thread replies.</p></div></div><div class="mon-head-actions">'+pageCounterMarkup()+'<button class="btn ghost" data-action="monitoring-refresh"'+(monitoringSyncing?' disabled':'')+'>'+(monitoringSyncing?'Checking…':'↻ Check now')+'</button></div></header>';
   const tabs='<nav class="mon-tabs"><button class="'+(monitoringTab==='activity'?'active':'')+'" data-action="monitoring-tab" data-tab="activity">Activity <b>'+esc(monitoringData.events.length)+'</b></button><button class="'+(monitoringTab==='watchlist'?'active':'')+'" data-action="monitoring-tab" data-tab="watchlist">Watchlist <b>'+esc(monitoringData.monitors.length)+'</b></button><span></span><small>'+esc(unread)+' unread · updated '+esc(monitoringDate(monitoringData.updatedAt))+'</small></nav>';
   if(monitoringTab==='watchlist'){content.innerHTML='<div class="monitoring-shell">'+head+tabs+viewMonitoringWatchlist()+'</div>';hydrateMonitoringMedia();return;}
   const toolbar='<div class="mon-toolbar"><input id="monitoringSearch" value="'+esc(monitoringQuery)+'" placeholder="Search monitoring activity…"><div><button class="'+(monitoringFilter==='all'?'active':'')+'" data-action="monitoring-filter" data-filter="all">All</button><button class="'+(monitoringFilter==='unread'?'active':'')+'" data-action="monitoring-filter" data-filter="unread">Unread</button><button data-action="monitoring-mark-read"'+(unread?'':' disabled')+'>Mark all read</button></div></div>';
@@ -643,7 +685,7 @@ function monitoringIntervalModal(id){
   const monitor=monitoringMonitor(id);if(!monitor)return;
   openModal("Edit check time",'<div class="field"><label>Check '+esc(monitor.label)+' every</label><select id="mon_edit_interval">'+monitoringIntervalOptions(monitor.intervalMinutes)+'</select></div>',"Save",async function(){const updated=await E.monitoringMonitorUpdate(id,{intervalMinutes:Number(val("mon_edit_interval"))});if(!updated){toast("Could not update check time","err");return;}closeModal();await loadMonitoringData();if(monitoringArtist&&monitoringArtist.monitorId===id)monitoringArtist.intervalMinutes=updated.intervalMinutes;renderView();toast("Check time updated","ok");});
 }
-if(E&&E.onMonitoringChanged)E.onMonitoringChanged(function(data){if(data)monitoringData=data;monitoringLoading=false;monitoringSyncing=false;if(monitoringMode)renderView();});
+if(E&&E.onMonitoringChanged)E.onMonitoringChanged(function(data){const anchor=monitoringMode&&!monitoringDetail&&!monitoringArtist?captureListPosition():null;if(data)monitoringData=data;monitoringLoading=false;monitoringSyncing=false;if(monitoringMode)renderViewAnchored(anchor,false);});
 if(E&&E.onMonitoringOpenEvent)E.onMonitoringOpenEvent(function(id){monitoringFocusId=String(id||"");monitoringTab="activity";monitoringFilter="all";setMonitoringMode(true);});
 let monitoringDownloadHideTimer=null;
 function paintMonitoringDownload(progress){
@@ -663,8 +705,9 @@ function _previewKey(kind,value,mode){
   return kind+"\u0000"+mode+"\u0000"+value;
 }
 function _previewRemember(key,result){
+  if(!result||!result.data)return;
   if(_modulePreviewCache.has(key))_modulePreviewCache.delete(key);
-  _modulePreviewCache.set(key,result||{data:"",kind:"missing"});
+  _modulePreviewCache.set(key,result);
   while(_modulePreviewCache.size>180)_modulePreviewCache.delete(_modulePreviewCache.keys().next().value);
 }
 function _previewPaint(img,result){
@@ -708,11 +751,156 @@ function viewVault(){
   return head("Secure Vault",""+openVerb()+" · right-click for more · Ctrl+F to search")+addbar+searchRow("vault","Search vault...")+pills+body;
 }
 
+const IDEA_TYPES={idea:"Feature",ui:"Quick change",bug:"Problem",task:"Task"};
+const IDEA_STATUSES={inbox:"Inbox",ready:"In Progress",testing:"Testing",done:"Done"};
+const IDEA_GROUPS={app:"App",other:"Other",unsorted:"Unsorted"};
+function ideaType(value){return Object.prototype.hasOwnProperty.call(IDEA_TYPES,value)?value:"idea";}
+function ideaStatus(value){value=value==="planned"?"ready":value==="working"?"testing":value;return Object.prototype.hasOwnProperty.call(IDEA_STATUSES,value)?value:"inbox";}
+function ideaGroup(value){return Object.prototype.hasOwnProperty.call(IDEA_GROUPS,value)?value:"app";}
+function ideaById(id){return find(state.ideas||[],id);}
+function ideaTitleFromText(value){const first=String(value||"").split(/\r?\n/).map(function(line){return line.trim();}).find(Boolean)||"Untitled idea";return first.replace(/^[#>*\-\s]+/,"").slice(0,90)||"Untitled idea";}
+function ideaUrls(value){const matches=String(value||"").match(/https?:\/\/[^\s<>]+/gi)||[];return Array.from(new Set(matches.map(function(url){return url.replace(/[),.;]+$/,"");}))).join("\n");}
+function ideaCodexText(item){
+  if(!item)return "";
+  const parts=["SINRAD IDEA","","Title: "+String(item.title||"Untitled idea"),"Type: "+IDEA_TYPES[ideaType(item.type)],"Tag: "+IDEA_GROUPS[ideaGroup(item.group)],"Status: "+IDEA_STATUSES[ideaStatus(item.status)],"","What I want:",String(item.details||item.original||"").trim()||"No extra details yet."];
+  if(item.references)parts.push("","References:",String(item.references).trim());
+  if(item.reviewNote)parts.push("","Audit:",String(item.reviewNote).trim());
+  if(item.original&&String(item.original).trim()!==String(item.details||"").trim())parts.push("","Original note (preserve this context):",String(item.original).trim());
+  parts.push("","Please inspect the current SINRAD app, confirm the intended behavior, implement this change without breaking existing workflows, and test the packaged build.");
+  return parts.join("\n");
+}
+function ideaVisibleItems(){
+  const term=searchTerms.ideas||"";
+  const workflow=ideaFilter!=="all"&&ideaFilter!=="inbox";
+  return (state.ideas||[]).filter(function(item){return (ideaFilter==="all"||ideaStatus(item.status)===ideaFilter)&&(workflow?ideaGroup(item.group)==="app":ideaGroupFilter==="all"||ideaGroup(item.group)===ideaGroupFilter)&&match(term,item.title,item.details,item.original,item.references,item.reviewNote,item.type,item.status,item.group);}).slice().sort(function(a,b){return Number(b.updated||b.created||0)-Number(a.updated||a.created||0);});
+}
+function ideaImportInstructions(){
+  const staged=ideaImportMedia.map(function(item){return item.name;});
+  return ["I am collecting development ideas for SINRAD. I will send screenshots first, then explain what I want. Talk with me normally and help clarify it. When I ask for the final import, return only this plain-text format:","","SINRAD_IDEAS_V1","","IDEA","TITLE: Short clear title","TYPE: problem | quick change | feature | task","TAG: app | other | unsorted","DETAILS: A concise description of what should change","REFERENCES: screenshot names or links, separated by |","---","IDEA","TITLE: Another idea","TYPE: feature","TAG: app","DETAILS: Description","REFERENCES:","",staged.length?("These screenshots are already staged in SINRAD. Use their exact filenames in REFERENCES so SINRAD attaches each one to the correct idea:\n"+staged.join("\n")):"Use the exact screenshot filenames shown in this chat in REFERENCES.","","Keep my intent and screenshot references. Split separate requests into separate IDEA blocks. Use app for SINRAD changes, other for unrelated projects, and unsorted when unclear. Do not include markdown fences or any text outside the format.","","The app is local and does not use AI. I will paste your final block into SINRAD's Chat Import screen."].join("\n");
+}
+function ideaImportType(value,title,details){
+  const raw=String(value||"").toLowerCase(),text=(String(title||"")+" "+String(details||"")).toLowerCase();
+  if(/problem|bug|fix|broken|issue/.test(raw))return "bug";
+  if(/quick|ui|change/.test(raw))return "ui";
+  if(/task|chore/.test(raw))return "task";
+  if(/feature|idea/.test(raw))return "idea";
+  if(/\b(?:bug|broken|issue|doesn'?t|not working)\b/.test(text))return "bug";
+  if(/\b(?:shorter|smaller|spacing|button|colour|color|animation|icon|ui)\b/.test(text))return "ui";
+  return "idea";
+}
+function parseIdeaImport(value){
+  const raw=String(value||"").replace(/\r/g,"").trim();if(!raw)return [];
+  const body=raw.replace(/^\s*SINRAD_IDEAS_V1\s*/i,"").trim(),blocks=body.split(/\n\s*---+\s*\n|\n(?=\s*IDEA\s*\n)/i),items=[];
+  blocks.forEach(function(block){
+    let text=String(block||"").replace(/^\s*IDEA\s*\n?/i,"").trim();if(!text)return;
+    const fields={};let active="";
+    text.split("\n").forEach(function(line){const match=line.match(/^\s*(TITLE|TYPE|TAG|GROUP|DETAILS?|SUMMARY|REFERENCES?|REFS?)\s*:\s*(.*)$/i);if(match){active=match[1].toLowerCase();fields[active]=match[2].trim();}else if(active&&line.trim())fields[active]+=(fields[active]?"\n":"")+line.trim();});
+    const title=fields.title||"",details=fields.details||fields.detail||fields.summary||"",refs=fields.references||fields.reference||fields.refs||fields.ref||"";
+    if(title||details)items.push({title:ideaTitleFromText(title||details),details:details||title,references:String(refs).split("|").map(function(ref){return ref.trim();}).filter(Boolean).join("\n"),type:ideaImportType(fields.type,title,details),group:ideaGroup(fields.tag||fields.group)});
+  });
+  if(items.length)return items.slice(0,100);
+  const refs=body.split("\n").filter(function(line){return /^\s*references?\s*:/i.test(line);}).map(function(line){return line.replace(/^\s*references?\s*:\s*/i,"").trim();}).join("\n");
+  body.split("\n").forEach(function(line){const match=line.match(/^\s*[•*-]\s+(.+?)\s*$/);if(!match)return;const title=match[1].trim();if(title)items.push({title:ideaTitleFromText(title),details:title,references:refs,type:ideaImportType("",title,title)});});
+  return items.slice(0,100);
+}
+function ideaModal(item){
+  item=item||{};const editing=!!item.id,type=ideaType(item.type),status=editing?ideaStatus(item.status):"ready",group=ideaGroup(item.group);
+  ideaEditMedia=(Array.isArray(item.attachments)?item.attachments:[]).map(function(media){return {name:String(media.name||"Attachment"),file:String(media.file||"")};}).filter(function(media){return media.file;});
+  const typeOptions=Object.keys(IDEA_TYPES).map(function(key){return '<option value="'+key+'"'+(key===type?' selected':'')+'>'+esc(IDEA_TYPES[key])+'</option>';}).join("");
+  const statusOptions=Object.keys(IDEA_STATUSES).map(function(key){return '<option value="'+key+'"'+(key===status?' selected':'')+'>'+esc(IDEA_STATUSES[key])+'</option>';}).join("");
+  const groupOptions=Object.keys(IDEA_GROUPS).map(function(key){return '<option value="'+key+'"'+(key===group?' selected':'')+'>'+esc(IDEA_GROUPS[key])+'</option>';}).join("");
+  const original=editing&&item.original?'<details class="idea-original"><summary>Original note</summary><div>'+esc(item.original)+'</div></details>':"";
+  openModal(editing?"Edit idea":"New idea",'<div class="idea-modal-grid"><div class="field idea-modal-title"><label>Short title</label><input id="idea_title" value="'+esc(item.title||"")+'" placeholder="e.g. Make the settings rows shorter"></div><div class="field"><label>Type</label><select id="idea_type">'+typeOptions+'</select></div><div class="field"><label>Tag</label><select id="idea_group">'+groupOptions+'</select></div><div class="field"><label>Status</label><select id="idea_status">'+statusOptions+'</select></div></div><div class="field"><label>Details — write naturally</label><textarea id="idea_details" rows="7" placeholder="Say what you want changed in your own words">'+esc(item.details||"")+'</textarea></div><div class="field"><label>References <span style="color:var(--dim)">(links, filenames, or reminders)</span></label><textarea id="idea_refs" rows="3" placeholder="https://... or image-214.png">'+esc(item.references||"")+'</textarea></div><div class="idea-edit-media-head"><b>Images</b><button type="button" class="btn" data-action="idea-edit-images-pick">Add images</button></div><div id="idea_edit_media"></div>'+original,"Save",async function(){
+    const details=$("#idea_details").value.trim(),enteredTitle=val("idea_title"),title=enteredTitle||ideaTitleFromText(details),nextType=ideaType(val("idea_type")),nextGroup=ideaGroup(val("idea_group")),nextStatus=ideaStatus(val("idea_status")),references=$("#idea_refs").value.trim();
+    if(!details&&!enteredTitle){toast("Write the idea first","warn");return;}
+    if(nextStatus!=="inbox"&&nextGroup!=="app"){toast("Only App ideas can enter In Progress, Testing, or Done","warn");return;}
+    const existing=editing?ideaById(item.id):null,previous=existing?Object.assign({},existing,{attachments:(existing.attachments||[]).map(function(media){return Object.assign({},media);})}):null;
+    rememberUndo((existing?"Edited":"Added")+" idea "+title);
+    const attachments=ideaEditMedia.map(function(media){return {name:media.name,file:media.file};}),entry=existing?Object.assign(existing,{title:title,details:details,references:references,type:nextType,group:nextGroup,status:nextStatus,attachments:attachments,updated:nowMs()}):{id:uid(),title:title,details:details,original:details,references:references,type:nextType,group:nextGroup,status:nextStatus,attachments:attachments,created:nowMs(),updated:nowMs()};
+    if(!existing)state.ideas.unshift(entry);
+    const saved=await flushSave();
+    if(!saved){if(existing)Object.assign(existing,previous);else state.ideas=state.ideas.filter(function(candidate){return candidate.id!==entry.id;});toast("Idea could not be saved","err");return;}
+    closeModal();renderView();toast(existing?"Idea updated":"Idea saved","ok");
+  });
+  renderIdeaEditMedia();
+}
+function ideaEditMediaHtml(){
+  if(!ideaEditMedia.length)return '<div class="idea-edit-media-empty">No images attached yet.</div>';
+  return '<div class="idea-attachments">'+ideaEditMedia.map(function(media,index){return '<figure><img src="sinrad-idea://media/'+encodeURIComponent(media.file)+'" alt="'+esc(media.name)+'"><figcaption>'+esc(media.name)+'</figcaption><button type="button" data-action="idea-edit-image-remove" data-index="'+index+'" title="Remove image">×</button></figure>';}).join("")+'</div>';
+}
+function renderIdeaEditMedia(){const target=$("#idea_edit_media");if(target)target.innerHTML=ideaEditMediaHtml();}
+async function pickIdeaEditImages(){
+  if(!E||!E.ideaImagesPick){toast("Adding images needs the desktop build","warn");return;}
+  const result=await E.ideaImagesPick();if(result&&result.ok){(result.items||[]).forEach(function(media){if(media&&media.file&&!ideaEditMedia.some(function(saved){return saved.file===media.file;}))ideaEditMedia.push({name:String(media.name||"Image"),file:String(media.file)});});renderIdeaEditMedia();if(result.items&&result.items.length)toast("Added "+result.items.length+" image"+(result.items.length===1?"":"s"),"ok");}else if(!(result&&result.canceled))toast(result&&result.error||"Images could not be added","err");
+}
+async function ideaQuickAdd(){
+  const box=$("#idea_quick"),raw=box?box.value.trim():"";if(!raw){toast("Write the idea first","warn");if(box)box.focus();return;}
+  const entry={id:uid(),title:ideaTitleFromText(raw),details:raw,original:raw,references:ideaUrls(raw),type:ideaType(val("idea_quick_type")),group:"app",status:"ready",created:nowMs(),updated:nowMs()};
+  rememberUndo("Added idea "+entry.title);state.ideas.unshift(entry);const saved=await flushSave();
+  if(!saved){state.ideas=state.ideas.filter(function(item){return item.id!==entry.id;});toast("Idea could not be saved","err");return;}
+  renderView();toast("Added to Ideas inbox","ok");
+}
+function copyVisibleIdeas(){
+  const items=ideaVisibleItems();if(!items.length){toast("No ideas are visible","warn");return;}
+  const text="SINRAD IDEAS TO REVIEW\n\n"+items.map(function(item,index){return "--- IDEA "+(index+1)+" ---\n"+ideaCodexText(item);}).join("\n\n");copy(text,"Ideas for Codex");
+}
+function ideaStatusIcon(status){return status==="inbox"?"⌑":status==="ready"?"✓":status==="testing"?"△":"▣";}
+function ideaSideNav(counts){
+  const rows=[{id:"inbox",label:"Inbox"},{id:"import",label:"Chat import"},{id:"ready",label:"In Progress"},{id:"testing",label:"Testing"},{id:"done",label:"Done"}];
+  return '<aside class="idea-side"><div class="idea-side-label">Ideas</div>'+rows.map(function(row){const count=row.id==="import"?"":counts[row.id]||0;return '<button type="button" class="idea-side-item'+(ideaPane===row.id?' active':'')+'" data-action="idea-pane" data-pane="'+row.id+'"><span class="idea-side-icon">'+ideaStatusIcon(row.id)+'</span><b>'+row.label+'</b>'+(row.id!=="import"?'<span>'+count+'</span>':'')+'</button>';}).join("")+'</aside>';
+}
+function mergeIdeaImportMedia(items){
+  (Array.isArray(items)?items:[]).forEach(function(item){if(!item||!item.file||ideaImportMedia.some(function(saved){return saved.file===item.file;}))return;ideaImportMedia.push({name:String(item.name||"Screenshot"),file:String(item.file)});});
+}
+async function pickIdeaImportImages(){
+  if(!E||!E.ideaImagesPick){toast("Image import needs the desktop build","warn");return;}
+  const result=await E.ideaImagesPick();if(result&&result.ok){mergeIdeaImportMedia(result.items);ideaImportPreview=[];renderView();if(result.items&&result.items.length)toast("Staged "+result.items.length+" image"+(result.items.length===1?"":"s"),"ok");}else if(!(result&&result.canceled))toast(result&&result.error||"Images could not be added","err");
+}
+async function importIdeaImageFiles(files){
+  if(!E||!E.ideaImagesImport)return;const selected=Array.from(files||[]).filter(function(file){return /^image\/(?:jpeg|png|webp|gif)$/i.test(file.type)||/\.(?:jpe?g|png|webp|gif)$/i.test(file.name||"");}).slice(0,20);if(!selected.length){toast("Drop or paste JPG, PNG, WebP, or GIF images","warn");return;}
+  try{const payload=[];for(const file of selected)payload.push({name:file.name||("pasted-image-"+Date.now()+".png"),type:file.type||"",bytes:new Uint8Array(await file.arrayBuffer())});const result=await E.ideaImagesImport(payload);if(!result||!result.ok)throw new Error(result&&result.error||"Images could not be added");mergeIdeaImportMedia(result.items);ideaImportPreview=[];renderView();toast("Staged "+result.items.length+" image"+(result.items.length===1?"":"s"),"ok");}catch(error){toast(String(error&&error.message||error),"err");}
+}
+function ideaImportMediaFor(item,total){
+  if(total===1)return ideaImportMedia.slice();const text=[item.title,item.details,item.references].join("\n").toLowerCase();return ideaImportMedia.filter(function(media){return text.includes(String(media.name||"").toLowerCase());});
+}
+function ideaImportMediaUsage(items){
+  const used=new Set();(items||[]).forEach(function(item){ideaImportMediaFor(item,items.length).forEach(function(media){used.add(media.file);});});return {used:used,unmatched:ideaImportMedia.filter(function(media){return !used.has(media.file);})};
+}
+function ideaImportView(){
+  const preview=ideaImportPreview||[],usage=ideaImportMediaUsage(preview),valid=preview.length>0&&usage.unmatched.length===0;
+  const cards=preview.length?preview.map(function(item){const media=ideaImportMediaFor(item,preview.length);return '<article class="idea-import-card type-'+ideaType(item.type)+'"><div><span>'+esc(IDEA_TYPES[ideaType(item.type)])+' · '+esc(IDEA_GROUPS[ideaGroup(item.group)])+'</span><b>'+esc(item.title)+'</b>'+(media.length?'<small>'+media.length+' image'+(media.length===1?'':'s')+'</small>':item.references?'<small>'+esc(String(item.references).split(/\r?\n/)[0])+'</small>':'')+'</div><p>'+esc(item.details||item.title)+'</p></article>';}).join(""):'<div class="idea-import-empty">Paste the final block from your chat, then check it here before saving.</div>';
+  const staged=ideaImportMedia.length?'<div class="idea-import-media">'+ideaImportMedia.map(function(media,index){return '<figure><img src="sinrad-idea://media/'+encodeURIComponent(media.file)+'" alt="'+esc(media.name)+'"><figcaption>'+esc(media.name)+'</figcaption><button type="button" data-action="idea-import-image-remove" data-index="'+index+'" title="Remove image">×</button></figure>';}).join("")+'</div>':'<div class="idea-import-drop-empty"><b>Add the image first</b><span>Paste, drop, or choose screenshots. Then send the same images to your chat.</span></div>';
+  const warning=usage.unmatched.length?'<div class="idea-import-warning">'+usage.unmatched.length+' staged image'+(usage.unmatched.length===1?' is':'s are')+' not named in the chat result.</div>':'';
+  return '<main class="idea-main"><header class="idea-page-head"><div><h1>Import ideas from a chat</h1></div><button type="button" class="idea-copy-instructions" data-action="idea-copy-instructions"><span>▣</span><b>Copy chat instructions</b></button></header><div class="idea-steps"><div><span>1</span><b>Add images here</b><small>Paste, drop, or choose screenshots</small></div><div><span>2</span><b>Send them to the chat</b><small>Then describe the change normally</small></div><div><span>3</span><b>Paste the result</b><small>SINRAD matches the filenames</small></div></div><div class="idea-import-drop" data-idea-drop="true">'+staged+'<button type="button" class="btn" data-action="idea-import-images-pick">Add images</button></div><div class="idea-import-columns"><section class="idea-import-panel"><h2>Paste the chat result</h2><p>You do not need to understand or edit the format.</p><textarea id="idea_import_text" spellcheck="false" placeholder="SINRAD_IDEAS_V1\n\nPaste the final block here...">'+esc(ideaImportText)+'</textarea><footer><small>Nothing is saved until you approve the preview.</small><button type="button" class="btn" data-action="idea-import-check">Check import</button></footer></section><section class="idea-import-panel preview"><h2>Preview · '+preview.length+' idea'+(preview.length===1?'':'s')+'</h2><p>SINRAD shows what will be added before saving.</p><div class="idea-import-preview">'+cards+'</div>'+warning+'<footer><button type="button" class="btn" data-action="idea-import-cancel"'+(!preview.length?' disabled':'')+'>Cancel</button><button type="button" class="btn primary" data-action="idea-import-add"'+(!valid?' disabled':'')+'>Add '+preview.length+' idea'+(preview.length===1?'':'s')+'</button></footer></section></div></main>';
+}
+function ideaMediaMarkup(media,large){
+  const source='sinrad-idea://media/'+encodeURIComponent(media.file||""),extension=String(media.file||"").split(".").pop().toLowerCase(),name=esc(media.name||"Idea attachment");
+  if(extension==="mp4"||extension==="webm")return '<figure><video src="'+source+'" controls preload="metadata"></video><figcaption>'+name+'</figcaption></figure>';
+  if(extension==="mp3")return '<figure class="audio"><audio src="'+source+'" controls preload="metadata"></audio><figcaption>'+name+'</figcaption></figure>';
+  return '<figure data-ctx="idea-media" data-id="'+esc(media.file||"")+'"><img src="'+source+'" alt="'+name+'" loading="'+(large?'eager':'lazy')+'"><figcaption>'+name+'</figcaption></figure>';
+}
+function ideaDetailView(item){
+  const attachments=Array.isArray(item.attachments)?item.attachments:[],media=attachments.length?'<div class="idea-reader-media">'+attachments.map(function(file){return ideaMediaMarkup(file,true);}).join("")+'</div>':'<div class="idea-reader-no-media">No media attached to this idea.</div>',details=String(item.details||item.original||"").trim(),refs=String(item.references||"").trim(),review=String(item.reviewNote||"").trim();
+  return '<main class="idea-reader" data-ctx="idea" data-id="'+esc(item.id)+'"><button type="button" class="idea-reader-back" data-action="idea-back">← Back to ideas</button><header><div class="idea-reader-meta">'+esc(IDEA_TYPES[ideaType(item.type)])+' · '+esc(IDEA_GROUPS[ideaGroup(item.group)])+' · '+esc(IDEA_STATUSES[ideaStatus(item.status)])+'</div><h1>'+esc(item.title||"Untitled idea")+'</h1></header>'+media+'<section class="idea-reader-copy">'+(review?'<div class="idea-reader-audit"><b>Review</b><span>'+esc(review)+'</span></div>':'')+'<h2>Idea</h2><div>'+esc(details||"No details yet.")+'</div>'+(refs?'<h2>References</h2><div class="idea-reader-refs">'+esc(refs)+'</div>':'')+'</section></main>';
+}
+function ideaListView(counts){
+  ideaFilter=ideaPane;const items=ideaVisibleItems();
+  const body=items.length?'<div class="idea-list">'+items.map(function(item){const status=ideaStatus(item.status),type=ideaType(item.type),group=ideaGroup(item.group),details=String(item.details||item.original||"").trim();return '<article class="idea-list-card status-'+status+'" data-action="idea-open" data-ctx="idea" data-id="'+esc(item.id)+'"><div class="idea-list-card-head"><span>'+esc(IDEA_TYPES[type])+' · <b>'+esc(IDEA_GROUPS[group])+'</b></span><time>'+esc(fmtDate(item.updated||item.created))+'</time></div><h2>'+esc(item.title||"Untitled idea")+'</h2><p>'+esc(details||"No details yet.")+'</p>'+((item.attachments||[]).length?'<small>'+item.attachments.length+' media attachment'+(item.attachments.length===1?'':'s')+'</small>':item.references?'<small>'+esc(String(item.references).split(/\r?\n/)[0])+'</small>':'')+'</article>';}).join("")+'</div>':'<div class="idea-list-empty"><b>No '+esc(IDEA_STATUSES[ideaPane]).toLowerCase()+' ideas</b><span>Ideas moved here will appear in this list.</span></div>';
+  const filters=ideaPane==="inbox"?'<div class="idea-group-filters"><button type="button" data-action="idea-group-filter" data-filter="all" class="'+(ideaGroupFilter==="all"?'active':'')+'">All tags</button>'+Object.keys(IDEA_GROUPS).map(function(group){return '<button type="button" data-action="idea-group-filter" data-filter="'+group+'" class="'+(ideaGroupFilter===group?'active':'')+'">'+esc(IDEA_GROUPS[group])+'</button>';}).join("")+'</div>':'';
+  return '<main class="idea-main"><header class="idea-page-head"><div><h1>'+esc(IDEA_STATUSES[ideaPane])+'</h1><p>'+counts[ideaPane]+' saved idea'+(counts[ideaPane]===1?'':'s')+'</p></div></header>'+searchRow("ideas","Search ideas and references...")+filters+body+'</main>';
+}
+function viewIdeas(){
+  const all=state.ideas||[],counts={inbox:0,ready:0,testing:0,done:0};all.forEach(function(item){const status=ideaStatus(item.status);if(status==="inbox"||ideaGroup(item.group)==="app")counts[status]++;});
+  const top='<div class="idea-workspace-top"><div><b>S.I.R</b><span>Ideas</span></div><div><button type="button" data-action="idea-search" title="Search ideas">'+ICO_SEARCH+'</button><button type="button" data-action="settings-open" title="Settings">⚙</button></div></div>';
+  const viewing=ideaViewingId?ideaById(ideaViewingId):null;if(ideaViewingId&&!viewing)ideaViewingId="";
+  return '<div class="ideas-view">'+top+'<div class="idea-workspace-body">'+ideaSideNav(counts)+(viewing?ideaDetailView(viewing):ideaPane==="import"?ideaImportView():ideaListView(counts))+'</div></div>';
+}
+
 function collColor(name){ var h=0; name=String(name||''); for(var i=0;i<name.length;i++){ h=(h*31+name.charCodeAt(i))%360; } return 'hsl('+h+',55%,55%)'; }
 function isTagPage(u){ var s=String(u||''); return s.indexOf('/tags/')>=0 || s.indexOf('/tag/')>=0; }
 function linkDisplayPath(u){ try{ const x=new URL(u); const p=(x.pathname==="/"?"":x.pathname)+(x.search||""); return p||x.hostname; }catch(_){ return String(u||""); } }
 function _linkSelCount(){ return Object.keys(linkSelLinks).length; }
-function _linkDeleteSel(){ var ids=Object.keys(linkSelLinks); var n=ids.length; if(!n) return; function go(){ rememberUndo("Deleted "+n+" links"); var kill={}; ids.forEach(function(x){kill[x]=1;}); state.links=state.links.filter(function(l){ return !kill[l.id]; }); saveState(); linkSelLinks={}; renderView(); log("warn","deleted "+n+" link(s)"); } if(n>4){ confirmModal("Delete "+n+" link(s)?").then(function(y){ if(y) go(); }); } else { go(); } }
+function _linkDeleteSel(){ var ids=Object.keys(linkSelLinks); var n=ids.length; if(!n) return; function go(){ const anchor=captureListPosition();rememberUndo("Deleted "+n+" links"); var kill={}; ids.forEach(function(x){kill[x]=1;}); state.links=state.links.filter(function(l){ return !kill[l.id]; }); saveState(); linkSelLinks={}; renderViewAnchored(anchor,false); log("warn","deleted "+n+" link(s)"); } if(n>4){ confirmModal("Delete "+n+" links?").then(function(y){ if(y) go(); }); } else { go(); } }
 function _linkClearSel(){ linkSelLinks={}; renderView(); }
 function duplicateReviewModal(){
   const groups=SinradShared.exactDuplicateGroups(state.links||[]);
@@ -1192,12 +1380,17 @@ function showCardMenu(type,id,x,y){
   if(type==="vault"){ const v=find(state.vault,id); if(!v)return; if(v.url)it+=mi("vault-open",id,"Open site"); it+=mi("vault-copy-u",id,"Copy username")+mi("vault-copy-p",id,"Copy password")+mi("vault-eye",id,revealed.has(id)?"Hide password":"Show password")+miT("vault-fav",id,"Favorite",v.favorite,FAV_COLOR)+miT("vault-pri",id,"Priority",v.priority,PRI_COLOR)+mi("vault-edit",id,"Edit")+`<div class="cdiv"></div>`+mi("vault-del",id,"Delete","#ff5470",true); }
   else if(type==="link"){ const l=find(state.links,id); if(!l)return; const host=hostOf(l.url),cats=linkCategoryList(l),transfer=currentView==="lot"?mi(l.inLinks?"link-unsend":"link-send",id,l.inLinks?"Remove from Links":"Send to Links",null,false,l.inLinks?"←":"→"):""; it+=`<div class="cm-link-head"><span><b>${esc(l.title)}</b><small>${esc(host)}</small></span></div>`+mi("link-open",id,"Open link",null,false,"↗")+miT("link-fav-toggle",id,"Favorite",l.favorite,FAV_COLOR,"★")+`<div class="cdiv"></div><div class="cm-head">Categories</div>`+Object.keys(CAT_COLORS).map(c=>miCat(id,c,cats.indexOf(c)>=0)).join("")+miCat(id,"__none__",!cats.length)+`<div class="cdiv"></div>`+transfer+mi("link-del",id,"Delete link","#ff5470",true,"×"); }
   else if(type==="folder"){ const f=find(state.folders,id); if(!f)return; const fp=f.path||f.name||""; const pn=petPinCount(); const pinned=isPetPinned(fp); const pinLab=pinned?("Unpin from Pet Recents ("+pn+"/3)"):(pn>=3?"Pet recents full (3/3)":"Pin to Pet Recents ("+pn+"/3)"); it+=mi("folder-open",id,"Open")+miT("folder-fav",id,"Favorite",f.favorite,FAV_COLOR)+mi("folder-edit",id,"Edit")+miT("folder-pet-pin",id,pinLab,pinned,"#ff79c6")+`<div class="cdiv"></div><div class="cm-head">Category</div>`+Object.keys(FOLDER_CATS).map(c=>miCatF(id,c,normCat(f)===c)).join("")+miCatF(id,"__none__",!normCat(f))+`<div class="cdiv"></div>`+mi("folder-del",id,"Remove","#ff5470",true); }
+  else if(type==="idea"){ const idea=ideaById(id);if(!idea)return;const current=ideaStatus(idea.status);if(ideaViewingId===id)it+=mi("idea-back","","Back")+'<div class="cdiv"></div>';it+=mi("idea-edit",id,"Edit idea")+mi("idea-copy",id,"Copy for Codex",null,false,CTX_ICON.copy)+'<div class="cdiv"></div><div class="cm-head">Status</div>'+Object.keys(IDEA_STATUSES).map(function(status){return '<div class="ci'+(status===current?' on':'')+'" data-action="idea-status" data-id="'+esc(id)+'" data-status="'+status+'"><span class="ci-ico">'+(status===current?'✓':'○')+'</span><span class="ci-label">'+esc(IDEA_STATUSES[status])+'</span></div>';}).join("")+'<div class="cdiv"></div>'+mi("idea-del",id,"Delete idea","#ff5470",true); }
+  else if(type==="idea-media"){it+=mi("idea-image-copy",id,"Copy image",null,false,CTX_ICON.copy);}
   else if(type==="shot"){ const s=shotById(id); if(!s)return; it+=mi("shot-open",id,"Open")+mi("shot-copy",id,"Copy image")+mi("shot-lookup",id,"Look up on Google Lens","#27b4ff")+`<div class="cdiv"></div>`+mi("shot-reveal",id,"Reveal in Explorer")+mi("shot-refresh","","Refresh","#ff79c6"); }
   else if(type==="monitor"){ const monitor=monitoringMonitor(id); if(!monitor)return; it+=mi("monitoring-monitor-open",id,"Open artist",null,false,"↗")+mi("monitoring-monitor-interval",id,"Edit check time",null,false,"◷")+mi("monitoring-monitor-toggle",id,monitor.enabled?"Pause watcher":"Resume watcher",null,false,monitor.enabled?CTX_ICON.pause:CTX_ICON.play)+mi("monitoring-monitor-refresh",id,"Check now",null,false,"↻")+`<div class="cdiv"></div>`+mi("monitoring-exit","","Back",null,false,CTX_ICON.back)+mi("monitoring-monitor-remove",id,"Remove watcher","#d86565",true,"×"); }
+  else if(type==="monitor-watchlist"){it+=mi("monitoring-add","","Add watcher",null,false,"+")+`<div class="cdiv"></div>`+mi("monitoring-exit","","Back",null,false,CTX_ICON.back);}
   else if(type==="monitor-artist"){if(!monitoringArtist||monitoringArtist.monitorId!==id)return;it+=mi("monitoring-artist-back","","Back",null,false,CTX_ICON.back)+`<div class="cdiv"></div>`+mi("monitoring-monitor-interval",id,"Edit check time",null,false,"◷")+mi("monitoring-artist-download-all",id,"Download everything",null,false,CTX_ICON.download)+mi("monitoring-artist-original",id,"Open original",null,false,"↗");}
   else if(type==="monitor-artist-post"){if(!monitoringArtist)return;it+=mi("monitoring-artist-post-open",id,"Open post",null,false,"↗")+mi("monitoring-artist-post-download-all",id,"Download post files",null,false,CTX_ICON.download)+`<div class="cdiv"></div>`+mi("monitoring-artist-back","","Back",null,false,CTX_ICON.back);}
-  else if(type==="monitor-file"){ const index=Number(id),file=monitoringDetail&&monitoringDetail.files&&monitoringDetail.files[index];if(!file)return;const label=file.kind==="image"?"Download image":file.kind==="video"?"Download video":file.kind==="audio"?"Download audio":"Download file";it+=mi("monitoring-post-back","","Back",null,false,CTX_ICON.back)+'<div class="cdiv"></div><div class="ci" data-action="monitoring-download" data-index="'+index+'"><span class="ci-ico">'+CTX_ICON.download+'</span><span class="ci-label">'+esc(label)+'</span></div>'; }
-  else if(type==="monitor-post"){ if(!monitoringDetail)return;it+=mi("monitoring-post-back","","Back",null,false,CTX_ICON.back)+`<div class="cdiv"></div>`+mi("monitoring-original","","Open original",null,false,"↗");if((monitoringDetail.files||[]).length>1)it+=mi("monitoring-download-all","","Download all files",null,false,"↓"); }
+  else if(type==="monitor-file"){ const index=Number(id),file=monitoringDetail&&monitoringDetail.files&&monitoringDetail.files[index];if(!file)return;const label=file.kind==="image"?"Download image":file.kind==="video"?"Download video":file.kind==="audio"?"Download audio":"Download file";it+=mi("monitoring-post-back","","Back",null,false,CTX_ICON.back)+monitoringPostNavigationMenu()+'<div class="cdiv"></div><div class="ci" data-action="monitoring-download" data-index="'+index+'"><span class="ci-ico">'+CTX_ICON.download+'</span><span class="ci-label">'+esc(label)+'</span></div>'; }
+  else if(type==="monitor-post"){ if(!monitoringDetail)return;it+=mi("monitoring-post-back","","Back",null,false,CTX_ICON.back)+monitoringPostNavigationMenu()+`<div class="cdiv"></div>`+mi("monitoring-original","","Open original",null,false,"↗");if((monitoringDetail.files||[]).length>1)it+=mi("monitoring-download-all","","Download all files",null,false,"↓"); }
+  else if(type==="offline-item"){const item=offlineItem(id);if(!item)return;it+=offlineItemMenu(item,false);}
+  else if(type==="offline-source"){const source=(offlineData.sources||[]).find(function(entry){return entry.id===id;});if(!source)return;it+=mi("offline-source-refresh",id,"Sync now",null,false,"↻")+mi("offline-source-limit",id,"Change unread limit",null,false,"#")+'<div class="cdiv"></div>'+mi("offline-source-remove",id,"Remove source","#ff5470",true,CTX_ICON.delete);}
   else return;
   showMenu(x,y,it);
 }
@@ -1226,6 +1419,28 @@ document.addEventListener("click",async(ev)=>{
   if((a==="vault-open"||a==="link-open"||a==="folder-open")&&!t.closest("#ctxmenu")&&(state.openMode||'double')==='double')return;
   switch(a){
     case "nav": if(offlineMode)setOfflineMode(false,true);if(monitoringMode)setMonitoringMode(false,true);currentView=t.dataset.nav; $("#content").classList.remove("searching"); searchTerms={}; renderNav(); renderView(); break;
+    case "idea-quick-add": await ideaQuickAdd();break;
+    case "idea-new": ideaModal();break;
+    case "idea-open": ideaReturnAnchor=captureListPosition(id);ideaViewingId=id;renderView();$("#content").scrollTop=0;break;
+    case "idea-back": {const anchor=ideaReturnAnchor;ideaViewingId="";ideaReturnAnchor=null;renderViewAnchored(anchor,true);break;}
+    case "idea-edit": ideaModal(ideaById(id));break;
+    case "idea-edit-images-pick": await pickIdeaEditImages();break;
+    case "idea-edit-image-remove": {const index=Number(t.dataset.index);if(Number.isInteger(index)&&index>=0&&index<ideaEditMedia.length){ideaEditMedia.splice(index,1);renderIdeaEditMedia();}break;}
+    case "idea-pane": ideaViewingId="";ideaPane=t.dataset.pane||"inbox";ideaFilter=ideaPane==="import"?"all":ideaPane;searchTerms.ideas="";renderView();break;
+    case "idea-copy-instructions": await copy(ideaImportInstructions(),"Chat instructions");break;
+    case "idea-import-images-pick": await pickIdeaImportImages();break;
+    case "idea-import-image-remove": {const index=Number(t.dataset.index);if(Number.isInteger(index)&&index>=0&&index<ideaImportMedia.length){ideaImportMedia.splice(index,1);ideaImportPreview=[];renderView();}break;}
+    case "idea-import-check": {const box=$("#idea_import_text");ideaImportText=box?box.value:"";ideaImportPreview=parseIdeaImport(ideaImportText);if(!ideaImportPreview.length){toast("No ideas were found — copy the chat instructions and try again","warn");}renderView();break;}
+    case "idea-import-cancel": ideaImportPreview=[];renderView();break;
+    case "idea-import-add": {if(!ideaImportPreview.length||ideaImportMediaUsage(ideaImportPreview).unmatched.length)break;const created=nowMs(),raw=ideaImportText,total=ideaImportPreview.length;rememberUndo("Imported "+total+" ideas");const added=ideaImportPreview.map(function(item,index){const group=ideaGroup(item.group);return {id:uid(),title:item.title,details:item.details,original:raw,references:item.references||ideaUrls(raw),type:ideaType(item.type),group:group,status:group==="app"?"ready":"inbox",attachments:ideaImportMediaFor(item,total).map(function(media){return {name:media.name,file:media.file};}),created:created+index,updated:created+index};});state.ideas=added.concat(state.ideas||[]);const saved=await flushSave();if(!saved){state.ideas=(state.ideas||[]).filter(function(item){return added.indexOf(item)<0;});toast("Ideas could not be saved","err");break;}ideaImportPreview=[];ideaImportText="";ideaImportMedia=[];ideaPane=added.some(function(item){return item.status==="ready";})?"ready":"inbox";ideaFilter=ideaPane;renderView();toast("Added "+added.length+" idea"+(added.length===1?"":"s")+" to "+IDEA_STATUSES[ideaPane],"ok");break;}
+    case "idea-search": {if(ideaPane==="import"){ideaPane="inbox";ideaFilter="inbox";}renderView();const input=document.querySelector('[data-search="ideas"]');if(input){input.focus();input.select();}break;}
+    case "idea-filter": ideaFilter=t.dataset.filter||"all";renderView();break;
+    case "idea-group-filter": ideaGroupFilter=t.dataset.filter||"all";renderView();break;
+    case "idea-copy": {const idea=ideaById(id);if(idea)await copy(ideaCodexText(idea),"Codex prompt");break;}
+    case "idea-image-copy": {const ok=E&&E.ideaImageCopy?await E.ideaImageCopy(id):false;toast(ok?"Image copied":"Could not copy image",ok?"ok":"err");break;}
+    case "idea-copy-visible": copyVisibleIdeas();break;
+    case "idea-status": {const idea=ideaById(id),status=ideaStatus(t.dataset.status);if(idea&&status!=="inbox"&&ideaGroup(idea.group)!=="app"){toast("Only App ideas can enter In Progress, Testing, or Done","warn");break;}if(idea&&idea.status!==status){rememberUndo("Changed idea status");idea.status=status;idea.updated=nowMs();await flushSave();renderView();toast("Moved to "+IDEA_STATUSES[status],"ok");}break;}
+    case "idea-del": {const idea=ideaById(id);if(idea&&await confirmModal("Delete "+(idea.title||"this idea")+"?")){const anchor=captureListPosition(id);rememberUndo("Deleted idea "+(idea.title||""));state.ideas=state.ideas.filter(function(item){return item.id!==id;});await flushSave();renderViewAnchored(anchor,false);toast("Idea deleted","ok");}break;}
     case "settings-back": closeSettings();break;
     case "settings-duplicates": closeSettings();duplicateReviewModal();break;
     case "settings-rules": closeSettings();smartRulesModal();break;
@@ -1233,6 +1448,7 @@ document.addEventListener("click",async(ev)=>{
     case "settings-extension": await runSettingsCommand("ext open",false);break;
     case "settings-offline-open": await openOfflineStorageFolder();break;
     case "settings-offline-change": await chooseOfflineStorageFolder();break;
+    case "settings-offline-history": closeSettings();offlineRetentionModal();break;
     case "settings-monitoring-output-open": await openMonitoringOutputFolder();break;
     case "monitoring-output-open": await openMonitoringOutputFolder();break;
     case "settings-monitoring-output-change": await chooseMonitoringOutputFolder();break;
@@ -1243,12 +1459,13 @@ document.addEventListener("click",async(ev)=>{
     case "monitoring-mode": toggleMonitoringMode(); break;
     case "monitoring-exit": setMonitoringMode(false);break;
     case "monitoring-post-back": leaveMonitoringPost();break;
+    case "monitoring-post-nav": await navigateMonitoringPost(id==="previous"?"previous":"next");break;
     case "monitoring-post-artist-open": {if(!monitoringDetail||!E||!E.monitoringArtistDetail)break;const monitorId=monitoringDetail.monitorId||id,requestId=++monitoringArtistRequest;monitoringDetail=null;monitoringArtistLoading=true;monitoringArtistRange={monitorId:"",from:"",to:""};renderView();const result=await E.monitoringArtistDetail(monitorId);if(requestId!==monitoringArtistRequest)break;monitoringArtistLoading=false;if(result&&result.ok){monitoringArtist=result.artist;renderView();}else{renderView();toast(result&&result.error||"Could not load that artist","err");}break;}
     case "monitoring-artist-back": leaveMonitoringPost();leaveMonitoringArtist();break;
     case "monitoring-tab": monitoringTab=t.dataset.tab==="watchlist"?"watchlist":"activity";monitoringFocusId="";monitoringDetail=null;monitoringArtist=null;renderView();break;
     case "monitoring-filter": monitoringFilter=t.dataset.filter==="unread"?"unread":"all";monitoringFocusId="";renderView();break;
     case "monitoring-add": monitoringAddModal();break;
-    case "monitoring-monitor-open": {const monitor=monitoringMonitor(id);if(!monitor)break;if(monitor.kind!=="pawchive"||!E||!E.monitoringArtistDetail){if(monitor.url)openTarget(monitor.url,"url");break;}const requestId=++monitoringArtistRequest;monitoringArtistLoading=true;monitoringArtistRange={monitorId:"",from:"",to:""};monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();const result=await E.monitoringArtistDetail(id);if(requestId!==monitoringArtistRequest)break;monitoringArtistLoading=false;if(result&&result.ok){monitoringArtist=result.artist;renderView();}else{renderView();toast(result&&result.error||"Could not load that artist","err");}break;}
+    case "monitoring-monitor-open": {const monitor=monitoringMonitor(id);if(!monitor)break;if(monitor.kind!=="pawchive"||!E||!E.monitoringArtistDetail){if(monitor.url)openTarget(monitor.url,"url");break;}monitoringArtistReturnAnchor=captureListPosition(id);const requestId=++monitoringArtistRequest;monitoringArtistLoading=true;monitoringArtistRange={monitorId:"",from:"",to:""};monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();const result=await E.monitoringArtistDetail(id);if(requestId!==monitoringArtistRequest)break;monitoringArtistLoading=false;if(result&&result.ok){monitoringArtist=result.artist;renderView();$("#content").scrollTop=0;}else{renderViewAnchored(monitoringArtistReturnAnchor,false);toast(result&&result.error||"Could not load that artist","err");}break;}
     case "monitoring-monitor-interval": monitoringIntervalModal(id);break;
     case "monitoring-artist-original": if(monitoringArtist&&monitoringArtist.url)openTarget(monitoringArtist.url,"url");break;
     case "monitoring-artist-range-reset": if(monitoringArtist){monitoringArtistRange={monitorId:"",from:"",to:""};monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();}break;
@@ -1258,41 +1475,46 @@ document.addEventListener("click",async(ev)=>{
     case "monitoring-artist-date-back": if(monitoringArtist&&monitoringDatePicker.side){if(monitoringDatePicker.level==="day")monitoringDatePicker.level="month";else monitoringDatePicker.level="year";renderView();}break;
     case "monitoring-artist-date-edge": if(monitoringArtist&&monitoringDatePicker.side){const days=monitoringArtistPostDays(monitoringArtist),side=monitoringDatePicker.side,item=t.dataset.edge==="latest"?days[0]:days[days.length-1];if(item){if(side==="from"){monitoringArtistRange.from=item.iso;if(new Date(item.iso)>new Date(monitoringArtistRange.to))monitoringArtistRange.to=item.iso;}else{monitoringArtistRange.to=item.iso;if(new Date(item.iso)<new Date(monitoringArtistRange.from))monitoringArtistRange.from=item.iso;}}monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();}break;
     case "monitoring-artist-date-pick": if(monitoringArtist&&monitoringDatePicker.side&&t.dataset.date){const side=monitoringDatePicker.side,date=t.dataset.date;if(side==="from"){monitoringArtistRange.from=date;if(new Date(date)>new Date(monitoringArtistRange.to))monitoringArtistRange.to=date;}else{monitoringArtistRange.to=date;if(new Date(date)<new Date(monitoringArtistRange.from))monitoringArtistRange.from=date;}monitoringDatePicker={side:"",level:"year",year:0,month:-1};renderView();}break;
-    case "monitoring-artist-post-open": {if(!monitoringArtist||!E||!E.monitoringArtistPostDetail)break;const requestId=++monitoringDetailRequest;monitoringDetailLoading=true;renderView();const result=await E.monitoringArtistPostDetail(monitoringArtist.monitorId,id);if(requestId!==monitoringDetailRequest)break;monitoringDetailLoading=false;if(result&&result.ok){monitoringDetail=result.detail;renderView();}else{renderView();toast(result&&result.error||"Could not open that post","err");}break;}
+    case "monitoring-artist-post-open": {if(!monitoringArtist||!E||!E.monitoringArtistPostDetail)break;rememberMonitoringReturn(id);const requestId=++monitoringDetailRequest;monitoringDetailLoading=true;renderView();const result=await E.monitoringArtistPostDetail(monitoringArtist.monitorId,id);if(requestId!==monitoringDetailRequest)break;monitoringDetailLoading=false;if(result&&result.ok){monitoringDetail=result.detail;renderView();}else{renderView();toast(result&&result.error||"Could not open that post","err");}break;}
     case "monitoring-artist-download-range": {if(!monitoringArtist||!E||!E.monitoringArtistDownloadAll)break;const from=monitoringArtistRange.from,to=monitoringArtistRange.to,fromTime=new Date(from+"T00:00:00").getTime(),toTime=new Date(to+"T23:59:59.999").getTime();if(!from||!to||!Number.isFinite(fromTime)||!Number.isFinite(toTime)||fromTime>toTime){toast("Choose a valid From and To date","warn");break;}const selected=(monitoringArtist.posts||[]).filter(function(post){return post.date>=fromTime&&post.date<=toTime;}).length;if(!selected){toast("No works are inside that date range","warn");break;}const approved=await confirmModal("Download available files from "+selected+" works to the Monitoring output folder?",false,{title:"Download date range",go:"Download"});if(!approved)break;toast("Date-range download started — keep SINRAD open","ok");const result=await E.monitoringArtistDownloadAll(monitoringArtist.monitorId,from,to);if(result&&result.ok)toast("Downloaded "+result.count+" files from "+result.postCount+" works"+(result.failed?" · "+result.failed+" skipped":""),result.failed?"warn":"ok");else toast(result&&result.error||"Date-range download failed","err");break;}
     case "monitoring-artist-download-all": {if(!monitoringArtist||!E||!E.monitoringArtistDownloadAll)break;const approved=await confirmModal("Download every available file from "+monitoringArtist.posts.length+" works to the Monitoring output folder? This may use a lot of storage.",false,{title:"Download artist",go:"Download"});if(!approved)break;toast("Artist download started — keep SINRAD open","ok");const result=await E.monitoringArtistDownloadAll(monitoringArtist.monitorId,"","");if(result&&result.ok)toast("Downloaded "+result.count+" files from "+result.postCount+" works"+(result.failed?" · "+result.failed+" skipped":""),result.failed?"warn":"ok");else toast(result&&result.error||"Artist download failed","err");break;}
     case "monitoring-artist-post-download-all": {if(!monitoringArtist||!E||!E.monitoringArtistPostDownloadAll)break;const result=await E.monitoringArtistPostDownloadAll(monitoringArtist.monitorId,id);if(result&&result.ok)toast("Downloaded "+result.count+" file"+(result.count===1?"":"s"),"ok");else if(!(result&&result.canceled))toast(result&&result.error||"Download failed","err");break;}
     case "monitoring-refresh": {if(!E||!E.monitoringRefresh||monitoringSyncing)break;monitoringSyncing=true;renderView();const result=await E.monitoringRefresh("");monitoringSyncing=false;await loadMonitoringData();toast(result&&result.ok?(result.baselined?"Watchers initialized — future updates will appear here":("Found "+result.added+" new update"+(result.added===1?"":"s"))):(result&&result.error||"Monitoring check could not finish"),result&&result.ok?"ok":"warn");break;}
     case "monitoring-monitor-refresh": {if(!E||!E.monitoringRefresh||monitoringSyncing)break;monitoringSyncing=true;renderView();const result=await E.monitoringRefresh(id);monitoringSyncing=false;await loadMonitoringData();toast(result&&result.ok?(result.baselined?"Baseline saved — future updates will be reported":("Found "+result.added+" new update"+(result.added===1?"":"s"))):(result&&result.error||"Watcher check could not finish"),result&&result.ok?"ok":"warn");break;}
     case "monitoring-monitor-toggle": {const monitor=monitoringMonitor(id);if(monitor&&E&&E.monitoringMonitorUpdate){await E.monitoringMonitorUpdate(id,{enabled:!monitor.enabled});await loadMonitoringData();toast(monitor.enabled?"Watcher paused":"Watcher resumed","ok");}break;}
-    case "monitoring-monitor-remove": if(await confirmModal("Remove this watcher and its activity history?")){await E.monitoringRemove(id);await loadMonitoringData();toast("Watcher removed","ok");}break;
+    case "monitoring-monitor-remove": if(await confirmModal("Remove this watcher and its activity history?")){const anchor=captureListPosition(id);await E.monitoringRemove(id);await loadMonitoringData(anchor);toast("Watcher removed","ok");}break;
     case "monitoring-mark-read": if(E&&E.monitoringMarkRead){await E.monitoringMarkRead();await loadMonitoringData();toast("Monitoring activity marked read","ok");}break;
-    case "monitoring-event-open": {const item=monitoringEvent(id);if(item){if(!item.read&&E&&E.monitoringEventUpdate){item.read=true;await E.monitoringEventUpdate(id,{read:true});}monitoringFocusId="";if(item.kind!=="pawchive"||!E||!E.monitoringPostDetail){if(item.url)openTarget(item.url,"url");renderView();break;}const requestId=++monitoringDetailRequest;monitoringDetailLoading=true;renderView();const result=await E.monitoringPostDetail(id);if(requestId!==monitoringDetailRequest)break;monitoringDetailLoading=false;if(result&&result.ok){monitoringDetail=result.detail;renderView();}else{renderView();toast(result&&result.error||"Could not open that Pawchive post","err");}}break;}
+    case "monitoring-event-open": {const item=monitoringEvent(id);if(item){rememberMonitoringReturn(id);if(!item.read&&E&&E.monitoringEventUpdate){item.read=true;await E.monitoringEventUpdate(id,{read:true});}monitoringFocusId="";if(item.kind!=="pawchive"||!E||!E.monitoringPostDetail){if(item.url)openTarget(item.url,"url");renderView();break;}const requestId=++monitoringDetailRequest;monitoringDetailLoading=true;renderView();const result=await E.monitoringPostDetail(id);if(requestId!==monitoringDetailRequest)break;monitoringDetailLoading=false;if(result&&result.ok){monitoringDetail=result.detail;renderView();}else{renderView();toast(result&&result.error||"Could not open that Pawchive post","err");}}break;}
     case "monitoring-original": if(monitoringDetail&&monitoringDetail.originalUrl)openTarget(monitoringDetail.originalUrl,"url");break;
     case "monitoring-download": {if(!monitoringDetail)break;const index=Number(t.dataset.index),result=monitoringDetail.eventId&&E&&E.monitoringDownload?await E.monitoringDownload(monitoringDetail.eventId,index):E&&E.monitoringArtistDownload?await E.monitoringArtistDownload(monitoringDetail.monitorId,monitoringDetail.postId,index):null;if(result&&result.ok)toast("Attachment downloaded","ok");else if(!(result&&result.canceled))toast(result&&result.error||"Download failed","err");break;}
     case "monitoring-download-all": {if(!monitoringDetail)break;const result=monitoringDetail.eventId&&E&&E.monitoringDownloadAll?await E.monitoringDownloadAll(monitoringDetail.eventId):E&&E.monitoringArtistPostDownloadAll?await E.monitoringArtistPostDownloadAll(monitoringDetail.monitorId,monitoringDetail.postId):null;if(result&&result.ok)toast("Downloaded "+result.count+" file"+(result.count===1?"":"s"),"ok");else if(!(result&&result.canceled))toast(result&&result.error||"Download failed","err");break;}
-    case "offline-tab": offlineTab=t.dataset.tab==="sources"?"sources":"feed";offlineSelectedId="";renderView();break;
-    case "offline-filter": offlineFilter=t.dataset.filter||"all";renderView();break;
-    case "offline-refresh": {if(!E||!E.offlineRefresh||offlineSyncing)break;offlineSyncing=true;renderView();const result=await E.offlineRefresh("");offlineSyncing=false;await loadOfflineData();toast(result&&result.ok?("Synced "+result.added+" new item"+(result.added===1?"":"s")):(result&&result.error||"Sync could not finish"),result&&result.ok?"ok":"warn");break;}
-    case "offline-source-refresh": {if(!E||!E.offlineRefresh||offlineSyncing)break;offlineSyncing=true;renderView();const result=await E.offlineRefresh(id);offlineSyncing=false;await loadOfflineData();toast(result&&result.ok?("Synced "+result.added+" new item"+(result.added===1?"":"s")):(result&&result.error||"Sync could not finish"),result&&result.ok?"ok":"warn");break;}
-    case "offline-reddit-connect": redditConnectModal();break;
-    case "offline-reddit-help": openTarget("https://support.reddithelp.com/hc/en-us/articles/14945211791892-Reddit-Developer-Interfaces","url");break;
-    case "offline-reddit-disconnect": if(await confirmModal("Disconnect Reddit? Downloaded posts will stay available.")){await E.offlineRedditDisconnect();await loadOfflineData();toast("Reddit disconnected","ok");}break;
+    case "offline-tab": offlineTab=t.dataset.tab==="sources"?"sources":"feed";offlineSelectedId="";offlineBrowseIds=[];renderView();break;
+    case "offline-filter": offlineFilter=["unread","history","favorite"].includes(t.dataset.filter)?t.dataset.filter:"unread";offlineBrowseIds=[];renderView();break;
+    case "offline-layout": {const result=E&&E.offlineSettings?await E.offlineSettings({feedLayout:t.dataset.layout==="scroll"?"scroll":"cards"}):null;if(result){offlineData=result;renderView();}break;}
+    case "offline-refresh": {if(!E||!E.offlineRefresh||offlineSyncing)break;const anchor=captureListPosition();offlineSyncing=true;renderViewAnchored(anchor,false);const result=await E.offlineRefresh("");await loadOfflineData(anchor);const removed=Number(result&&result.removed)||0;toast(result&&result.ok?(offlineExtension.connected?((removed?"Refreshed "+removed+" old post"+(removed===1?"":"s")+" · ":"")+"filling every unread slot"):"Queued — waiting for the browser extension"):(result&&result.error||"Sync could not be queued"),result&&result.ok&&offlineExtension.connected?"ok":"warn");break;}
+    case "offline-source-refresh": {if(!E||!E.offlineRefresh||offlineSyncing)break;const anchor=captureListPosition();offlineSyncing=true;renderViewAnchored(anchor,false);const result=await E.offlineRefresh(id);await loadOfflineData(anchor);const removed=Number(result&&result.removed)||0;toast(result&&result.ok?(offlineExtension.connected?((removed?"Refreshed "+removed+" old post"+(removed===1?"":"s")+" · ":"")+"filling every unread slot"):"Queued — waiting for the browser extension"):(result&&result.error||"Sync could not be queued"),result&&result.ok&&offlineExtension.connected?"ok":"warn");break;}
+    case "offline-extension-open": if(E&&E.extOpen)await E.extOpen();break;
     case "offline-source-add": redditSourceModal();break;
+    case "offline-source-follow": {const item=offlineItem(id),name=offlineRedditName(item);if(!item||!name||!E||!E.offlineSourceAdd)break;const result=await E.offlineSourceAdd({platform:"reddit",handle:name,limit:30,intervalHours:24,sort:"new",topComments:0});if(!result||!result.ok){toast(result&&result.error||"Could not start background downloads","err");break;}await loadOfflineData();offlineExtension=await E.offlineExtensionStatus();if(!offlineExtension.connected){offlineExtensionRequiredModal(name);break;}toast("Background browser download queued for r/"+name,"ok");break;}
     case "offline-source-remove": if(await confirmModal("Remove this subscription? Already downloaded posts will stay until retention removes them.")){await E.offlineSourceRemove(id,false);await loadOfflineData();toast("Subscription removed","ok");}break;
+    case "offline-source-limit": {const source=(offlineData.sources||[]).find(function(entry){return entry.id===id;});if(source)offlineSourceLimitModal(source);break;}
     case "offline-retention": offlineRetentionModal();break;
-    case "offline-item-open": {const item=offlineItem(id);if(item){offlineSelectedId=id;if(!item.read&&E&&E.offlineItemUpdate){item.read=true;E.offlineItemUpdate(id,{read:true}).catch(function(){});}renderView();}break;}
-    case "offline-item-back": offlineSelectedId="";renderView();break;
+    case "offline-item-open": {const item=offlineItem(id);if(item){offlineBrowseIds=offlineFilteredItems().map(function(entry){return entry.id;});offlineReturnAnchor=captureListPosition(id);offlineSelectedId=id;if(!item.read&&E&&E.offlineItemUpdate){item.read=true;E.offlineItemUpdate(id,{read:true}).catch(function(){});}renderView();const content=$("#content");if(content)content.scrollTop=0;}break;}
+    case "offline-item-nav": {const item=offlineItem(id);if(item){offlineSelectedId=id;if(!item.read&&E&&E.offlineItemUpdate){item.read=true;E.offlineItemUpdate(id,{read:true}).catch(function(){});}renderView();const content=$("#content");if(content)content.scrollTop=0;}break;}
+    case "offline-item-back": {const anchor=offlineReturnAnchor;offlineSelectedId="";offlineBrowseIds=[];offlineReturnAnchor=null;renderViewAnchored(anchor,true);break;}
     case "offline-gallery-prev":
     case "offline-gallery-next": {const gallery=t.closest(".of-gallery"),images=gallery?Array.from(gallery.querySelectorAll("[data-gallery-image]")):[];if(!gallery||images.length<2)break;const direction=a==="offline-gallery-next"?1:-1,current=Number(gallery.dataset.galleryIndex)||0,next=(current+direction+images.length)%images.length;images.forEach(function(image,index){image.classList.toggle("active",index===next);if(index!==next&&image.tagName==="VIDEO")image.pause();});gallery.dataset.galleryIndex=String(next);const count=gallery.querySelector(".of-gallery-count b");if(count)count.textContent=String(next+1);break;}
-    case "offline-item-favorite": {const item=offlineItem(id);if(item&&E&&E.offlineItemUpdate){item.favorite=!item.favorite;await E.offlineItemUpdate(id,{favorite:item.favorite});renderView();}break;}
+    case "offline-item-favorite": {const item=offlineItem(id);if(item&&E&&E.offlineItemUpdate){const anchor=offlineSelectedId?offlineReturnAnchor:captureListPosition(id);item.favorite=!item.favorite;await E.offlineItemUpdate(id,{favorite:item.favorite});if(offlineSelectedId)renderView();else renderViewAnchored(anchor,false);}break;}
+    case "offline-item-unread": {const item=offlineItem(id);if(item&&E&&E.offlineItemUpdate){const anchor=offlineSelectedId?offlineReturnAnchor:captureListPosition(id);await E.offlineItemUpdate(id,{read:false});if(offlineSelectedId===id){offlineSelectedId="";offlineReturnAnchor=null;}await loadOfflineData(anchor);toast("Moved back to Unread","ok");}break;}
+    case "offline-item-remove": {const item=offlineItem(id);if(item&&E&&E.offlineItemRemove){const anchor=offlineSelectedId?offlineReturnAnchor:captureListPosition(id),result=await E.offlineItemRemove(id);if(result&&result.ok){rememberOfflineUndo("Deleted offline post",result.undoToken);offlineBrowseIds=offlineBrowseIds.filter(function(value){return value!==id;});if(offlineSelectedId===id){offlineSelectedId="";offlineReturnAnchor=null;}await loadOfflineData(anchor);toast("Post deleted · Ctrl+Z to undo","ok");}}break;}
+    case "offline-history-clear": {if(E&&E.offlineHistoryClear){const anchor=captureListPosition(),result=await E.offlineHistoryClear();if(result&&result.ok){rememberOfflineUndo("Cleared offline history",result.undoToken);offlineSelectedId="";offlineBrowseIds=[];offlineReturnAnchor=null;await loadOfflineData(anchor);toast(result.removed?"History cleared · Ctrl+Z to undo":"History is already empty",result.removed?"ok":"warn");}}break;}
     case "offline-original": {const item=offlineItem(id);if(item&&item.url)openTarget(item.url,"url");break;}
     case "offline-capture-open": {const item=offlineItem(id);if(item&&item.captureRef&&E&&E.offlineCaptureOpen){const result=await E.offlineCaptureOpen(item.captureRef);if(!result||!result.ok)toast(result&&result.error||"Could not open the saved page","err");}break;}
     case "win-min": E&&E.winMin?E.winMin():toast("Window controls work in the desktop build"); break;
     case "win-max": E&&E.winMax?E.winMax():toast("Window controls work in the desktop build"); break;
     case "win-close": E&&E.winClose?E.winClose():toast("Window controls work in the desktop build"); break;
     case "vault-edit": vaultModal(find(state.vault,id)); break;
-    case "vault-del": { const v=find(state.vault,id); if(v&&await confirmModal("Delete "+v.name+"?")){ rememberUndo("Deleted vault entry "+v.name); state.vault=state.vault.filter(x=>x.id!==id); log("warn","Deleted vault entry: "+v.name); saveState(); renderView(); toast("Deleted","ok"); } break; }
+    case "vault-del": { const v=find(state.vault,id); if(v&&await confirmModal("Delete "+v.name+"?")){ const anchor=captureListPosition(id);rememberUndo("Deleted vault entry "+v.name); state.vault=state.vault.filter(x=>x.id!==id); log("warn","Deleted vault entry: "+v.name); saveState(); renderViewAnchored(anchor,false); toast("Deleted","ok"); } break; }
     case "vault-fav": { const v=find(state.vault,id); if(v){ rememberUndo("Changed vault favorite"); v.favorite=!v.favorite; log("info",(v.favorite?"Favorited":"Unfavorited")+": "+v.name); saveState(); renderView(); } break; }
     case "vault-pri": { const v=find(state.vault,id); if(v){ rememberUndo("Changed vault priority"); v.priority=!v.priority; log("info",(v.priority?"Priority on":"Priority off")+": "+v.name); saveState(); renderView(); } break; }
     case "vault-eye": if(revealed.has(id))revealed.delete(id); else revealed.add(id); renderView(); break;
@@ -1313,7 +1535,7 @@ document.addEventListener("click",async(ev)=>{
     case "cat-add": { const catType=t.dataset.type||"link"; openModal("New Category", '<div class="field"><label>Category name</label><input id="cat_name" placeholder="e.g. Tutorials"></div><div class="field"><label>Color</label><div style="display:flex;gap:8px;align-items:center"><input type="color" id="cat_color" value="#27b4ff" style="width:60px;height:40px;border:none;border-radius:4px;background:var(--input);cursor:pointer;padding:0"></div></div>', "Create", function(){ var name=($("#cat_name")||{}).value||""; name=name.trim(); if(!name){ toast("Name required","warn"); return; } var cc=CAT_COLORS[name]; if(cc&&(!state.categories||!state.categories[name])&&DEFAULT_CATS[name]){ toast("Category already exists","warn"); return; } if(state.categories&&state.categories[name]){ toast("Category already exists","warn"); return; } var color=($("#cat_color")||{}).value||"#27b4ff"; if(catType==="folder"){if(!state.folderCategories)state.folderCategories={};state.folderCategories[name]=color;saveState();refreshFolderCats();renderView();}else if(catType==="shot"){if(!state.shotCollections)state.shotCollections={};if(state.shotCollections[name]||SHOT_DEFAULT_COLS[name]){toast("Category already exists","warn");return;}state.shotCollections[name]=color;saveState();renderView();}else{addCategory(name,color);}closeModal(); toast("Category created: "+name,"ok"); }); setTimeout(function(){ var i=document.getElementById("cat_name"); if(i) i.focus(); },30); break; }
     case "cat-del-pill": { var cn2=(t.dataset.cat||"").trim(); if(cn2){ confirmModal("Delete category \""+cn2+"\"? Links will become uncategorized.").then(function(y){ if(y){ deleteCategory(cn2); toast("Category deleted","ok"); } }); } break; }
     case "cat-delete": { var cn=id; confirmModal("Delete category \""+cn+"\"? Links will become uncategorized.").then(function(y){ if(y){ deleteCategory(cn); toast("Category deleted","ok"); } }); break; }
-    case "link-del": { const l=find(state.links,id); if(l&&await confirmModal("Delete "+l.title+"?")){ rememberUndo("Deleted link "+l.title); state.links=state.links.filter(x=>x.id!==id); log("warn","Deleted link: "+l.title); saveState(); renderView(); } break; }
+    case "link-del": { const l=find(state.links,id); if(l&&await confirmModal("Delete "+l.title+"?")){ const anchor=captureListPosition(id);rememberUndo("Deleted link "+l.title); state.links=state.links.filter(x=>x.id!==id); log("warn","Deleted link: "+l.title); saveState(); renderViewAnchored(anchor,false); } break; }
     case "undo-history": undoHistoryModal(); break;
     case "undo-last": undoLastChange(); break;
     case "duplicate-review": duplicateReviewModal(); break;
@@ -1349,11 +1571,11 @@ document.addEventListener("click",async(ev)=>{
     case "shot-file-open": if(shotOpenId) shotFileTo(shotOpenId, t.dataset.col||""); renderView(); break;
     case "shot-unfile": shotFileTo(id, ""); renderView(); break;
     case "shot-fav": { const s=shotById(id); if(s){ s.favorite=!s.favorite; saveState(); renderView(); } break; }
-    case "shot-forget": { const s=shotById(id); if(s&&await confirmModal("Remove "+s.name+" from Shots? The file on disk stays.")){ state.shots=state.shots.filter(function(x){ return x.id!==id; }); if(shotOpenId===id) shotHide(); saveState(); renderView(); toast("Removed from Shots","ok"); } break; }
+    case "shot-forget": { const s=shotById(id); if(s&&await confirmModal("Remove "+s.name+" from Shots? The file on disk stays.")){ const anchor=captureListPosition(id);state.shots=state.shots.filter(function(x){ return x.id!==id; }); if(shotOpenId===id) shotHide(); saveState(); renderViewAnchored(anchor,false); toast("Removed from Shots","ok"); } break; }
     case "folder-open": openByAction("folder-open",id); break;
     case "folder-edit": folderEditModal(id); break;
     case "folder-fav": { const f=find(state.folders,id); if(f){ rememberUndo("Changed folder favorite"); f.favorite=!f.favorite; log("info",(f.favorite?"Favorited":"Unfavorited")+" folder: "+(f.name||"")); saveState(); renderView(); } break; }
-    case "folder-del": { const f=find(state.folders,id); if(f&&await confirmModal("Remove "+(f.name||baseName(f.path||f.name))+"?")){ rememberUndo("Removed folder "+(f.name||baseName(f.path||f.name))); state.folders=state.folders.filter(x=>x.id!==id); log("warn","Removed quick folder"); saveState(); renderView(); } break; }
+    case "folder-del": { const f=find(state.folders,id); if(f&&await confirmModal("Remove "+(f.name||baseName(f.path||f.name))+"?")){ const anchor=captureListPosition(id);rememberUndo("Removed folder "+(f.name||baseName(f.path||f.name))); state.folders=state.folders.filter(x=>x.id!==id); log("warn","Removed quick folder"); saveState(); renderViewAnchored(anchor,false); } break; }
     case "folder-cat": { const cat=t.dataset.cat; const idx=folderCats.indexOf(cat); if(idx>=0){folderCats.splice(idx,1);}else{folderCats.push(cat);} renderView(); break; }
     case "folder-cat-set": { const f=find(state.folders,id); if(f){ rememberUndo("Changed folder category"); f.category=(t.dataset.cat==="__none__")?"":t.dataset.cat; log("info","Tagged folder "+(f.name||baseName(f.path||f.name))+" → "+(f.category||"none")); saveState(); renderView(); } break; }
     case "folder-filter": folderFilter=t.dataset.filter; renderView(); break;
@@ -1377,6 +1599,11 @@ document.addEventListener("click",async(ev)=>{
 function hostOf(u){ try{ const h=new URL(u).hostname; return h||String(u).slice(0,40); }catch(e){ return String(u).slice(0,40); } }
 
 let _searchRenderTimer=null;
+document.addEventListener("input",function(ev){if(ev.target&&ev.target.id==="idea_import_text")ideaImportText=ev.target.value;});
+document.addEventListener("paste",function(ev){if(currentView!=="ideas"||ideaPane!=="import"||!ev.clipboardData)return;const files=Array.from(ev.clipboardData.files||[]).filter(function(file){return /^image\//i.test(file.type||"");});if(!files.length)return;ev.preventDefault();importIdeaImageFiles(files);});
+document.addEventListener("dragover",function(ev){const zone=ev.target&&ev.target.closest&&ev.target.closest("[data-idea-drop]");if(!zone)return;ev.preventDefault();zone.classList.add("dragging");});
+document.addEventListener("dragleave",function(ev){const zone=ev.target&&ev.target.closest&&ev.target.closest("[data-idea-drop]");if(zone)zone.classList.remove("dragging");});
+document.addEventListener("drop",function(ev){const zone=ev.target&&ev.target.closest&&ev.target.closest("[data-idea-drop]");if(!zone)return;ev.preventDefault();zone.classList.remove("dragging");importIdeaImageFiles(ev.dataTransfer&&ev.dataTransfer.files);});
 document.addEventListener("input",(ev)=>{ const s=ev.target.closest("[data-search]"); if(!s)return; const k=s.dataset.search,pos=s.value.length; searchTerms[k]=s.value; if(_searchRenderTimer)clearTimeout(_searchRenderTimer); _searchRenderTimer=setTimeout(function(){ _searchRenderTimer=null; if(k==="console"){ renderTermBody(); return; } renderView(); const again=document.querySelector('[data-search="'+k+'"]'); if(again){ again.focus(); try{ again.setSelectionRange(pos,pos); }catch(e){} } },140); });
 document.addEventListener("input",function(ev){
   if(!ev.target||ev.target.id!=="offlineSearch")return;
@@ -1436,6 +1663,7 @@ function renderSettings(){
     settingContextRow("Exact duplicates","duplicates","Review")+
     settingContextRow("Smart categories","smart-rules","Edit rules")+
     settingContextRow("Link health","link-health",_linkCheckRunning?("Checking "+_linkCheckDone+"/"+_linkCheckTotal):"Check now")+
+    '<div class="settings-section-title">Offline reader</div>'+settingContextRow("History cleanup","offline-history",(offlineData.settings&&offlineData.settings.historyCleanupMode)||"Manual")+
     '<div class="settings-section-title">Media folders</div>'+settingFolderRow("Offline library",offlineData.storagePath,"offline-storage")+settingFolderRow("Monitoring downloads",monitoringData.settings&&monitoringData.settings.downloadFolder,"monitoring-output")+settingContextRow("Intro videos","media-intros","Open folder")+settingContextRow("App animations","media-animations","Open folder")+
     '<div class="settings-section-title">Extension</div>'+settingContextRow("Browser extension","extension","Open folder")+
     '<div class="settings-section-title">Hotkeys</div>'+settingHotkeyRow("globalSearch","Global search",true)+settingHotkeyRow("commandPalette","Commands",true)+settingHotkeyRow("undo","Undo",true)+settingHotkeyRow("quickSave","Quick save",s.hotkeyEnabled!==false)+
@@ -1451,7 +1679,7 @@ async function chooseOfflineStorageFolder(){if(!E||!E.offlineStorageChoose){toas
 async function openMonitoringOutputFolder(){if(!E||!E.monitoringOutputOpen){toast("Monitoring folders need the desktop app","warn");return;}if(!await E.monitoringOutputOpen())toast("Could not open the Monitoring folder","err");}
 async function chooseMonitoringOutputFolder(){if(!E||!E.monitoringOutputChoose){toast("Monitoring folders need the desktop app","warn");return;}const result=await E.monitoringOutputChoose();if(result&&result.ok){if(result.snapshot)monitoringData=result.snapshot;renderSettings();toast("Future Monitoring downloads will use this folder","ok");}else if(result&&!result.canceled)toast(result.error||"Could not change the Monitoring folder","err");}
 async function openSettingsMediaFolder(kind){if(!E||!E.mediaOpen){toast("Media folders need the desktop app","warn");return;}const ok=await E.mediaOpen(kind);if(!ok)toast("Could not open that folder","err");}
-function settingsMenuHtml(key){let items="";if(key==="duplicates")items=mi("settings-duplicates","","Review exact duplicates");else if(key==="smart-rules")items=mi("settings-rules","","Edit rules");else if(key==="link-health")items=mi("settings-link-check","",_linkCheckRunning?("Checking "+_linkCheckDone+"/"+_linkCheckTotal):"Check now");else if(key==="offline-storage")items=mi("settings-offline-open","","Open folder")+mi("settings-offline-change","","Change folder");else if(key==="monitoring-output")items=mi("settings-monitoring-output-open","","Open folder")+mi("settings-monitoring-output-change","","Change folder");else if(key==="media-intros")items=mi("settings-media-intros","","Open folder");else if(key==="media-animations")items=mi("settings-media-animations","","Open folder");else if(key==="extension")items=mi("settings-extension","","Open folder");return items+(items?'<div class="cdiv"></div>':'')+mi("settings-back","","Back",null,false,CTX_ICON.back);}
+function settingsMenuHtml(key){let items="";if(key==="duplicates")items=mi("settings-duplicates","","Review exact duplicates");else if(key==="smart-rules")items=mi("settings-rules","","Edit rules");else if(key==="link-health")items=mi("settings-link-check","",_linkCheckRunning?("Checking "+_linkCheckDone+"/"+_linkCheckTotal):"Check now");else if(key==="offline-history")items=mi("settings-offline-history","","Configure cleanup")+mi("offline-history-clear","","Clear history now","#ff5470",true,CTX_ICON.delete);else if(key==="offline-storage")items=mi("settings-offline-open","","Open folder")+mi("settings-offline-change","","Change folder");else if(key==="monitoring-output")items=mi("settings-monitoring-output-open","","Open folder")+mi("settings-monitoring-output-change","","Change folder");else if(key==="media-intros")items=mi("settings-media-intros","","Open folder");else if(key==="media-animations")items=mi("settings-media-animations","","Open folder");else if(key==="extension")items=mi("settings-extension","","Open folder");return items+(items?'<div class="cdiv"></div>':'')+mi("settings-back","","Back",null,false,CTX_ICON.back);}
 const settingsPanel=$("#settingsPanel");
 if(settingsPanel){
   settingsPanel.addEventListener("click",async function(ev){
@@ -1479,8 +1707,8 @@ if(settingsPanel){
 
 let commandActive=0,commandItems=[];
 function commandDefinitions(){const hotkeys=currentHotkeys();return [
-  {group:"Navigate",id:"search",icon:"⌕",name:"Search everything",hint:hotkeyDisplay(hotkeys.globalSearch)},{group:"Navigate",id:"vault",icon:"◇",name:"Go to Vault"},{group:"Navigate",id:"links",icon:"↗",name:"Go to Links"},{group:"Navigate",id:"lot",icon:"P",name:"Go to Parking Lot"},{group:"Navigate",id:"folders",icon:"□",name:"Go to Folders"},{group:"Navigate",id:"shots",icon:"▣",name:"Go to Screenies"},{group:"Navigate",id:"offline",icon:"◫",name:offlineMode?"Exit Offline Reader":"Open Offline Reader"},{group:"Navigate",id:"monitoring",icon:"◎",name:monitoringMode?"Exit Monitoring Mode":"Open Monitoring Mode"},{group:"Navigate",id:"settings",icon:"⚙",name:"Open Settings"},
-  {group:"Create",id:"add-vault",icon:"+",name:"Add vault entry"},{group:"Create",id:"add-link",icon:"+",name:"Add link"},{group:"Create",id:"add-folder",icon:"+",name:"Add folder"},
+  {group:"Navigate",id:"search",icon:"⌕",name:"Search everything",hint:hotkeyDisplay(hotkeys.globalSearch)},{group:"Navigate",id:"vault",icon:"◇",name:"Go to Vault"},{group:"Navigate",id:"links",icon:"↗",name:"Go to Links"},{group:"Navigate",id:"lot",icon:"P",name:"Go to Parking Lot"},{group:"Navigate",id:"folders",icon:"□",name:"Go to Folders"},{group:"Navigate",id:"shots",icon:"▣",name:"Go to Screenies"},{group:"Navigate",id:"ideas",icon:"◇",name:"Go to Ideas"},{group:"Navigate",id:"offline",icon:"◫",name:offlineMode?"Exit Offline Reader":"Open Offline Reader"},{group:"Navigate",id:"monitoring",icon:"◎",name:monitoringMode?"Exit Monitoring Mode":"Open Monitoring Mode"},{group:"Navigate",id:"settings",icon:"⚙",name:"Open Settings"},
+  {group:"Create",id:"add-vault",icon:"+",name:"Add vault entry"},{group:"Create",id:"add-link",icon:"+",name:"Add link"},{group:"Create",id:"add-folder",icon:"+",name:"Add folder"},{group:"Create",id:"add-idea",icon:"+",name:"Add idea"},
   {group:"Actions",id:"undo",icon:"↶",name:"Undo latest change",hint:hotkeyDisplay(hotkeys.undo)},{group:"Actions",id:"duplicates",icon:"≋",name:"Review exact duplicates"},{group:"Actions",id:"rules",icon:"⌁",name:"Smart category rules"},{group:"Actions",id:"check-links",icon:"✓",name:"Check saved links"},{group:"Actions",id:"backup",icon:"↓",name:"Create encrypted backup"},{group:"Actions",id:"restore",icon:"↑",name:"Restore encrypted backup"},{group:"Actions",id:"update",icon:"↻",name:"Check for updates"}
 ];}
 function renderCommandPalette(){const input=$("#commandInput"),list=$("#commandList");if(!input||!list)return;const query=input.value.trim().toLowerCase();commandItems=commandDefinitions().filter(function(command){return !query||command.name.toLowerCase().indexOf(query)>=0||command.id.indexOf(query)>=0;});if(commandActive>=commandItems.length)commandActive=0;let lastGroup="";list.innerHTML=commandItems.length?commandItems.map(function(command,index){const heading=command.group!==lastGroup?'<div class="cp-group">'+esc(command.group)+'</div>':'';lastGroup=command.group;return heading+'<button type="button" class="cp-item'+(index===commandActive?' active':'')+'" data-command="'+command.id+'"><i>'+command.icon+'</i><b>'+esc(command.name)+'</b><small>'+esc(command.hint||"")+'</small></button>';}).join(""):'<div class="cp-empty">No matching command</div>';}
@@ -1488,7 +1716,7 @@ function openCommandPalette(){const palette=$("#commandPalette"),input=$("#comma
 if(E&&E.onCommandPalette)E.onCommandPalette(openCommandPalette);
 function closeCommandPalette(){const palette=$("#commandPalette");if(palette){palette.classList.remove("show");palette.setAttribute("aria-hidden","true");}}
 function commandNavigate(view,focus){if(offlineMode)setOfflineMode(false,true);if(monitoringMode)setMonitoringMode(false,true);currentView=view;searchTerms={};renderNav();renderView();if(focus)setTimeout(function(){const target=$(focus);if(target)target.focus();},20);}
-function runPaletteCommand(id){closeCommandPalette();switch(id){case "search":{if(offlineMode)setOfflineMode(false,true);if(monitoringMode)setMonitoringMode(false,true);renderView();const input=$("#globalSearchInput");if(input){input.focus();input.select();renderGlobalSearch();}break;}case "undo":undoLastChange();break;case "settings":openSettings();break;case "offline":setOfflineMode(!offlineMode);break;case "monitoring":toggleMonitoringMode();break;case "vault":case "links":case "lot":case "folders":case "shots":commandNavigate(id);break;case "add-vault":commandNavigate("vault");vaultModal();break;case "add-link":commandNavigate("links","#lk_url");break;case "add-folder":commandNavigate("folders","#fd_path");break;case "duplicates":commandNavigate("links");duplicateReviewModal();break;case "rules":commandNavigate("links");smartRulesModal();break;case "check-links":commandNavigate("links");checkSavedLinks();break;case "backup":backupExportModal();break;case "restore":backupImportModal();break;case "update":updateCheckClick(false);break;}}
+function runPaletteCommand(id){closeCommandPalette();switch(id){case "search":{if(offlineMode)setOfflineMode(false,true);if(monitoringMode)setMonitoringMode(false,true);renderView();const input=$("#globalSearchInput");if(input){input.focus();input.select();renderGlobalSearch();}break;}case "undo":undoLastChange();break;case "settings":openSettings();break;case "offline":setOfflineMode(!offlineMode);break;case "monitoring":toggleMonitoringMode();break;case "vault":case "links":case "lot":case "folders":case "shots":case "ideas":commandNavigate(id);break;case "add-vault":commandNavigate("vault");vaultModal();break;case "add-link":commandNavigate("links","#lk_url");break;case "add-folder":commandNavigate("folders","#fd_path");break;case "add-idea":commandNavigate("ideas");ideaModal();break;case "duplicates":commandNavigate("links");duplicateReviewModal();break;case "rules":commandNavigate("links");smartRulesModal();break;case "check-links":commandNavigate("links");checkSavedLinks();break;case "backup":backupExportModal();break;case "restore":backupImportModal();break;case "update":updateCheckClick(false);break;}}
 const commandInput=$("#commandInput"),commandPalette=$("#commandPalette");
 if(commandInput){commandInput.addEventListener("input",function(){commandActive=0;renderCommandPalette();});commandInput.addEventListener("keydown",function(ev){if(ev.key==="ArrowDown"&&commandItems.length){ev.preventDefault();commandActive=(commandActive+1)%commandItems.length;renderCommandPalette();}else if(ev.key==="ArrowUp"&&commandItems.length){ev.preventDefault();commandActive=(commandActive<=0?commandItems.length:commandActive)-1;renderCommandPalette();}else if(ev.key==="Enter"&&commandItems.length){ev.preventDefault();runPaletteCommand(commandItems[commandActive].id);}else if(ev.key==="Escape"){ev.preventDefault();closeCommandPalette();}});}
 if(commandPalette){commandPalette.addEventListener("click",function(ev){const item=ev.target.closest("[data-command]");if(item){runPaletteCommand(item.dataset.command);return;}if(ev.target===commandPalette)closeCommandPalette();});}
@@ -1507,7 +1735,7 @@ document.addEventListener("keydown",(ev)=>{
   if(ev.target&&ev.target.closest&&ev.target.closest("[data-hotkey-field]"))return;
   if(hotkeyMatches(ev,"globalSearch")){ev.preventDefault();const input=$("#globalSearchInput");if(input){input.focus();input.select();renderGlobalSearch();}return;}
   if((ev.ctrlKey||ev.metaKey)&&!ev.shiftKey&&ev.key.toLowerCase()==="f"){
-    const k={vault:"vault",links:"links",folders:"folders",console:"console",lot:"lot",shots:"shots"}[currentView];
+    const k={vault:"vault",links:"links",folders:"folders",console:"console",lot:"lot",shots:"shots",ideas:"ideas"}[currentView];
     if(!k)return; ev.preventDefault();
     if(currentView==="console"){ const i=document.querySelector('[data-search="console"]'); if(i){i.focus();i.select();} return; }
     $("#content").classList.add("searching"); const i=document.querySelector('[data-search="'+k+'"]'); if(i){i.focus();i.select();}
@@ -1530,10 +1758,11 @@ document.addEventListener("contextmenu", function(ev){
     let menu="";
     if(offlineMode){
       const item=offlineSelectedId&&offlineItem(offlineSelectedId);
-      if(item){menu=mi("offline-item-back","","Back",null,false,CTX_ICON.back);if(item.captureRef)menu+=mi("offline-capture-open",item.id,"Open saved page");menu+='<div class="cdiv"></div>'+mi("offline-item-favorite",item.id,item.favorite?"Remove favorite":"Favorite",null,false,CTX_ICON.star)+mi("offline-original",item.id,"Open original");}
-      else menu=mi("offline-exit","","Back",null,false,CTX_ICON.back);
-    }else if(monitoringDetail)menu=mi("monitoring-post-back","","Back",null,false,CTX_ICON.back);
+      if(item)menu=offlineItemMenu(item,true);
+      else menu=(offlineFilter==="history"?mi("offline-history-clear","","Clear all history","#ff5470",true,CTX_ICON.delete)+'<div class="cdiv"></div>':"")+mi("offline-exit","","Back",null,false,CTX_ICON.back);
+    }else if(monitoringDetail)menu=mi("monitoring-post-back","","Back",null,false,CTX_ICON.back)+monitoringPostNavigationMenu();
     else if(monitoringArtist)menu=mi("monitoring-artist-back","","Back",null,false,CTX_ICON.back)+mi("monitoring-monitor-interval",monitoringArtist.monitorId,"Edit check time",null,false,"◷")+mi("monitoring-artist-download-all",monitoringArtist.monitorId,"Download everything",null,false,CTX_ICON.download);
+    else if(monitoringTab==="watchlist")menu=mi("monitoring-add","","Add watcher",null,false,"+")+mi("monitoring-exit","","Back",null,false,CTX_ICON.back);
     else menu=mi("monitoring-exit","","Back",null,false,CTX_ICON.back);
     ev.preventDefault();ev.stopImmediatePropagation();showMenu(ev.clientX,ev.clientY,menu);return;
   }
@@ -1553,6 +1782,7 @@ document.getElementById("norma").addEventListener("contextmenu", function(ev){
   showMenu(ev.clientX, ev.clientY, mi("norma-dock","","Dock Norma",null,false,CTX_ICON.pin));
 });
 document.addEventListener("contextmenu",(e)=>{ const c=e.target.closest("[data-ctx]"); if(c){ e.preventDefault(); showCardMenu(c.dataset.ctx,c.dataset.id,e.clientX,e.clientY); } });
+document.addEventListener("contextmenu",function(e){if(currentView!=="ideas"||offlineMode||monitoringMode)return;if(e.target.closest("[data-ctx],button,input,textarea,select,#ctxmenu,#overlay"))return;e.preventDefault();showMenu(e.clientX,e.clientY,mi("idea-new","","New detailed idea",null,false,"+")+mi("idea-copy-visible","","Copy visible ideas for Codex",null,false,CTX_ICON.copy));});
 document.addEventListener("contextmenu",function(e){ if(currentView!=="shots") return; if(e.target.closest("[data-ctx]")) return; if(e.target.closest("#ctxmenu")||e.target.closest("#overlay")||e.target.closest("#shotbox")||e.target.closest("#shotshow")) return; e.preventDefault(); showMenu(e.clientX,e.clientY,mi("shot-refresh","","Refresh","#ff79c6")); });
 $("#ctxmenu").addEventListener("click",hideMenu);
 document.addEventListener("click",(e)=>{ const m=$("#ctxmenu"); if(m.classList.contains("show")&&!m.contains(e.target)&&!e.target.closest("#norma-bubble")&&!e.target.closest("#norma"))hideMenu(); });
@@ -1575,35 +1805,49 @@ var _lastParked=null;
 function protocolParkAck(d,ok){ if(d&&d.requestId&&E&&E.protocolParkAck)E.protocolParkAck(d.requestId,!!ok); }
 if(E&&E.onHotkeyPark) E.onHotkeyPark(function(txt){ var p=_parkParseClip(txt); if(!p){ try{toast("clipboard has no link","warn");}catch(_){} return; } var url=(p.url||"").trim(); if(url.indexOf("www.")===0) url="https://"+url; var nu=normUrl(url); if(!nu){ toast("could not parse URL","warn"); return; } var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ log("info","hotkey: already in Links — "+ex.title); toast("Already in Links","warn"); return; } var raw=p.title||_parkHost(url); var title=raw.length>45?raw.slice(0,42)+"...":raw; var auto=smartCategories(url,"Check out"),category=auto.main; rememberUndo("Saved hotkey link"); var link={id:uid(),title:title,url:url,category:category,categories:auto.all,favorite:false,created:nowMs()}; state.links.unshift(link); saveState(); log("ok","hotkey → Links ["+auto.all.join(", ")+"]: "+title); celebrate(); renderView(); toast("Added to "+category,"ok"); });
 if(E&&E.hotkeyStatus) E.hotkeyStatus(function(mm){ if(mm&&mm.enabled===false){ log('info','hotkey disabled — use Settings → Tools to enable'); } else { log(mm&&mm.ok?'ok':'warn', 'hotkey '+(mm&&mm.ok?'ready':'FAILED')+' ('+(mm&&mm.combo||currentHotkeys().quickSave)+')'); } });
-var _batchParkQueue=[], _batchParkTimer=null;
+var _batchParkQueue=[], _batchParkTimer=null, _batchParkBusy=false;
+var _legacyParkNotice={added:0,dup:0}, _legacyParkNoticeTimer=null;
 function _protocolParkItem(item){ if(!item||typeof item.url!=="string")return null; var url=item.url.trim(); if(url.indexOf("www.")===0)url="https://"+url; return normUrl(url)?{url:url,title:item.title||_parkHost(url),requestId:item.requestId||""}:null; }
-async function _persistProtocolParkBatch(q){
+function _showParkCompletion(added,dup){
+  if(added>0){celebrate();log("ok","extension \u2192 Parking Lot: "+added+" link(s) parked"+(dup?" ("+dup+" exact duplicates skipped)":""));toast("Parked "+added+" tab"+(added===1?"":"s")+" to Parking Lot","ok");if(E&&E.showNotif)E.showNotif({title:"Sinrad is informing you that \uff08\uffe3\ufe36\uffe3\uff09\u2197",body:added+" tab"+(added===1?"":"s")+" parked \u2713"});}
+  else if(dup>0)toast(dup+" tab"+(dup===1?" was":"s were")+" already parked","warn");
+}
+function _queueLegacyParkCompletion(added,dup){
+  _legacyParkNotice.added+=added;_legacyParkNotice.dup+=dup;
+  if(_legacyParkNoticeTimer)clearTimeout(_legacyParkNoticeTimer);
+  _legacyParkNoticeTimer=setTimeout(function(){var done=_legacyParkNotice;_legacyParkNotice={added:0,dup:0};_legacyParkNoticeTimer=null;_showParkCompletion(done.added,done.dup);},1200);
+}
+async function _persistProtocolParkBatch(q,deferCompletion){
   var added=0,dup=0,addedIds=[];
   for(var i=0;i<q.length;i++){ var r=_parkOne(q[i].title,q[i].url); if(r.dup)dup++; else if(!r.bad){added++;if(r.id)addedIds.push(r.id);} }
   var persisted=added>0?await flushSave():true;
-  if(added>0&&persisted){ renderView();celebrate();log("ok","extension \u2192 Parking Lot: "+added+" link(s) parked"+(dup?" ("+dup+" exact duplicates skipped)":""));toast("Parked "+added+" tab"+(added===1?"":"s")+" to Parking Lot","ok");if(E&&E.showNotif)E.showNotif({title:"Sinrad is informing you that \uff08\uffe3\ufe36\uffe3\uff09\u2197",body:added+" tab"+(added===1?"":"s")+" parked \u2713"}); }
+  if(added>0&&persisted){ renderView();if(deferCompletion)_queueLegacyParkCompletion(added,dup);else _showParkCompletion(added,dup); }
   else if(added>0&&!persisted){ var failedIds={};addedIds.forEach(function(id){failedIds[id]=1;});state.links=state.links.filter(function(link){return !failedIds[link.id];});toast("Could not persist parked tabs","err"); }
-  else if(dup>0){toast(dup+" tab"+(dup===1?" was":"s were")+" already parked","warn");}
+  else if(dup>0){if(deferCompletion)_queueLegacyParkCompletion(0,dup);else _showParkCompletion(0,dup);}
   return persisted;
+}
+function _scheduleLegacyParkDrain(delay){
+  if(_batchParkTimer)clearTimeout(_batchParkTimer);
+  _batchParkTimer=setTimeout(async function(){
+    _batchParkTimer=null;if(_batchParkBusy||!_batchParkQueue.length){if(_batchParkQueue.length)_scheduleLegacyParkDrain(80);return;}
+    var q=_batchParkQueue;_batchParkQueue=[];_batchParkBusy=true;
+    var persisted=await _persistProtocolParkBatch(q,true);
+    for(var j=0;j<q.length;j++)protocolParkAck(q[j],persisted);
+    _batchParkBusy=false;if(_batchParkQueue.length)_scheduleLegacyParkDrain(80);
+  },delay==null?180:delay);
 }
 if(E&&E.onProtocolPark) E.onProtocolPark(async function(d){
   if(!d){protocolParkAck(d,false);return;}
   if(d.lot&&Array.isArray(d.tabs)){
     var batch=d.tabs.map(_protocolParkItem).filter(Boolean);
     if(!batch.length){protocolParkAck(d,false);return;}
-    protocolParkAck(d,await _persistProtocolParkBatch(batch));
+    protocolParkAck(d,await _persistProtocolParkBatch(batch,false));
     return;
   }
   var item=_protocolParkItem(d);if(!item){protocolParkAck(d,false);return;}var url=item.url,nu=normUrl(url);
   if(d.lot){
     _batchParkQueue.push({url:url,title:item.title,requestId:d.requestId||""});
-    if(_batchParkTimer)clearTimeout(_batchParkTimer);
-    _batchParkTimer=setTimeout(async function(){
-      _batchParkTimer=null;
-      var q=_batchParkQueue;_batchParkQueue=[];
-      var persisted=await _persistProtocolParkBatch(q);
-      for(var j=0;j<q.length;j++)protocolParkAck(q[j],persisted);
-    },900);
+    _scheduleLegacyParkDrain();
     return;
   }
   var ex=null; for(var a=0;a<state.links.length;a++){ if(normUrl(state.links[a].url)===nu){ex=state.links[a];break;} } if(ex){ protocolParkAck(d,true); toast("Already in Links","warn"); if(E&&E.showNotif) E.showNotif({title:"Homie you already saved this exact link (\u00b4\u3002\uff3f\u3002\u0060)",body:ex.title||url}); return; } var raw=d.title||_parkHost(url); var title=raw.length>45?raw.slice(0,42)+"...":raw; var auto=smartCategories(url,"Check out"),category=auto.main; rememberUndo("Saved extension link"); var link={id:uid(),title:title,url:url,category:category,categories:auto.all,favorite:false,created:nowMs()}; state.links.unshift(link); saveState(); var persisted=await flushSave(); protocolParkAck(d,persisted); if(!persisted){state.links=state.links.filter(function(item){return item.id!==link.id;});toast("Could not persist link","err");return;} log("ok","extension \u2192 Links ["+auto.all.join(", ")+"]: "+title); celebrate(); renderView(); toast("Saved to "+category,"ok"); if(E&&E.showNotif) E.showNotif({title:"Sinrad is informing you that \uff08\uffe3\ufe36\uffe3\uff09\u2197",body:"Link saved \u2713  "+title}); });
@@ -1611,7 +1855,7 @@ if(E&&E.dataPath) E.dataPath(function(pp){ log('info','data file: '+pp); });
 var lotSelLinks={}, lotSelColls={};
 var linkSelLinks={};
 function _lotCountSel(){ var t=Object.keys(lotSelLinks).length; Object.keys(lotSelColls).forEach(function(c){ state.links.forEach(function(l){ if(_inLot(l)&&(l.coll||"")===c) t++; }); }); return t; }
-function _lotDeleteSel(){ var ids=Object.keys(lotSelLinks), colls=Object.keys(lotSelColls); var total=_lotCountSel(); if(!total) return; function go(){ rememberUndo("Deleted "+total+" parked links"); var kill={}; ids.forEach(function(x){var selected=find(state.links,x);if(_inLot(selected))kill[x]=1;}); colls.forEach(function(c){ state.links.forEach(function(l){ if(_inLot(l)&&(l.coll||"")===c) kill[l.id]=1; }); }); var n=Object.keys(kill).length; state.links=state.links.filter(function(l){ return !kill[l.id]; }); saveState(); lotSelLinks={}; lotSelColls={}; renderView(); log("warn","deleted "+n+" parked link(s)"); } if(total>4){ confirmModal("Delete "+total+" parked link(s)?").then(function(y){ if(y) go(); }); } else { go(); } }
+function _lotDeleteSel(){ var ids=Object.keys(lotSelLinks), colls=Object.keys(lotSelColls); var total=_lotCountSel(); if(!total) return; function go(){ const anchor=captureListPosition();rememberUndo("Deleted "+total+" parked links"); var kill={}; ids.forEach(function(x){var selected=find(state.links,x);if(_inLot(selected))kill[x]=1;}); colls.forEach(function(c){ state.links.forEach(function(l){ if(_inLot(l)&&(l.coll||"")===c) kill[l.id]=1; }); }); var n=Object.keys(kill).length; state.links=state.links.filter(function(l){ return !kill[l.id]; }); saveState(); lotSelLinks={}; lotSelColls={}; renderViewAnchored(anchor,false); log("warn","deleted "+n+" parked link(s)"); } if(total>4){ confirmModal("Delete "+total+" parked link(s)?").then(function(y){ if(y) go(); }); } else { go(); } }
 function _lotClearSel(){ lotSelLinks={}; lotSelColls={}; renderView(); }
 document.addEventListener("click", function(ev){
   var rb=ev.target.closest&&ev.target.closest(".lr-rename"); if(rb){ ev.stopPropagation(); ev.preventDefault(); var rr=rb.closest(".lot-row"); if(rr) renameStack(rr.dataset.coll); return; }

@@ -115,6 +115,7 @@
     (Array.isArray(data.links)?data.links:[]).forEach(function(item){const parked=isParkedLink(item);add(parked?"Parking Lot":"Links",parked?"lot":"links",item,item.title,item.url,[item.title,item.url,item.note,item.category].concat(Array.isArray(item.categories)?item.categories:[]));});
     (Array.isArray(data.folders)?data.folders:[]).forEach(function(item){add("Folders","folders",item,item.name||item.path,item.path,[item.name,item.path,item.category]);});
     (Array.isArray(data.shots)?data.shots:[]).forEach(function(item){add("Screenies","shots",item,item.name||item.path,item.collection||item.path,[item.name,item.path,item.collection]);});
+    (Array.isArray(data.ideas)?data.ideas:[]).forEach(function(item){add("Ideas","ideas",item,item.title,item.status||item.type,[item.title,item.details,item.original,item.references,item.reviewNote,item.type,item.status,item.group]);});
     return index;
   }
   function searchGlobalIndex(index,query,limit) {

@@ -128,7 +128,7 @@ test("Pawchive reader uses quick previews, flat media and contextual downloads",
   assert.match(detailView,/data-ctx="monitor-file"/);
   assert.match(detailView,/data-action="monitoring-post-back">← Back<\/button>/);
   assert.match(detailView,/class="mon-reader-creator"[\s\S]*data-action="monitoring-post-artist-open"/);
-  assert.equal((detailView.match(/<button/g)||[]).length,2);
+  assert.equal((detailView.match(/<button/g)||[]).length,3);
   assert.match(renderer,/case "monitoring-post-artist-open"[\s\S]*E\.monitoringArtistDetail/);
   assert.match(css,/\.mon-reader-creator\{[^}]*background:transparent[^}]*cursor:pointer/);
   assert.match(renderer,/type==="monitor-file"[\s\S]*Download image/);
@@ -139,6 +139,9 @@ test("Pawchive reader uses quick previews, flat media and contextual downloads",
   assert.match(detailView,/class="mon-file-row"/);
   assert.match(detailView,/controls preload="auto" playsinline/);
   assert.match(detailView,/mon-reader-audio[^>]*controls preload="auto"/);
+  assert.match(detailView,/class="mon-media-file"[^>]*data-action="monitoring-download"[^>]*data-index/);
+  assert.match(detailView,/Click to download/);
+  assert.doesNotMatch(detailView,/mon-media-file">Right-click to download/);
   assert.match(css,/\.mon-file-row\{[^}]*width:min\(920px,100%\)[^}]*display:grid[^}]*grid-template-columns:minmax\(0,1fr\)[^}]*grid-auto-flow:row/);
   assert.match(css,/\.mon-media-frame\.image\{[^}]*aspect-ratio:auto/);
 });
@@ -152,7 +155,7 @@ test("browser snapshots enter Offline Reader through the authenticated bridge", 
   assert.match(main,/metadata:_captureMetadata/);
   assert.match(main,/u\.pathname==="\/capture\/start"\?4194304/);
   assert.match(preload,/offlineCaptureOpen:/);
-  assert.match(renderer,/mi\("offline-capture-open",item\.id,"Open saved page"/);
+  assert.doesNotMatch(renderer,/Open saved page/);
   assert.match(renderer,/function offlineGallery\(item\)/);
   assert.match(renderer,/function offlinePostBody\(item\)/);
   assert.match(renderer,/sinrad-offline:\/\/media\//);
@@ -162,6 +165,16 @@ test("browser snapshots enter Offline Reader through the authenticated bridge", 
   assert.match(renderer,/class="of-comment"/);
   assert.match(renderer,/class="of-post-flair"/);
   assert.match(renderer,/function offlineCommentMedia\(comment\)/);
+  assert.match(renderer,/data-preview-loop="5"/);
+  assert.match(renderer,/function offlinePostNeighbors\(id\)/);
+  assert.match(renderer,/mi\("offline-item-remove",item\.id,"Delete post"/);
+  assert.match(renderer,/offlineData\.sync&&\(offlineData\.sync\.active\|\|offlineData\.sync\.queued\)/);
+  assert.match(renderer,/class="of-storage"/);
+  assert.match(renderer,/function offlineSourceLimitModal\(source\)/);
+  assert.match(main,/offlineFeed\.cleanupHistory/);
+  assert.match(main,/knownKeys:source\.seenPostKeys/);
+  assert.match(preload,/offlineItemRemove:/);
+  assert.match(preload,/offlineSourceUpdate:/);
   assert.match(renderer,/function offlineRichBlocks\(blocks,className\)/);
   assert.match(extension,/contentBlocks = richContentBlocks\(bodyNode\)/);
   assert.match(main,/contentBlocks:commentBlocks\(entry\.contentBlocks\)/);
@@ -185,7 +198,10 @@ test("module previews stay behind cached, lazy and privileged bridges",function(
 
 test("Park All uses one acknowledged batch and categorized parked links stay isolated", function () {
   assert.match(main,/Array\.isArray\(data\.tabs\)[\s\S]*_sendParkWithAck\(\{tabs:tabs,lot:true,batch:true\}\)/);
-  assert.match(renderer,/d\.lot&&Array\.isArray\(d\.tabs\)[\s\S]*_persistProtocolParkBatch\(batch\)/);
+  assert.match(main,/X-Sinrad-Extension-Version/);
+  assert.match(renderer,/d\.lot&&Array\.isArray\(d\.tabs\)[\s\S]*_persistProtocolParkBatch\(batch,false\)/);
+  assert.match(renderer,/function _queueLegacyParkCompletion\([\s\S]*setTimeout\([\s\S]*_showParkCompletion/);
+  assert.match(renderer,/_persistProtocolParkBatch\(q,true\)[\s\S]*protocolParkAck/);
   assert.match(renderer,/function _inLot\(l\)\{ return SinradShared\.isParkedLink\(l\); \}/);
 });
 
@@ -195,6 +211,83 @@ test("completion animation can be dismissed by clicking it", function () {
   assert.match(html,/id="celebrate"[^>]*Click to close/);
   assert.match(renderer,/celebrateOverlay\.addEventListener\("click",stopCelebrate\)/);
   assert.match(css,/#celebrate\.show\{[^}]*pointer-events:auto[^}]*cursor:pointer/);
+});
+
+test("Ideas is a local module with chat import, approval and Codex handoff", function () {
+  const shared=fs.readFileSync(path.join(root,"assets","shared.js"),"utf8");
+  assert.match(renderer,/{id:"ideas"[\s\S]*name:"Ideas"/);
+  assert.match(renderer,/function viewIdeas\(\)/);
+  assert.match(renderer,/function parseIdeaImport\(value\)/);
+  assert.match(renderer,/SINRAD_IDEAS_V1/);
+  assert.match(renderer,/data-action="idea-import-check"/);
+  assert.match(renderer,/data-action="idea-import-add"/);
+  assert.match(renderer,/data-action="idea-import-images-pick"/);
+  assert.match(renderer,/function importIdeaImageFiles\(files\)/);
+  assert.match(renderer,/function ideaImportMediaFor\(item,total\)/);
+  assert.match(renderer,/attachments:ideaImportMediaFor\(item,total\)/);
+  assert.match(main,/ipcMain\.handle\("idea-images-pick"/);
+  assert.match(main,/ipcMain\.handle\("idea-images-import"/);
+  assert.match(main,/ipcMain\.handle\("idea-image-copy"/);
+  assert.match(preload,/ideaImagesPick:[\s\S]*ideaImagesImport:[\s\S]*ideaImageCopy:/);
+  assert.match(renderer,/Nothing is saved until you approve the preview/);
+  assert.match(renderer,/function ideaCodexText\(item\)/);
+  assert.match(renderer,/const IDEA_GROUPS=\{app:"App",other:"Other",unsorted:"Unsorted"\}/);
+  assert.match(renderer,/data-action="idea-group-filter"/);
+  assert.match(renderer,/function ideaDetailView\(item\)/);
+  assert.match(renderer,/case "idea-edit": ideaModal/);
+  assert.match(renderer,/data-action="idea-edit-images-pick"/);
+  assert.match(renderer,/data-ctx="idea-media"/);
+  assert.match(renderer,/case "idea-image-copy"/);
+  assert.match(renderer,/sinrad-idea:\/\/media\//);
+  assert.match(main,/const IDEA_MEDIA_PROTOCOL="sinrad-idea"/);
+  assert.match(html,/sinrad-idea:/);
+  assert.match(renderer,/idea-reader-audit/);
+  assert.match(renderer,/Only App ideas can enter In Progress, Testing, or Done/);
+  assert.match(renderer,/ready:"In Progress"/);
+  assert.match(renderer,/status:group==="app"\?"ready":"inbox"/);
+  assert.match(renderer,/status=editing\?ideaStatus\(item\.status\):"ready"/);
+  assert.match(renderer,/const filters=ideaPane==="inbox"/);
+  assert.doesNotMatch(renderer,/class="idea-head-actions"><button/);
+  assert.match(renderer,/mi\("idea-new","","New detailed idea"/);
+  assert.match(renderer,/data-action="idea-status"/);
+  assert.match(renderer,/Copy for Codex/);
+  assert.match(shared,/add\("Ideas","ideas"/);
+});
+
+test("the main app uses the requested readability scale increase", function () {
+  assert.match(main,/mainWin\.webContents\.setZoomFactor\(1\.16\)/);
+});
+
+test("offline Reddit sync continues past known posts and surfaces interest", function () {
+  const extension=fs.readFileSync(path.join(root,"extension","background.js"),"utf8");
+  assert.match(extension,/gatherRedditCandidates/);
+  assert.match(extension,/known\.has\(key\)/);
+  assert.match(extension,/kind === 'top'/);
+  assert.match(renderer,/class="of-interest popular">Popular/);
+  assert.match(renderer,/class="of-interest">Interesting/);
+});
+
+test("offline videos use balanced quality and feed sources stay mixed", function () {
+  assert.match(main,/preferredVideoUrls\(task\.url\)/);
+  assert.match(main,/36\*1024\*1024/);
+  assert.match(main,/_upgradeLowQualityOfflineVideos/);
+  assert.match(renderer,/function offlineMixSources\(items\)/);
+  assert.match(renderer,/return offlineMixSources\(filtered\)/);
+  const vm=require("node:vm"),code=renderer.slice(renderer.indexOf("function offlineMixSources(items)"),renderer.indexOf("function offlineSourceName(item)")),context={};vm.runInNewContext(code,context);
+  const input=[{id:"a1",sourceId:"a"},{id:"a2",sourceId:"a"},{id:"a3",sourceId:"a"},{id:"b1",sourceId:"b"},{id:"b2",sourceId:"b"}];
+  assert.deepEqual(Array.from(context.offlineMixSources(input),item=>item.id),["a1","b1","a2","b2","a3"]);
+  assert.equal(input.length,5);
+});
+
+test("list navigation preserves its visual anchor and partial Reddit batches continue", function () {
+  assert.match(renderer,/function captureListPosition\(preferredId\)/);
+  assert.match(renderer,/function restoreListPosition\(anchor,focus\)/);
+  assert.match(renderer,/offlineReturnAnchor=captureListPosition\(id\)/);
+  assert.match(renderer,/renderViewAnchored\(anchor,true\)/);
+  assert.match(main,/continueRefill=saved>0&&kept<source\.limit/);
+  assert.match(main,/syncRequestedAt:continueRefill\?now\+1:0/);
+  assert.match(offlineFeed,/freshnessDays:3/);
+  assert.match(offlineFeed,/cleanupStale\(now\)/);
 });
 
 test("startup intro can be skipped with one guarded click", function () {
@@ -242,7 +335,7 @@ test("context menus share the calm icon-led desktop treatment", function () {
   assert.match(petCss,/#menu\{[^}]*width:160px[^}]*linear-gradient[^}]*border:1px solid #4a453b[^}]*padding:5px/);
   assert.match(petCss,/#menu \.mi\{min-height:27px;padding:3px 7px[^}]*font-size:10\.5px/);
   const petHtml=fs.readFileSync(path.join(root,"pet.html"),"utf8");
-  assert.doesNotMatch(petHtml,/data-nav=|>\s*(?:Vault|Links|Folders|Screenies)\s*</);
+  assert.doesNotMatch(petHtml,/data-nav=|>\s*(?:Vault|Links|Folders|Screenies|Ideas)\s*</);
   assert.match(petHtml,/data-pin="1"[\s\S]*Recent Folders[\s\S]*id="petKill"/);
   assert.doesNotMatch(renderer,/function menuItem\(nav,label,icon\)/);
   assert.match(main,/width:304, height:340/);
@@ -350,7 +443,20 @@ test("dedicated views keep visible Back navigation and contextual secondary acti
   assert.match(renderer,/data-action="offline-item-back">← Back<\/button>/);
   assert.match(renderer,/data-action="monitoring-exit">← Back<\/button>/);
   assert.match(renderer,/data-action="monitoring-post-back">← Back<\/button>/);
-  assert.match(renderer,/mi\("offline-capture-open",item\.id,"Open saved page"/);
+  assert.match(renderer,/function rememberMonitoringReturn\(id\)/);
+  assert.match(renderer,/function monitoringPostNeighbors\(\)/);
+  assert.match(renderer,/case "monitoring-post-nav": await navigateMonitoringPost/);
+  assert.match(renderer,/data-ctx="monitor-watchlist"/);
+  assert.doesNotMatch(renderer,/class="mon-watch-actions"><button class="btn primary" data-action="monitoring-add"/);
+  assert.doesNotMatch(renderer,/Open saved page/);
+  assert.match(renderer,/data-ctx="offline-item"/);
+  assert.match(renderer,/offline-source-follow/);
+  assert.match(main,/u\.pathname==="\/offline\/jobs"/);
+  assert.match(main,/ipcMain\.handle\("offline-extension-status"/);
+  assert.doesNotMatch(main,/oauth\.reddit\.com|reddit\.com\/api\/v1\/access_token|reddit\/callback/);
+  assert.doesNotMatch(renderer,/Reddit Data API|Reddit client ID|Connect Reddit/);
+  assert.match(main,/site-preview-v4/);
+  assert.match(renderer,/offlineExtensionRequiredModal\(name\)/);
   assert.match(renderer,/function settingsMenuHtml\(key\)/);
   assert.match(css,/\.setting-row\{min-height:35px;padding:3px 0/);
   assert.match(css,/\.setting-hotkey-input\{width:150px;flex-basis:150px/);

@@ -75,11 +75,12 @@ test("global search spans modules without exposing or searching vault passwords"
     vault:[{id:"v1",name:"Mail account",username:"sean@example.com",password:"private-needle"}],
     links:[{id:"l1",title:"Animation guide",url:"https://example.com/guide",category:"Guides"},{id:"l2",title:"Parked animation",url:"https://park.test",src:"park",category:"",inLinks:false}],
     folders:[{id:"f1",name:"Animation assets",path:"C:\\Art\\Animation"}],
-    shots:[{id:"s1",name:"animation-frame.png",path:"C:\\Shots\\animation-frame.png"}]
+    shots:[{id:"s1",name:"animation-frame.png",path:"C:\\Shots\\animation-frame.png"}],
+    ideas:[{id:"i1",title:"Animation controls",details:"Let users stop the animation",type:"ui",status:"inbox"}]
   };
   assert.deepEqual(globalSearch(state,"private-needle"),[]);
   const results=globalSearch(state,"animation");
-  assert.deepEqual(results.map(function(item){return item.view;}).sort(),["folders","links","lot","shots"]);
+  assert.deepEqual(results.map(function(item){return item.view;}).sort(),["folders","ideas","links","lot","shots"]);
   assert.equal(results.some(function(item){return Object.prototype.hasOwnProperty.call(item,"password");}),false);
   assert.deepEqual(searchGlobalIndex(buildGlobalSearchIndex(state),"animation"),results);
 });

@@ -7,6 +7,16 @@ const BRIDGE_KEY = '__SINRAD_BRIDGE_KEY__';
 let sessionToken = '';
 let sessionBase = '';
 
+function reloadForExtensionUpdate(response) {
+  const expected = response && response.headers && response.headers.get('X-Sinrad-Extension-Version');
+  const loaded = chrome.runtime.getManifest().version;
+  if (!expected || expected === loaded) return false;
+  chrome.action.setBadgeBackgroundColor({ color: '#f5a623' });
+  chrome.action.setBadgeText({ text: '↻' });
+  setTimeout(() => chrome.runtime.reload(), 50);
+  return true;
+}
+
 function setStatus(ok) {
   chrome.action.setBadgeBackgroundColor({ color: ok ? '#168a45' : '#c62828' });
   chrome.action.setBadgeText({ text: ok ? '✓' : '!' });
@@ -19,6 +29,7 @@ async function getToken() {
   for (const base of BASES) {
     try {
       const response = await fetch(base + '/token', { cache: 'no-store', headers: { 'X-Sinrad-Bridge-Key': BRIDGE_KEY } });
+      if (reloadForExtensionUpdate(response)) throw new Error('S.I.R extension updated. Try again in a moment.');
       if (!response.ok) throw new Error('HTTP ' + response.status);
       const data = await response.json();
       if (!data.token) throw new Error('token missing');
@@ -36,12 +47,14 @@ async function authorizedRequest(route, options) {
   request.method = request.method || 'POST';
   request.headers = Object.assign({}, request.headers || {}, { 'X-Sinrad-Token': token, 'X-Sinrad-Bridge-Key': BRIDGE_KEY });
   let response = await fetch(sessionBase + route, request);
+  if (reloadForExtensionUpdate(response)) throw new Error('S.I.R extension updated. Try again in a moment.');
   if (response.status === 401) {
     sessionToken = '';
     sessionBase = '';
     token = await getToken();
     request.headers = Object.assign({}, request.headers, { 'X-Sinrad-Token': token, 'X-Sinrad-Bridge-Key': BRIDGE_KEY });
     response = await fetch(sessionBase + route, request);
+    if (reloadForExtensionUpdate(response)) throw new Error('S.I.R extension updated. Try again in a moment.');
   }
   let result = null;
   try { result = await response.json(); } catch (_) {}
@@ -261,9 +274,9 @@ function collectPageMetadata() {
       let commentAuthor = value('author');
       if (!commentAuthor) { const authorNode = node.querySelector && node.querySelector('a[href*="/user/"]');commentAuthor = authorNode ? clean(authorNode.textContent, 200) : ''; }
       const avatarUrl = value('avatar') || value('author-avatar-url');
-      const commentMedia = [];
-      function addCommentMedia(raw) {
-        try { const url = new URL(String(raw || '').replace(/&amp;/g, '&'), location.href);if (url.protocol === 'https:' && !commentMedia.includes(url.toString()) && commentMedia.length < 4) commentMedia.push(url.toString()); } catch (_) {}
+      const commentMedia = [],commentGifs = [];
+      function addCommentMedia(raw, gifLike) {
+        try { const url = new URL(String(raw || '').replace(/&amp;/g, '&'), location.href);if (url.protocol === 'https:' && !commentMedia.includes(url.toString()) && commentMedia.length < 4) commentMedia.push(url.toString());if(gifLike&&!commentGifs.includes(url.toString()))commentGifs.push(url.toString()); } catch (_) {}
       }
       if (bodyNode) {
         let mediaNodes = [];
@@ -271,12 +284,13 @@ function collectPageMetadata() {
         mediaNodes.forEach((mediaNode) => {
           const tag = String(mediaNode.tagName || '').toLowerCase();
           if (tag === 'img' && /avatar|emoji|award|flair/i.test(String(mediaNode.className || '') + ' ' + String(mediaNode.alt || ''))) return;
-          addCommentMedia(mediaNode.currentSrc || mediaNode.src || mediaNode.getAttribute('src') || mediaNode.getAttribute('data-src'));
+          const player=tag==='source'&&mediaNode.closest?mediaNode.closest('video'):mediaNode,raw=mediaNode.currentSrc || mediaNode.src || mediaNode.getAttribute('src') || mediaNode.getAttribute('data-src'),gifLike=/\.gif(?:$|[?#])/i.test(String(raw||''))||((tag==='video'||tag==='source')&&(player&&(player.loop||/gif/i.test(String(player.getAttribute&&player.getAttribute('aria-label')||'')+' '+String(player.className||'')))));
+          addCommentMedia(raw,gifLike);
         });
       }
       if (!body && !commentMedia.length) return;
       const created = Date.parse(value('created') || value('created-timestamp'));
-      comments.push({author:clean(commentAuthor.replace(/^\/?u\//i, ''), 200),avatarUrl,body,contentBlocks,mediaUrls:commentMedia,score:Number(value('score').replace(/[^0-9-]/g, '')) || 0,depth:Number(value('depth')) || 0,date:Number.isFinite(created) ? created : 0});
+      comments.push({author:clean(commentAuthor.replace(/^\/?u\//i, ''), 200),avatarUrl,body,contentBlocks,mediaUrls:commentMedia,gifMediaUrls:commentGifs,score:Number(value('score').replace(/[^0-9-]/g, '')) || 0,depth:Number(value('depth')) || 0,date:Number.isFinite(created) ? created : 0});
     });
   }
   let authorFlair = '',postFlair = '',authorAvatarUrl = '';
@@ -287,6 +301,7 @@ function collectPageMetadata() {
     let avatar=null;try{avatar=post.querySelector('[slot="credit-bar"] a[href*="/user/"] img,faceplate-hovercard[data-id="user-hover-card"] img');}catch(_){}authorAvatarUrl=avatar?clean(avatar.currentSrc||avatar.src||avatar.getAttribute('src'),4000):attribute('icon');
   }
   return {
+    pageReady: !!post,
     platform: isReddit ? 'reddit' : 'web', community, title, author, authorFlair, postFlair, authorAvatarUrl, content, contentBlocks,
     date: Number.isFinite(parsedDate) ? parsedDate : Date.now(), score, commentCount, mediaUrls, comments
   };
@@ -301,14 +316,15 @@ function capturePageMetadata(tabId) {
   });
 }
 
-async function savePageOffline(tab) {
+async function savePageOffline(tab, options) {
+  const captureOptions = options && typeof options === 'object' ? options : {};
   if (!tab || !Number.isInteger(tab.id) || !/^https?:\/\//i.test(tab.url || '')) throw new Error('Only web pages can be saved offline');
-  const metadata = await capturePageMetadata(tab.id);
+  const metadata = captureOptions.metadata || await capturePageMetadata(tab.id);
   const blob = await captureMhtml(tab.id);
   if (!blob.size || blob.size > 256 * 1024 * 1024) throw new Error('Saved page must be under 256 MB');
   let captureId = '';
   try {
-    const started = await postJson('/capture/start', { url: tab.url, title: tab.title || '', size: blob.size, mime: blob.type || 'multipart/related', metadata });
+    const started = await postJson('/capture/start', { url: tab.url, title: tab.title || '', size: blob.size, mime: blob.type || 'multipart/related', metadata, sourceId: captureOptions.sourceId || '' });
     captureId = started.captureId;
     const chunkSize = 1024 * 1024;
     for (let offset = 0, index = 0; offset < blob.size; offset += chunkSize, index++) {
@@ -317,11 +333,155 @@ async function savePageOffline(tab) {
     }
     await postJson('/capture/finish', { captureId });
     setStatus(true);
-    chrome.notifications.create('sinrad-offline-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Saved for offline use', message: (tab.title || tab.url).slice(0, 180), priority: 0, silent: true });
+    if (captureOptions.notify !== false) chrome.notifications.create('sinrad-offline-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Saved for offline use', message: (tab.title || tab.url).slice(0, 180), priority: 0, silent: true });
   } catch (error) {
     if (captureId) postJson('/capture/cancel', { captureId }).catch(() => {});
     throw error;
   }
+}
+
+function waitForTab(tabId, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => { chrome.tabs.onUpdated.removeListener(onUpdated); reject(new Error('Reddit page took too long to load')); }, timeoutMs || 30000);
+    function finish(tab) { clearTimeout(timeout); chrome.tabs.onUpdated.removeListener(onUpdated); resolve(tab); }
+    function onUpdated(id, change, tab) { if (id === tabId && change.status === 'complete') finish(tab); }
+    chrome.tabs.onUpdated.addListener(onUpdated);
+    chrome.tabs.get(tabId, (tab) => {
+      const error = chrome.runtime.lastError;
+      if (error || !tab) { clearTimeout(timeout); chrome.tabs.onUpdated.removeListener(onUpdated); reject(new Error(error && error.message || 'Reddit tab was unavailable')); }
+      else if (tab.status === 'complete') finish(tab);
+    });
+  });
+}
+
+function collectRedditPostCandidates(community) {
+  const wanted = String(community || '').toLowerCase();
+  const output = [],roots=[document],seenRoots=new Set(),queue=[document];
+  while(queue.length&&roots.length<500){const root=queue.shift();if(!root||seenRoots.has(root))continue;seenRoots.add(root);if(root!==document)roots.push(root);let nodes=[];try{nodes=root.querySelectorAll('*');}catch(_){}Array.from(nodes||[]).forEach((node)=>{if(node.shadowRoot&&!seenRoots.has(node.shadowRoot))queue.push(node.shadowRoot);});}
+  function compactNumber(value) {
+    const text = String(value == null ? '' : value).trim().replace(/,/g, '');
+    const match = text.match(/(-?\d+(?:\.\d+)?)\s*([km])?/i);
+    if (!match) return 0;
+    const multiplier = match[2] && match[2].toLowerCase() === 'm' ? 1000000 : (match[2] ? 1000 : 1);
+    return Math.round(Number(match[1]) * multiplier) || 0;
+  }
+  roots.forEach((root)=>root.querySelectorAll('a[href*="/comments/"],shreddit-post[permalink*="/comments/"],[permalink*="/comments/"],[data-permalink*="/comments/"]').forEach((link) => {
+    try {
+      const raw=link.href||link.getAttribute('permalink')||link.getAttribute('data-permalink')||link.getAttribute('content-href')||'',url = new URL(raw, location.href);
+      const match = url.pathname.match(/^\/r\/([A-Za-z0-9_]{2,21})\/comments\/([A-Za-z0-9]+)(?:\/([^/?#]+))?\/?/i);
+      if (!match || match[1].toLowerCase() !== wanted) return;
+      const full = 'https://www.reddit.com/r/' + match[1] + '/comments/' + match[2] + '/' + (match[3] ? match[3] + '/' : '');
+      if (output.some((entry) => entry.url === full)) return;
+      const card = link.matches&&link.matches('shreddit-post,[data-testid="post-container"],article')?link:link.closest('shreddit-post,[data-testid="post-container"],article,.thing');
+      const attr = (name) => card && card.getAttribute ? card.getAttribute(name) : '';
+      const score = compactNumber(attr('score') || attr('upvote-count') || (card && card.querySelector('[data-post-click-location="vote"]') || {}).textContent);
+      const comments = compactNumber(attr('comment-count') || attr('comments-count') || (card && card.querySelector('a[href*="/comments/"] [aria-label*="comment" i]') || {}).textContent);
+      output.push({url:full,score:score,comments:comments});
+    } catch (_) {}
+  }));
+  let next='';for(const root of roots){const link=root.querySelector('a[rel="next"],span.next-button a,a[aria-label="Next page"]');if(!link)continue;try{const candidate=new URL(link.href,location.href);if(candidate.pathname.toLowerCase().startsWith('/r/'+wanted+'/')&&candidate.searchParams.has('after')){next=candidate.href;break;}}catch(_){}}
+  return {posts:output,next:next};
+}
+
+function redditPostKey(value) {
+  try { const match = new URL(String(value || '')).pathname.match(/^\/r\/([A-Za-z0-9_]{2,21})\/comments\/([A-Za-z0-9]+)/i);return match ? (match[1] + ':' + match[2]).toLowerCase() : ''; }
+  catch (_) { return ''; }
+}
+
+function scrollRedditListing() {
+  const before = document.documentElement.scrollHeight;
+  window.scrollBy({top:Math.max(1200, window.innerHeight * 2),behavior:'instant'});
+  return {before:before,top:window.scrollY};
+}
+
+async function gatherRedditCandidates(tabId, community, known, target, kind) {
+  const found = new Map(),visitedPages=new Set();let stableRounds = 0,lastTop = -1;
+  for (let attempt = 0; attempt < 32; attempt++) {
+    const results = await chrome.scripting.executeScript({ target: { tabId }, func: collectRedditPostCandidates, args: [community] });
+    const snapshot=results&&results[0]&&results[0].result||{},entries=Array.isArray(snapshot)?snapshot:(Array.isArray(snapshot.posts)?snapshot.posts:[]);
+    entries.forEach((entry, index) => {
+      const key = redditPostKey(entry && entry.url);if (!key) return;
+      const score = Math.max(0, Number(entry.score) || 0),comments = Math.max(0, Number(entry.comments) || 0);
+      const listBonus = kind === 'top' ? 1200 : (kind === 'hot' ? 700 : 80);
+      const rank = listBonus + Math.min(20000, score) + comments * 8 + Math.max(0, 200 - index * 4);
+      const prior = found.get(key);if (!prior || rank > prior.rank) found.set(key,{url:entry.url,score:score,comments:comments,rank:rank,kind:kind});
+    });
+    const unseen = Array.from(found.keys()).filter((key) => !known.has(key)).length;
+    if (unseen >= target && attempt >= 3) break;
+    if(snapshot.next&&!visitedPages.has(snapshot.next)){visitedPages.add(snapshot.next);await chrome.tabs.update(tabId,{url:snapshot.next});await waitForTab(tabId,30000);stableRounds=0;lastTop=-1;continue;}
+    const scrolled = await chrome.scripting.executeScript({ target: { tabId }, func: scrollRedditListing });
+    const top = scrolled && scrolled[0] && scrolled[0].result ? Number(scrolled[0].result.top) : -1;
+    if (top === lastTop) stableRounds++;else stableRounds = 0;
+    lastTop = top;if (stableRounds >= 6) break;
+    await new Promise((resolve) => setTimeout(resolve, 1300));
+  }
+  return Array.from(found.entries()).filter((entry) => !known.has(entry[0])).map((entry) => entry[1]);
+}
+
+async function waitForRedditPost(tabId) {
+  for (let attempt = 0; attempt < 16; attempt++) {
+    const metadata = await capturePageMetadata(tabId);
+    const title = String(metadata && metadata.title || '').trim();
+    if (metadata && metadata.pageReady && metadata.platform === 'reddit' && title && title !== 'Reddit - The heart of the internet') {
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+      return await capturePageMetadata(tabId);
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1250));
+  }
+  throw new Error('Reddit did not finish loading the post');
+}
+
+async function closeBackgroundTab(tabId) {
+  if (!Number.isInteger(tabId)) return;
+  try { await chrome.tabs.remove(tabId); } catch (_) {}
+}
+
+async function runOfflineJob(job) {
+  let listingId = null, saved = 0, failed = 0;
+  const known = new Set([].concat(job.knownKeys || [],(job.knownUrls || []).map(redditPostKey)).map((value) => String(value || '').toLowerCase()).filter(Boolean));
+  try {
+    const target = Math.min(100, Number(job.limit) || 30),candidates = new Map();
+    const listings = [{path:'hot/',kind:'hot'},{path:'top/?sort=top&t=week',kind:'top'},{path:'new/',kind:'new'}];
+    for (const source of listings) {
+      const listing = await chrome.tabs.create({ url: 'https://old.reddit.com/r/' + encodeURIComponent(job.handle) + '/' + source.path, active: false });listingId = listing.id;
+      await waitForTab(listing.id, 30000);
+      const batch = await gatherRedditCandidates(listing.id, job.handle, known, target, source.kind);
+      batch.forEach((candidate) => {const key=redditPostKey(candidate.url),prior=candidates.get(key);if(key&&(!prior||candidate.rank>prior.rank))candidates.set(key,candidate);});
+      await closeBackgroundTab(listingId);listingId = null;
+    }
+    const selected = Array.from(candidates.values()).sort((a,b) => b.rank-a.rank).slice(0,target);
+    if(!selected.length)throw new Error('Reddit did not expose any unseen posts for r/'+job.handle);
+    for (const candidate of selected) {
+      let postId = null;
+      try {
+        const post = await chrome.tabs.create({ url:candidate.url, active: false }); postId = post.id;
+        const loadedPost = await waitForTab(post.id, 30000);
+        const metadata = await waitForRedditPost(post.id);
+        metadata.score = Math.max(Number(metadata.score)||0,candidate.score||0);metadata.commentCount = Math.max(Number(metadata.commentCount)||0,candidate.comments||0);
+        const latest = await chrome.tabs.get(post.id);
+        await savePageOffline(latest || loadedPost, { sourceId: job.sourceId, notify: false, metadata });
+        saved++;
+      } catch (_) { failed++; }
+      finally { await closeBackgroundTab(postId); }
+    }
+    await postJson('/offline/job-finish', { sourceId: job.sourceId, ok: saved > 0 || failed === 0, saved, failed, error: saved === 0 ? 'Reddit pages could not be captured' : '' });
+    if (saved) chrome.notifications.create('sinrad-reddit-sync-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Offline Reddit updated', message: 'Saved ' + saved + ' new r/' + job.handle + ' post' + (saved === 1 ? '' : 's'), priority: 0, silent: true });
+  } catch (error) {
+    await closeBackgroundTab(listingId);
+    await postJson('/offline/job-finish', { sourceId: job.sourceId, ok: false, saved, failed, error: String(error && error.message || error).slice(0, 300) }).catch(() => {});
+    setStatus(false);chrome.notifications.create('sinrad-reddit-sync-error-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Offline Reddit needs attention', message: String(error && error.message || error).slice(0, 180), priority: 1, silent: true });
+  }
+}
+
+let offlinePollRunning = false;
+async function pollOfflineJobs() {
+  if (offlinePollRunning) return;
+  offlinePollRunning = true;let handledJob=false;
+  try {
+    const result = await authorizedRequest('/offline/jobs', { method: 'GET', cache: 'no-store' });
+    if (result.job) {handledJob=true;await runOfflineJob(result.job);}
+  } catch (_) {}
+  finally { offlinePollRunning = false;if(handledJob)setTimeout(pollOfflineJobs,1500); }
 }
 
 // === Toolbar icon click: save current page ===
@@ -331,6 +491,8 @@ chrome.action.onClicked.addListener((tab) => {
 
 // === Right-click context menu ===
 chrome.runtime.onInstalled.addListener(() => {
+  chrome.alarms.create('sinrad-offline-poll', { periodInMinutes: 1 });
+  setTimeout(pollOfflineJobs, 1000);
   chrome.contextMenus.removeAll(() => {
     // Opera groups these page commands into one S.I.R submenu. This costs one
     // extra click but keeps Quick Save and both bulk actions together.
@@ -340,8 +502,8 @@ chrome.runtime.onInstalled.addListener(() => {
       contexts: ['page', 'link', 'selection']
     });
     chrome.contextMenus.create({
-      id: 'sinrad-save-offline',
-      title: 'Save page for offline use',
+      id: 'sinrad-add-subreddit-offline',
+      title: 'Add subreddit to Offline',
       contexts: ['page']
     });
     chrome.contextMenus.create({
@@ -357,13 +519,20 @@ chrome.runtime.onInstalled.addListener(() => {
   });
 });
 
+chrome.runtime.onStartup.addListener(() => { chrome.alarms.create('sinrad-offline-poll', { periodInMinutes: 1 }); setTimeout(pollOfflineJobs, 1000); });
+chrome.alarms.onAlarm.addListener((alarm) => { if (alarm && alarm.name === 'sinrad-offline-poll') pollOfflineJobs(); });
+chrome.alarms.create('sinrad-offline-poll', { periodInMinutes: 1 });
+pollOfflineJobs();
+
 chrome.contextMenus.onClicked.addListener((info, tab) => {
   if (info.menuItemId === 'sinrad-quick-save') {
     const sel = (info.selectionText || '').trim();
     const targetUrl = info.linkUrl || (/^https?:\/\//i.test(sel) ? sel : tab.url);
     saveOne(targetUrl, tab.title, false).catch(() => {});
-  } else if (info.menuItemId === 'sinrad-save-offline') {
-    savePageOffline(tab).catch((error) => notifyUnavailable(error));
+  } else if (info.menuItemId === 'sinrad-add-subreddit-offline') {
+    let handle='';try{const match=new URL(tab&&tab.url||'').pathname.match(/^\/r\/([A-Za-z0-9_]{2,21})(?:\/|$)/i);handle=match?match[1]:'';}catch(_){}
+    if(!handle){notifyUnavailable(new Error('Open a subreddit page first'));return;}
+    postJson('/offline/source-add',{handle}).then(() => chrome.notifications.create('sinrad-reddit-source-'+Date.now(),{type:'basic',iconUrl:'icon.png',title:'Added to Offline',message:'r/'+handle+' will keep an unread pool in SINRAD.',priority:0,silent:true})).catch((error)=>notifyUnavailable(error));
   } else if (info.menuItemId === 'sinrad-park-all' || info.menuItemId === 'sinrad-park-all-close') {
     const shouldClose = info.menuItemId === 'sinrad-park-all-close';
     
@@ -375,11 +544,6 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
         await saveBatchToSinrad(targets);
         const savedIds = targets.map((t) => t.id).filter((id) => Number.isInteger(id));
         if (shouldClose && savedIds.length) await chrome.tabs.remove(savedIds);
-        chrome.notifications.create('sinrad-parked-' + Date.now(), {
-          type: 'basic', iconUrl: 'icon.png', title: 'S.I.R',
-          message: 'Saved all ' + targets.length + ' tab(s) to Parking Lot' + (shouldClose ? ' and closed them' : ''),
-          priority: 0, silent: true
-        });
       } catch (error) {
         notifyUnavailable(error);
       }

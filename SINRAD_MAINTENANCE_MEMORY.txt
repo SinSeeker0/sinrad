@@ -24,9 +24,9 @@ HOW TO USE THIS FILE
 
 CURRENT SNAPSHOT — 2026-09-02
 -----------------------------
-Released version: 2.0.28
-Released Git commit: 956da44
-Current edit counter in the working tree: #211
+Released version: 2.0.30
+Released Git commit: ef0a4a6
+Current edit counter in the working tree: #241
 
 Important: the working tree contains unreleased work after v2.0.28.
 Do not discard, reset, or overwrite it.
@@ -221,10 +221,18 @@ PRODUCT RULES THAT MUST NOT BE LOST
   than visible button rows. Keep Back/navigation, primary create/filter actions,
   switches, hotkey fields, gallery controls, and media playback controls visible
   when they are needed.
+- In Ideas status lists, New Idea and Copy for Codex are right-click actions.
+  Do not restore them as visible header buttons.
 - Give a rough usage percentage before starting substantial work.
+- Always give the user a clickable exact location for test builds, previews,
+  exports, and other important output files.
 - Build test copies before releases.
 - Release only after the user explicitly says to release.
 - Increment the edit counter once per meaningful completed change batch.
+- Preserve list position by visual item anchor across detail Back navigation,
+  deletions, status changes, refreshes, and live updates. If the original item
+  disappeared, keep its next item at the same viewport position; fall back to
+  the previous item. Reuse the shared anchor helpers for future list modules.
 - Full URLs identify links. Same website does not mean duplicate page.
 - YouTube must remain the main category for YouTube links while preserving
   any other categories already assigned to the link.
@@ -512,7 +520,7 @@ Regression guards:
 
 
 BUG-006 — extension Quick Save goes to Parking Lot or takes two clicks
-Status: fixed previously; bulk batch and isolation repair awaiting user test.
+Status: fixed in source; edit #219 reload repair awaiting live Opera confirmation.
 
 Desired behavior:
 - The first context-menu Quick Save action saves the current page to Links.
@@ -530,8 +538,9 @@ Do not merge Links and Parking Lot semantics again.
 - A parked item is src="park" with inLinks=false. Its automatic category must
   never move it into permanent Links.
 - Stack list, open, rename, send, and delete actions use parked items only.
-- Extension 1.1.7 contains the batch request. Reload the stable extension
-  after starting the new test build.
+- Extension 1.2.6 contains the batch request and compares its version with the
+  desktop bridge. A stale worker reloads itself after the updated extension has
+  been loaded once. Manually reload the stable extension for this first repair.
 
 Opera limitation:
 Opera controls where extension menus appear in its native context menus.
@@ -1608,3 +1617,315 @@ UPDATE LOG FOR THIS MEMORY
   fast-uri to patched versions; npm audit now reports zero vulnerabilities.
 - Released v2.0.30 after 99/99 tests, the full UI smoke test, a local packaged
   Windows build, and successful GitHub Windows and Linux release builds.
+- Edit #219 diagnosed Park All notifications arriving in groups of two or three
+  as Opera retaining a legacy Manifest V3 worker that posted tabs separately,
+  even though the stable extension files on disk already used one batch.
+- The desktop bridge now advertises its bundled extension version. Extension
+  1.2.6 reloads itself when stale, and the duplicate extension success notice
+  was removed so the app owns the single batch-completion notification.
+- Confirmed 99/99 automated tests, diff check, the full Electron UI smoke test,
+  and packaged build `dist-verify/parking-reload-219`. Packaged app.asar and the
+  unpacked extension contain the expected #219 markers. Live Opera Park All
+  still needs user confirmation after one manual extension reload. No release
+  was made.
+- Edit #220 handles legacy Park All requests entirely in the desktop app. Browser
+  connection limits can deliver an old extension's tabs in waves such as 3, 3,
+  and 5; SINRAD now persists those waves quickly but combines their completion
+  count, Windows notification, toast, log entry, and animation into one result.
+- Confirmed 99/99 automated tests, diff check, the full Electron UI smoke test,
+  and packaged build `dist-verify/parking-single-completion-220`. Packaged
+  app.asar contains the #220 aggregation markers. Live Opera confirmation is
+  still required. No release was made.
+- Edit #221 adds Ideas as a normal local module. Quick capture accepts the
+  user's natural shorthand and preserves the original note. Ideas have type,
+  Inbox/Planned/Working/Done status, editable details, and free-form references.
+- Idea cards use right-click actions for editing, status changes, deletion, and
+  Copy for Codex. Right-clicking empty module space can create a detailed idea
+  or copy all currently visible ideas for review. Ideas are included in global
+  search, undo snapshots, backups, and the command palette without using AI.
+- Confirmed 100/100 automated tests, diff check, the full Electron UI smoke
+  test including idea capture/status persistence, and packaged build
+  `dist-verify/ideas-module-221`. Packaged app.asar contains the expected #221
+  module, search, and handoff markers. No release was made.
+- Edit #222 replaces the first Ideas draft with the approved chat-import
+  workspace shown in the design preview. It opens on Chat Import and has the
+  nested Inbox, Chat Import, Ready, Testing, and Done navigation.
+- Copy chat instructions creates a reusable prompt for a new Codex chat. The
+  returned `SINRAD_IDEAS_V1` block is parsed locally without AI, previewed, and
+  only saved after the user approves Add ideas. Imported ideas keep their full
+  original chat block, details, type, references, and Inbox status.
+- Existing #221 ideas remain compatible. Planned maps to Ready and Working maps
+  to Testing. Idea lists still support editing, right-click status changes,
+  deletion, global search, undo, backups, and Copy for Codex.
+- Confirmed 100/100 automated tests, diff check, full Electron UI smoke across
+  import/preview/approval/status persistence, a 1440 px visual capture, and
+  packaged build `dist-verify/ideas-chat-import-222`. Packaged app.asar contains
+  the expected #222 renderer and CSS markers. No release was made.
+- Deferred request: add a startup Monitoring inbox that summarizes newly found
+  Feed posts. Keep this separate from #222; it has not been implemented yet.
+- Edit #223 adds visible App, Other, and Unsorted tags to Ideas. Tags are
+  searchable, editable, included in Copy for Codex, shown on idea cards and
+  import previews, and can filter each status list without changing status.
+- Obsidian import preparation sorted the three approved UnsortedIdeas notes
+  into 405 ideas: 163 App, 230 Other, and 12 Unsorted. Seven credential/token
+  blocks and eight noise blocks were excluded. All 147 referenced local media
+  files resolved; none are missing.
+- Idea media is copied into the private `ideas/media` user-data folder by
+  content hash and loaded through the restricted `sinrad-idea` protocol. Large
+  data remains outside the encrypted 10 MB state. Imports use stable keys so a
+  repeat run does not duplicate ideas, and a timestamped encrypted-state backup
+  is made before the live library is changed.
+- Confirmed 100/100 automated tests, the full Electron UI smoke test, and local
+  packaged build `dist-verify/ideas-obsidian-import-223`. Imported all 405
+  approved ideas and 147 media references into the live encrypted library after
+  SINRAD was closed. Read-only verification found 163 App, 230 Other, and 12
+  Unsorted ideas with zero missing media. The pre-import encrypted backup is
+  `sinrad-data.json.before-ideas-1788482799029.bak`. No release was made.
+- Edit #224 changes Ideas from edit-first to read-first. Left-clicking an idea
+  opens a full workspace reader with the attached images, GIFs, videos, or audio
+  displayed large before the idea text. Editing remains in the right-click menu.
+  The reader has a visible Back control and Back also appears in its right-click
+  menu. Confirmed 100/100 automated tests, the full Electron UI smoke test, and
+  packaged build `dist-verify/ideas-reader-224`. No release was made.
+- Edit #225 fixes broken imported Idea media by allowing the private
+  `sinrad-idea:` protocol in the renderer image and media security policy.
+  Audited all 163 originally App-tagged Obsidian ideas against current code,
+  regression tests, and product decisions: 54 Ready, 24 Testing, 73 Done or
+  intentionally closed, and 12 corrected to Other because they describe
+  Discord/server work rather than SINRAD features. Audited ideas receive a
+  short reader-visible explanation of the decision.
+- Confirmed 100/100 automated tests, the full Electron UI smoke test, and
+  packaged build `dist-verify/ideas-media-audit-225`. The reviewed status map is
+  prepared but the live encrypted library must only be updated after SINRAD is
+  closed, so the running app cannot overwrite it. No release was made.
+- Edit #226 makes the workflow panels App-only. Ready, Testing, and Done hide
+  Other/Unsorted filters and only render App-tagged ideas. Other and Unsorted
+  remain available in Inbox, and the editor/context menu refuses to move them
+  into an App workflow status. Confirmed 100/100 automated tests, the full UI
+  smoke test, and packaged build `dist-verify/ideas-app-workflow-226`. The live
+  encrypted library was then backed up and updated: 54 App ideas are Ready, 24
+  are Testing, 73 are Done/closed, and 12 misclassified notes were moved to
+  Other in Inbox. A read-only second pass verified all 163 audit decisions. The
+  pre-audit backup is `sinrad-data.json.before-idea-audit-1788484302227.bak`.
+  No release was made.
+- Edit #227 moves Watchlist's Add watcher action into its right-click menu.
+  Opening a Monitoring Feed or artist post now records the exact source card
+  and scroll position, so Back returns to the same place. Post-reader
+  right-click menus also provide Previous post and Next post within the active
+  Feed or artist/date-filtered list.
+- Edit #228 removes the visible Ideas `New idea` and `Copy for Codex` header
+  buttons. Both remain available from the Ideas blank-space right-click menu.
+  This reinforces the product rule that secondary creation, maintenance, and
+  handoff actions belong in context menus instead of permanent header chrome.
+- Confirmed 100/100 automated tests, the full Electron UI smoke test including
+  Monitoring return/navigation and Watchlist context actions, and packaged
+  build `dist-verify/monitor-navigation-228`. No release was made.
+- Edit #229 applies a restrained 1.08 main-window readability scale so text,
+  controls, cards, and media layouts are slightly larger across normal,
+  Offline, Monitoring, Settings, and Ideas views without redesigning them.
+- Non-preview Monitoring attachments now show a prominent clickable file tile
+  with the real filename. Clicking the tile starts the same validated queued
+  download; its right-click download action remains available.
+- Ideas Chat Import now starts with screenshots. JPG, PNG, WebP, and GIF images
+  can be selected, pasted, or dropped into a local staging strip before the
+  chat result is pasted. The copied chat instructions list staged filenames;
+  one returned idea receives every staged image automatically, while multiple
+  ideas match images by exact filename in REFERENCES. Unmatched images prevent
+  saving instead of being silently lost or attached to the wrong idea.
+- Confirmed 101/101 automated tests, the full Electron UI smoke test including
+  persisted Idea attachments and the clickable Monitoring file tile, and
+  packaged build `dist-verify/readability-idea-images-229`. No release was made.
+- Edit #230 renames the Ideas `Ready` workflow to `In Progress` while retaining
+  the internal `ready` value for existing libraries. New manual, quick, chat,
+  and Obsidian-imported App ideas now enter In Progress automatically. Other
+  and Unsorted ideas continue to enter Inbox and remain outside App workflow
+  panels.
+- Offline Reddit cards now expose `Download future r/... posts` in their
+  right-click menu. It creates a daily newest-post source with three saved top
+  comments; the existing startup and 15-minute background scheduler continues
+  caching subscribed sources while SINRAD is open, even outside Offline Mode.
+- Rich previews for legacy `www.sankakucomplex.com` and
+  `chan.sankakucomplex.com` links are rewritten only for preview loading to the
+  current `sankaku.app` web app. SINRAD uses a sandboxed hidden renderer,
+  denies popups and cross-site navigation, captures a bounded preview, and
+  keeps the user's original saved URL unchanged.
+- Confirmed 102/102 automated tests and the full Electron UI smoke test,
+  including App-idea defaults and starting an Offline background subscription.
+  Packaged build verification follows under `dist-verify/offline-sankaku-230`.
+  No release was made.
+- Edit #231 fixes the two #230 follow-up failures. Choosing background Reddit
+  download while disconnected now opens a clear `Reddit not connected` dialog
+  with the current status and a direct Connect Reddit action instead of relying
+  on a brief toast and page switch.
+- Sankaku previews no longer capture the current web app's onboarding or
+  incognito warning. Legacy tag URLs are parsed locally and a bounded request
+  asks Sankaku's public post endpoint for the first matching sample thumbnail.
+  The preview cache key moved to v2 so incorrect #230 captures are ignored.
+  Live checks returned real rich images for both `?tags=name` and
+  `?tags/name` saved-link formats.
+- Main-window scale increased from 1.08 to 1.16 at the user's request.
+- Confirmed 102/102 automated tests and the full Electron UI smoke test,
+  including the disconnected Reddit dialog and subsequent source creation.
+  No release was made.
+- Edit #232 replaces the rejected Reddit Data API/OAuth product path with the
+  existing browser extension capture path. The client-ID modal, renderer IPC,
+  callback, token requests, direct API scheduler, and runtime OAuth requests
+  were removed from the desktop app.
+- Reddit subscriptions are now extension jobs. Every minute while the browser
+  is running, extension v1.2.7 asks SINRAD for one due subreddit, opens its New
+  page and unseen posts in inactive tabs, saves each post with the same MHTML +
+  metadata capture used by the manual `Save page for offline use` action, then
+  closes those tabs. Captured items retain their source ID, known post URLs are
+  skipped, and one completion notification reports the saved count.
+- Offline Sources and post right-click subscription actions now report the
+  browser extension's live connection state and explicitly say that no Reddit
+  API or developer account is used. A disconnected subscription remains queued
+  until the extension connects; Sync now queues the same extension job.
+- Confirmed 103/103 automated tests, the full Electron UI smoke test, packaged
+  source/extension inspection, and a clean packaged runtime smoke check under
+  `dist-verify/reddit-extension-offline-232`. No release was made.
+- Edit #233 fixes the first live extension-subscription failure from #232.
+  The listing scraper had intentionally reduced post URLs to `/comments/<id>/`;
+  Reddit left those inactive tabs as an unhydrated 600 KB shell titled
+  `Reddit - The heart of the internet`, and #232 saved that shell after a fixed
+  2.2 second delay.
+- Extension v1.2.8 preserves the full Reddit post URL including its slug, uses
+  the subreddit/post ID only as the duplicate key, waits for listing links,
+  then waits for a real `shreddit-post` element and non-placeholder title
+  before MHTML capture. It refuses to save the page if Reddit never finishes
+  loading instead of adding a broken card.
+- On #233 startup, only broken automatic Reddit captures are removed: they
+  must have an extension source ID, Reddit platform, the exact placeholder
+  title, no body, and no media. Their affected source is immediately requeued.
+  Real/manual captures are left untouched. The live report showed exactly
+  three matching broken captures in `S:\Offline Mode`.
+- Confirmed 104/104 automated tests, the full Electron UI smoke test, packaged
+  source/extension inspection for v1.2.8, and a clean packaged runtime smoke
+  check under `dist-verify/reddit-extension-ready-233`. No release was made.
+- Edit #234 fixes repeated Offline Reddit syncs stopping at the already-known
+  first screen. Extension v1.2.9 now scrolls each Reddit listing, remembers
+  candidates across Reddit's virtualized DOM, skips known subreddit/post IDs,
+  and continues until it finds the next unseen batch or reaches the listing's
+  end. Pressing Sync again can therefore collect older unseen posts instead of
+  rechecking only the first few cards.
+- Each Reddit sync now combines Hot, Top this week, and New without using the
+  Reddit API. Visible vote and comment counts plus listing position rank the
+  candidates; the strongest unseen posts are captured first. Listing activity
+  is carried into the saved post when Reddit's post page hides an exact count.
+- Offline feed cards label Reddit posts `Interesting` at 75 votes or 20
+  comments and `Popular` at 500 votes or 80 comments. Source copy now explains
+  that each batch mixes interesting, popular, and new posts.
+- Confirmed 105/105 automated tests, the full Electron UI smoke test, packaged
+  code/extension inspection for v1.2.9, and packaged runtime startup under
+  `dist-verify/reddit-interest-paging-234`. No release was made.
+- Edit #235 turns Offline Reddit into a rotating unread pool. Each source keeps
+  30 nonfavorite posts by default (editable from the source right-click menu).
+  Manual Sync removes read nonfavorites, preserves favorites, remembers every
+  seen Reddit post ID, and downloads only enough unseen posts to refill the
+  pool. Manual deletion also queues a replacement.
+- Offline feed video cards now autoplay a muted five-second looping preview.
+  Comment media recognized as a GIF is shown as a clean looping GIF-style
+  animation without video controls; ordinary comment videos keep controls.
+- Sync state now comes from the real extension queue/active job, so the header
+  spinner remains active until capture finishes. The header also reports the
+  actual bytes and file count used by cached media and saved pages.
+- Offline post right-click menus now include Delete, and the reader menu has
+  Previous/Next navigation based on the card sequence captured before the post
+  is marked read. Per-source Sync, unread-limit editing, and removal live in the
+  source right-click menu rather than repeated row buttons.
+- Extension v1.3.0 accepts persistent known post keys so removed/read posts are
+  not downloaded again. Confirmed 108/108 automated tests, the full Electron UI
+  smoke test, packaged source/extension inspection, and packaged runtime startup
+  under `dist-verify/offline-rotation-video-235-final`. No release was made.
+- Edit #236 replaces Offline Reader's All view with Unread, History, and
+  Favorites. Opening a post moves it from Unread to History immediately;
+  favorites stay separate and never consume a source's unread quota. History
+  posts can be marked unread from the right-click menu.
+- History cleanup defaults to manual. Settings can instead remove History by
+  read age or when the offline library passes a chosen storage limit; unread and
+  favorite posts are protected. Manual post/history deletion has no confirmation
+  dialog and can be restored with Ctrl+Z for ten minutes. `Open saved page` was
+  removed from the post menu.
+- Offline Reader now has Cards and Reddit-style Scroll layouts. Monitoring text
+  is selectable so titles, post text, comments, and filenames can be copied.
+- Extension v1.3.1 renames the old manual offline-page command to `Add subreddit
+  to Offline` and changes its behavior to subscribe the currently viewed
+  subreddit through SINRAD's authenticated local extension bridge. It still uses
+  browser capture rather than the Reddit API.
+- Confirmed 112/112 automated tests, the full Electron UI smoke test, packaged
+  source and extension v1.3.1 inspection, and isolated packaged runtime startup
+  under `dist-verify/offline-history-236`. No release was made.
+- Edit #237 adds shared visual list anchors. Opening a detail page records the
+  source item's viewport offset; Back restores that offset. When deletion,
+  reading, favoriting, refresh, or a live update removes the original item, the
+  next item occupies the same visual position, falling back to the previous
+  item. Offline, Monitoring, Ideas, and normal item deletion paths use the same
+  helpers so this behavior remains consistent in future modules.
+- Offline Reader automatically removes nonfavorite downloads after three days
+  based on when SINRAD cached them, then queues their subscribed sources for
+  replacement. The freshness period is editable in Offline history settings.
+  Favorites remain protected.
+- Partial Reddit extension batches no longer count as a finished refill. If a
+  source asks for 30 unread posts and a batch saves only 20, SINRAD immediately
+  queues the remaining 10; extension v1.3.2 keeps polling follow-up jobs and
+  scans longer through Hot, Top week, and New without using Reddit's API.
+- Offline reader titles, author information, body text, and comments are now
+  selectable and copyable. Images, videos, and controls remain nonselectable.
+- Confirmed 114/114 automated tests, the full Electron UI smoke test including
+  visual return-position and selectable-title checks, packaged source and
+  extension v1.3.2 inspection, and isolated packaged runtime startup under
+  `dist-verify/offline-navigation-refill-237-final`. No release was made.
+- Edit #238 fixes silent zero-result Reddit extension syncs. The extension now
+  scans old Reddit's stable HTML listing pages, follows their Next links, and
+  still opens/captures posts through the signed-in browser without Reddit's API.
+  It scans normal DOM and open shadow roots as a fallback for modern pages.
+- A sync that finds no unseen posts is now a real failure: SINRAD retains the
+  source error and extension v1.3.3 shows an `Offline Reddit needs attention`
+  notification instead of clearing the job as a false success. Successful
+  batches still show the number of posts saved.
+- Offline feed snapshots now sort by local download/add time, so the posts most
+  recently delivered to SINRAD appear at the top even if Reddit's post date is
+  older.
+- Confirmed 115/115 automated tests, lint, the full Electron UI smoke test,
+  packaged edit/extension inspection, and isolated packaged runtime startup
+  under `dist-verify/offline-delivery-order-238`. No release was made.
+- Edit #239 (2026-09-05): the reported blurry Linko video was cached from
+  v.redd.it CMAF_96.mp4 (177 KB); its 720p file was about 29.7 MB. Media caching
+  now tries 720p, 480p, then smaller CMAF/DASH renditions with a 36 MiB video
+  download limit. Oversized/unavailable files fall back without storing the
+  rejected file. Existing cached larger videos remain readable.
+- Startup repairs up to eight low-quality single-video posts in the background.
+  Successful repairs retain reading/favorite/download dates, record the actual
+  chosen URL and completion flag, and replace the old post-media files only
+  after the replacement is saved. Failed requests preserve the existing video.
+- Feed display interleaves sources while retaining newest-download order within
+  each source. The mix is deterministic across renders, so Back and previous/
+  next navigation do not reshuffle randomly while reading.
+- Verified 118 automated tests, lint, UI smoke (including Back navigation), and
+  packaged startup at `dist-verify/offline-video-mix-239/win-unpacked/Sinrad.exe`.
+  Live playback quality still needs user confirmation in this build. No release.
+- Edit #240 (2026-09-05): Sankaku tag previews now inspect up to eight API posts
+  and try multiple still-image candidates instead of depending on the first post.
+  Recognized Sankaku tag failures no longer fall through to a long-lived favicon,
+  and the preview cache identity moved to v3 so old broken icon results are ignored.
+  Live checks returned rich post images for `huoji_(wonderturkey)`,
+  `wonder_turkey`, and `norigure18`.
+- The Idea editor can now add and remove JPG, PNG, WebP, and GIF attachments while
+  creating or editing an idea. Idea reader images expose `Copy image` through their
+  right-click menu; privileged IPC validates the private media filename and size
+  before writing the bitmap to the clipboard.
+- Verified 119 automated tests, lint, the full Electron UI smoke test (including
+  Idea edit attachment and image-copy flows), packaged source inspection, and an
+  isolated packaged runtime startup at
+  `dist-verify/sankaku-idea-images-240/win-unpacked/Sinrad.exe`. No release.
+- Edit #241 (2026-09-05) fixes the live failure missed by #240. The Sankaku API
+  returned WebP samples for `wonder_turkey` and `huoji_(wonderturkey)` but JPEG
+  for `norigure18`; the network-only check passed all three, while Electron's
+  native preview conversion rejected the two WebP buffers. Sankaku now prefers
+  each image post's original JPEG/PNG candidate before its WebP/AVIF samples.
+- Failed renderer previews are no longer remembered for the whole app session,
+  the disk cache identity moved to v4, and main-process failures are logged for
+  diagnosis. Live checks now return JPEG for all three reported tags.
+- Verified 119 automated tests, lint, full Electron UI smoke, packaged marker
+  inspection, and isolated packaged startup at
+  `dist-verify/sankaku-native-preview-241/win-unpacked/Sinrad.exe`. No release.

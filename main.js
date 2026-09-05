@@ -6,7 +6,8 @@ app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
 const PROTOCOL="sinrad";
 const MONITOR_MEDIA_PROTOCOL="sinrad-monitor";
 const OFFLINE_MEDIA_PROTOCOL="sinrad-offline";
-protocol.registerSchemesAsPrivileged([{scheme:MONITOR_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}},{scheme:OFFLINE_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}}]);
+const IDEA_MEDIA_PROTOCOL="sinrad-idea";
+protocol.registerSchemesAsPrivileged([{scheme:MONITOR_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}},{scheme:OFFLINE_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}},{scheme:IDEA_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
 if(!app.isPackaged) app.setPath("userData",path.join(app.getPath("appData"),"Sinrad-Dev"));
 else app.setAsDefaultProtocolClient(PROTOCOL);
 // Keep the packaged identity stable so Windows preserves installed shortcuts
@@ -37,12 +38,13 @@ const DATA_TMP = DATA_FILE+".sinrad-tmp";
 const EXTENSION_SOURCE = path.join(__dirname,"extension").replace("app.asar","app.asar.unpacked");
 const EXTENSION_DIR = path.join(DATA_DIR,"browser-extension");
 const EXTENSION_KEY_FILE = path.join(DATA_DIR,"extension-bridge-key");
+let EXTENSION_VERSION="";
+try{EXTENSION_VERSION=String(JSON.parse(fs.readFileSync(path.join(EXTENSION_SOURCE,"manifest.json"),"utf8")).version||"");}catch(_){}
 const THUMBNAIL_DIR = path.join(DATA_DIR,"thumbnail-cache");
 const SITE_PREVIEW_DIR = path.join(DATA_DIR,"site-preview-cache");
 const LEGACY_OFFLINE_DIR = path.join(DATA_DIR,"offline-feed");
 const DEFAULT_OFFLINE_DIR = app.isPackaged ? path.join(app.getPath("documents"),"Sinrad Offline") : LEGACY_OFFLINE_DIR;
 const OFFLINE_LOCATION_FILE = path.join(DATA_DIR,"offline-location.json");
-const OFFLINE_AUTH_FILE = path.join(DATA_DIR,"offline-reddit-auth.json");
 function _prepareOfflineRoot(root){const resolved=path.resolve(root);fs.mkdirSync(resolved,{recursive:true,mode:0o700});fs.mkdirSync(path.join(resolved,"media"),{recursive:true,mode:0o700});fs.mkdirSync(path.join(resolved,"captures"),{recursive:true,mode:0o700});return resolved;}
 function _initialOfflineRoot(){
   let chosen="";try{const saved=JSON.parse(fs.readFileSync(OFFLINE_LOCATION_FILE,"utf8"));if(saved&&typeof saved.path==="string"&&path.isAbsolute(saved.path))chosen=saved.path;}catch(_){}
@@ -54,9 +56,10 @@ function _initialOfflineRoot(){
   }catch(_){return _prepareOfflineRoot(LEGACY_OFFLINE_DIR);}
 }
 let offlineFeed = new OfflineFeedStore(_initialOfflineRoot());
-try{if(!fs.existsSync(OFFLINE_AUTH_FILE)){const oldAuth=[path.join(offlineFeed.root,"reddit-auth.json"),path.join(LEGACY_OFFLINE_DIR,"reddit-auth.json")].find(function(candidate){return fs.existsSync(candidate);});if(oldAuth)fs.copyFileSync(oldAuth,OFFLINE_AUTH_FILE,fs.constants.COPYFILE_EXCL);}}catch(_){}
 const MONITORING_DIR = path.join(DATA_DIR,"monitoring");
 const ANIMATION_DIR = path.join(DATA_DIR,"animations");
+const IDEA_MEDIA_DIR = path.join(DATA_DIR,"ideas","media");
+const IDEA_IMAGE_EXTENSIONS=new Set([".jpg",".jpeg",".png",".webp",".gif"]);
 const monitoringStore = new MonitoringStore(MONITORING_DIR,app.getPath("downloads"));
 const THUMBNAIL_LIMITS={maxFiles:1500,maxBytes:256*1024*1024,maxAgeMs:45*24*60*60*1000};
 const SITE_PREVIEW_LIMITS={maxFiles:1600,maxBytes:320*1024*1024,maxAgeMs:45*24*60*60*1000};
@@ -137,46 +140,23 @@ function migrateLegacyStore(){
   for(const file of candidates){ const old=_readStoreFile(file); if(old && writeStore(old)){ console.log("[sinrad] migrated legacy store from",file); return; } }
 }
 
-/* ---------- offline feed + Reddit OAuth source ---------- */
-const REDDIT_REDIRECT="http://127.0.0.1:47821/reddit/callback";
-let _redditAuthCache=undefined;
-let _redditPendingAuth=null;
-let _redditNextRequestAt=0;
-let _offlineSyncPromise=null;
+/* ---------- offline feed + extension capture source ---------- */
 let _monitoringSyncPromise=null;
 const _pawchivePreviewCache=new Map();
-
-function _readRedditAuth(){
-  if(_redditAuthCache!==undefined) return _redditAuthCache;
-  try{
-    const box=JSON.parse(fs.readFileSync(OFFLINE_AUTH_FILE,"utf8"));
-    let raw="";
-    if(box&&box.format==="sinrad-offline-auth-v1"&&box.encrypted&&_encryptionAvailable()) raw=safeStorage.decryptString(Buffer.from(box.payload,"base64"));
-    else if(box&&box.format==="sinrad-offline-auth-v1"&&!box.encrypted) raw=Buffer.from(box.payload,"base64").toString("utf8");
-    const auth=JSON.parse(raw);
-    _redditAuthCache=auth&&auth.clientId&&auth.username?auth:null;
-  }catch(_){ _redditAuthCache=null; }
-  return _redditAuthCache;
-}
-
-function _writeRedditAuth(auth){
-  fs.mkdirSync(DATA_DIR,{recursive:true,mode:0o700});
-  if(!auth){ try{fs.unlinkSync(OFFLINE_AUTH_FILE);}catch(_){} _redditAuthCache=null; return; }
-  const raw=JSON.stringify(auth),encrypted=_encryptionAvailable();
-  const payload=encrypted?safeStorage.encryptString(raw).toString("base64"):Buffer.from(raw,"utf8").toString("base64");
-  fs.writeFileSync(OFFLINE_AUTH_FILE,JSON.stringify({format:"sinrad-offline-auth-v1",encrypted:encrypted,payload:payload}),{encoding:"utf8",mode:0o600});
-  _redditAuthCache=auth;
-}
-
-function _redditAuthStatus(){
-  const auth=_readRedditAuth();
-  return {connected:!!(auth&&auth.refreshToken),username:auth&&auth.username||"",clientId:auth&&auth.clientId||"",secure:_encryptionAvailable()};
-}
 
 function _offlineNotify(){
   try{ if(mainWin&&!mainWin.isDestroyed()) mainWin.webContents.send("offline-feed-changed",_offlineState()); }catch(_){}
 }
-function _offlineState(){const snapshot=offlineFeed.snapshot();snapshot.storagePath=offlineFeed.root;return snapshot;}
+let _offlineStorageCache={key:"",value:{bytes:0,files:0,captures:0,media:0}};
+function _offlineStorageSummary(snapshot){
+  const refs=new Set(),captures=new Set();
+  function media(ref){if(ref)refs.add(String(ref));}
+  (snapshot.items||[]).forEach(function(item){(item.media||[]).forEach(media);media(item.authorAvatar);(item.comments||[]).forEach(function(comment){media(comment.avatar);(comment.media||[]).forEach(media);});if(item.captureRef)captures.add(String(item.captureRef));});
+  const key=offlineFeed.root+"|"+snapshot.updatedAt+"|"+Array.from(refs).sort().join(",")+"|"+Array.from(captures).sort().join(",");if(_offlineStorageCache.key===key)return _offlineStorageCache.value;
+  let bytes=0,files=0;refs.forEach(function(ref){try{const target=offlineFeed.resolveMedia(ref),stat=target&&fs.statSync(target);if(stat&&stat.isFile()){bytes+=stat.size;files++;}}catch(_){}});captures.forEach(function(ref){try{const target=offlineFeed.resolveCapture(ref),stat=target&&fs.statSync(target);if(stat&&stat.isFile()){bytes+=stat.size;files++;}}catch(_){}});
+  const value={bytes:bytes,files:files,captures:captures.size,media:refs.size};_offlineStorageCache={key:key,value:value};return value;
+}
+function _offlineState(){const snapshot=offlineFeed.snapshot();snapshot.storagePath=offlineFeed.root;snapshot.storage=_offlineStorageSummary(snapshot);const queued=snapshot.sources.filter(function(source){return source.syncRequestedAt>source.lastSync;}).map(function(source){return source.id;});snapshot.sync={active:_offlineActiveJobs.size>0,queued:queued.length>0,activeSourceIds:Array.from(_offlineActiveJobs.keys()),queuedSourceIds:queued};return snapshot;}
 async function _switchOfflineRoot(value){
   const target=path.resolve(String(value||"")),current=path.resolve(offlineFeed.root),root=path.parse(target).root;
   if(!value||!path.isAbsolute(String(value))||target===root)throw new Error("Choose a normal folder, not a drive root");
@@ -190,68 +170,11 @@ async function _switchOfflineRoot(value){
   return _offlineState();
 }
 
-function _sleep(ms){return new Promise(function(resolve){setTimeout(resolve,ms);});}
-async function _redditThrottle(){const wait=_redditNextRequestAt-Date.now();if(wait>0)await _sleep(Math.min(wait,60000));_redditNextRequestAt=Date.now()+650;}
 async function _fetchWithTimeout(url,options,timeoutMs){
   const controller=new AbortController(),timer=setTimeout(function(){controller.abort();},timeoutMs||20000);
   try{return await fetch(url,Object.assign({},options||{},{signal:controller.signal}));}finally{clearTimeout(timer);}
 }
 
-async function _redditTokenRequest(auth,fields){
-  await _redditThrottle();
-  const body=new URLSearchParams(fields);
-  const response=await _fetchWithTimeout("https://www.reddit.com/api/v1/access_token",{
-    method:"POST",
-    headers:{"Authorization":"Basic "+Buffer.from(auth.clientId+":").toString("base64"),"Content-Type":"application/x-www-form-urlencoded","User-Agent":RedditSource.userAgent(auth.username,app.getVersion())},
-    body:body.toString()
-  },20000);
-  const payload=await response.json().catch(function(){return {};});
-  if(!response.ok||!payload.access_token)throw new Error(payload.error||("Reddit authentication failed (HTTP "+response.status+")"));
-  return payload;
-}
-
-async function _redditRefreshToken(auth){
-  if(!auth||!auth.refreshToken)throw new Error("Connect Reddit first");
-  const token=await _redditTokenRequest(auth,{grant_type:"refresh_token",refresh_token:auth.refreshToken});
-  auth.accessToken=token.access_token;
-  auth.expiresAt=Date.now()+Math.max(60,Number(token.expires_in)||3600)*1000-60000;
-  if(token.refresh_token)auth.refreshToken=token.refresh_token;
-  _writeRedditAuth(auth);
-  return auth;
-}
-
-async function _redditAccessToken(){
-  let auth=_readRedditAuth();
-  if(!auth||!auth.refreshToken)throw new Error("Connect Reddit first");
-  if(!auth.accessToken||Number(auth.expiresAt||0)<=Date.now())auth=await _redditRefreshToken(auth);
-  return auth;
-}
-
-async function _redditApi(endpoint,retry){
-  const auth=await _redditAccessToken();
-  await _redditThrottle();
-  const response=await _fetchWithTimeout("https://oauth.reddit.com"+endpoint,{
-    headers:{"Authorization":"Bearer "+auth.accessToken,"User-Agent":RedditSource.userAgent(auth.username,app.getVersion()),"Accept":"application/json"}
-  },25000);
-  const reset=Math.max(0,Number(response.headers.get("x-ratelimit-reset"))||0),remaining=Number(response.headers.get("x-ratelimit-remaining"));
-  if((response.status===429||remaining===0)&&reset)_redditNextRequestAt=Math.max(_redditNextRequestAt,Date.now()+Math.min(reset*1000,10*60*1000));
-  if(response.status===401&&retry!==false){auth.expiresAt=0;_writeRedditAuth(auth);return _redditApi(endpoint,false);}
-  if(!response.ok)throw new Error(response.status===429?"Reddit rate limit reached — try again later":"Reddit request failed (HTTP "+response.status+")");
-  const length=Number(response.headers.get("content-length")||0);if(length>12*1024*1024)throw new Error("Reddit response was too large");
-  return response.json();
-}
-
-async function _redditCompleteAuth(code,state){
-  const pending=_redditPendingAuth;
-  _redditPendingAuth=null;
-  if(!pending||!state||state!==pending.state||Date.now()-pending.createdAt>10*60*1000)throw new Error("Reddit connection expired — start it again");
-  const auth={clientId:pending.clientId,username:pending.username,refreshToken:"",accessToken:"",expiresAt:0};
-  const token=await _redditTokenRequest(auth,{grant_type:"authorization_code",code:String(code||""),redirect_uri:REDDIT_REDIRECT});
-  if(!token.refresh_token)throw new Error("Reddit did not return offline access. Reconnect and approve permanent access.");
-  auth.refreshToken=token.refresh_token;auth.accessToken=token.access_token;auth.expiresAt=Date.now()+Math.max(60,Number(token.expires_in)||3600)*1000-60000;
-  _writeRedditAuth(auth);_offlineNotify();
-  return true;
-}
 
 function _mimeExtension(type,url){
   const mime=String(type||"").split(";")[0].trim().toLowerCase();
@@ -273,62 +196,45 @@ async function _cacheRedditMedia(item,maximum){
   const limit=Math.min(20,Math.max(1,Number(maximum)||1)),postUrls=[],tasks=[],byUrl=new Map();
   (item.mediaUrls||[]).forEach(function(value){const safe=RedditSource.redditMediaUrl(value);if(safe&&!postUrls.includes(safe)&&postUrls.length<limit)postUrls.push(safe);});
   function addTask(value,key,assign){const safe=RedditSource.redditMediaUrl(value);if(!safe)return;let task=byUrl.get(safe);if(!task){task={url:safe,key:key,assign:[]};byUrl.set(safe,task);tasks.push(task);}task.assign.push(assign);}
-  const postRefs=new Array(postUrls.length);postUrls.forEach(function(url,index){addTask(url,"post-"+index,function(ref){postRefs[index]=ref;});});
+  const postRefs=new Array(postUrls.length);postUrls.forEach(function(url,index){addTask(url,"post-"+index,function(ref,actualUrl){postRefs[index]=ref;item.mediaUrls[index]=actualUrl;});});
   addTask(item.authorAvatarUrl,"author-avatar",function(ref){item.authorAvatar=ref;});
   let commentMediaCount=0;(item.comments||[]).slice(0,80).forEach(function(comment,commentIndex){
     addTask(comment.avatarUrl,"comment-"+commentIndex+"-avatar",function(ref){comment.avatar=ref;});
-    const refs=[];(comment.mediaUrls||[]).slice(0,4).forEach(function(url,mediaIndex){if(commentMediaCount>=40)return;commentMediaCount++;addTask(url,"comment-"+commentIndex+"-media-"+mediaIndex,function(ref){refs[mediaIndex]=ref;comment.media=refs.filter(Boolean);});});
+    const refs=[],gifRefs=[],gifUrls=new Set(comment.gifMediaUrls||[]);(comment.mediaUrls||[]).slice(0,4).forEach(function(url,mediaIndex){if(commentMediaCount>=40)return;commentMediaCount++;addTask(url,"comment-"+commentIndex+"-media-"+mediaIndex,function(ref){refs[mediaIndex]=ref;comment.media=refs.filter(Boolean);if(gifUrls.has(url)){gifRefs[mediaIndex]=ref;comment.gifMedia=gifRefs.filter(Boolean);}});});
   });
   if(!tasks.length)return item;
   async function cacheOne(task){
-    try{
-      const url=task.url;
-      const response=await _fetchWithTimeout(url,{headers:{"Accept":"image/*,video/mp4,video/webm;q=0.9","User-Agent":"Sinrad/"+app.getVersion()+" offline-reader"}},45000);
-      const finalUrl=RedditSource.redditMediaUrl(response.url||url);if(!response.ok||!finalUrl)return;
-      const contentType=String(response.headers.get("content-type")||"").split(";")[0].toLowerCase(),extension=_mimeExtension(contentType,finalUrl);if(!extension)return;
-      if([".mp4",".webm"].includes(extension)?!(contentType.startsWith("video/")||contentType==="application/octet-stream"):!contentType.startsWith("image/"))return;
-      const maximumBytes=[".mp4",".webm"].includes(extension)?96*1024*1024:12*1024*1024,length=Number(response.headers.get("content-length")||0);if(length>maximumBytes)return;
-      const bytes=await _responseBufferLimited(response,maximumBytes);if(!bytes.length)return;
-      const ref=await offlineFeed.writeMedia(item.sourceKey,task.key,bytes,extension);task.assign.forEach(function(assign){assign(ref);});
-    }catch(_){}
+    const candidates=RedditSource.preferredVideoUrls(task.url);if(!candidates.length)candidates.push(task.url);
+    for(const url of candidates){
+      try{
+        const response=await _fetchWithTimeout(url,{headers:{"Accept":"image/*,video/mp4,video/webm;q=0.9","User-Agent":"Sinrad/"+app.getVersion()+" offline-reader"}},45000);
+        const finalUrl=RedditSource.redditMediaUrl(response.url||url);if(!response.ok||!finalUrl){try{if(response.body)await response.body.cancel();}catch(_){}continue;}
+        const contentType=String(response.headers.get("content-type")||"").split(";")[0].toLowerCase(),extension=_mimeExtension(contentType,finalUrl);if(!extension){try{if(response.body)await response.body.cancel();}catch(_){}continue;}
+        if([".mp4",".webm"].includes(extension)?!(contentType.startsWith("video/")||contentType==="application/octet-stream"):!contentType.startsWith("image/")){try{if(response.body)await response.body.cancel();}catch(_){}continue;}
+        const maximumBytes=[".mp4",".webm"].includes(extension)?36*1024*1024:12*1024*1024,length=Number(response.headers.get("content-length")||0);if(length>maximumBytes){try{if(response.body)await response.body.cancel();}catch(_){}continue;}
+        const bytes=await _responseBufferLimited(response,maximumBytes);if(!bytes.length)continue;
+        const ref=await offlineFeed.writeMedia(item.sourceKey,task.key+":"+crypto.createHash("sha256").update(finalUrl).digest("hex"),bytes,extension);task.assign.forEach(function(assign){assign(ref,finalUrl);});return;
+      }catch(_){}
+    }
   }
   for(let index=0;index<tasks.length;index+=6)await Promise.all(tasks.slice(index,index+6).map(cacheOne));
   const cached=postRefs.filter(Boolean);if(cached.length)item.media=cached;
   return item;
 }
 
-async function _syncRedditSource(source){
-  const subreddit=RedditSource.cleanSubreddit(source.handle),limit=Math.min(100,Math.max(1,Number(source.limit)||30));
-  const endpoint="/r/"+encodeURIComponent(subreddit)+"/"+source.sort+"?limit="+limit+"&raw_json=1";
-  const payload=await _redditApi(endpoint),now=Date.now();
-  const items=RedditSource.parseListing(payload,source,now),known=new Set(offlineFeed.snapshot().items.map(function(item){return item.sourceKey;}));
-  for(const item of items){
-    if(!known.has(item.sourceKey)&&source.topComments>0){
-      try{const id=item.sourceKey.replace(/^reddit:t3_/,"");item.comments=RedditSource.parseComments(await _redditApi("/comments/"+encodeURIComponent(id)+"?limit="+source.topComments+"&depth=1&sort=top&raw_json=1"),source.topComments);}catch(_){}
-    }
-  }
-  const uncached=items.filter(function(item){return !known.has(item.sourceKey)&&item.mediaUrls&&item.mediaUrls.length;});
-  for(let index=0;index<uncached.length;index+=3)await Promise.all(uncached.slice(index,index+3).map(_cacheRedditMedia));
-  const result=offlineFeed.mergeItems(source.id,items);
-  offlineFeed.updateSource(source.id,{lastSync:now,lastError:""});
-  return result;
+async function _upgradeLowQualityOfflineVideos(){
+  const targets=offlineFeed.snapshot().items.filter(function(item){return !item.videoQualityChecked&&(item.mediaUrls||[]).length===1&&/\/(?:CMAF|DASH)_(?:96|240|360)\.mp4(?:$|[?#])/i.test(String(item.mediaUrls[0]||""));}).slice(0,8);let upgraded=0;
+  for(const item of targets){const replacement={sourceKey:item.sourceKey,mediaUrls:item.mediaUrls.slice(),comments:[]};await _cacheRedditMedia(replacement,1);if(replacement.media&&replacement.media[0]){const changed=offlineFeed.replaceItemMedia(item.id,replacement.media,replacement.mediaUrls);if(changed)upgraded++;}}
+  if(upgraded)_offlineNotify();return upgraded;
 }
 
+
 async function _refreshOfflineFeed(sourceId,force){
-  if(_offlineSyncPromise)return _offlineSyncPromise;
-  _offlineSyncPromise=(async function(){
-    const snapshot=offlineFeed.snapshot(),now=Date.now();let added=0,updated=0,synced=0,lastError="";
-    const sources=snapshot.sources.filter(function(source){return source.enabled&&(!sourceId||source.id===sourceId);});
-    for(const source of sources){
-      if(!force&&!sourceId&&source.lastSync&&now-source.lastSync<source.intervalHours*60*60*1000)continue;
-      try{
-        if(source.platform!=="reddit")continue;
-        const result=await _syncRedditSource(source);added+=result.added;updated+=result.updated;synced++;
-      }catch(error){lastError=String(error&&error.message||error);offlineFeed.updateSource(source.id,{lastError:lastError});}
-    }
-    offlineFeed.prune();_offlineNotify();return {ok:!lastError||synced>0,added:added,updated:updated,synced:synced,error:lastError};
-  })();
-  try{return await _offlineSyncPromise;}finally{_offlineSyncPromise=null;}
+  const now=Date.now(),sources=offlineFeed.snapshot().sources.filter(function(source){return source.enabled&&source.platform==="reddit"&&(!sourceId||source.id===sourceId);});
+  const stale=offlineFeed.cleanupStale(now),history=offlineFeed.cleanupHistory(now),removed=stale.removed+history.removed,queueIds=new Set(sources.map(function(source){return source.id;}).concat(stale.sourceIds||[]));
+  queueIds.forEach(function(id){offlineFeed.updateSource(id,{adapter:"extension",syncRequestedAt:now,lastError:""});});
+  if(queueIds.size)_offlineNotify();
+  return {ok:true,queued:queueIds.size,removed:removed,added:0,updated:0,synced:0,extension:_extensionStatus()};
 }
 
 /* ---------- Monitoring Mode sources ---------- */
@@ -625,7 +531,7 @@ function _installMonitorMediaProtocol(){
   });
 }
 
-function _offlineMediaMime(extension){return {".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",".gif":"image/gif",".mp4":"video/mp4",".webm":"video/webm"}[extension]||"application/octet-stream";}
+function _offlineMediaMime(extension){return {".jpg":"image/jpeg",".jpeg":"image/jpeg",".png":"image/png",".webp":"image/webp",".gif":"image/gif",".mp4":"video/mp4",".webm":"video/webm",".mp3":"audio/mpeg"}[extension]||"application/octet-stream";}
 function _installOfflineMediaProtocol(){
   protocol.handle(OFFLINE_MEDIA_PROTOCOL,async function(request){
     try{
@@ -644,6 +550,44 @@ function _installOfflineMediaProtocol(){
       const bytes=await fs.promises.readFile(target);return new Response(bytes,{status:200,headers:Object.assign(baseHeaders,{"Content-Length":String(bytes.length)})});
     }catch(_){return new Response("Media unavailable",{status:502});}
   });
+}
+
+function _installIdeaMediaProtocol(){
+  protocol.handle(IDEA_MEDIA_PROTOCOL,async function(request){
+    try{
+      const parsed=new URL(request.url);if(parsed.hostname!=="media")return new Response("Not found",{status:404});
+      const name=decodeURIComponent(parsed.pathname).replace(/^\/+/i,"");if(!/^[a-f0-9]{64}\.(?:jpg|jpeg|png|webp|gif|mp4|webm|mp3)$/i.test(name))return new Response("Not found",{status:404});
+      const target=path.join(IDEA_MEDIA_DIR,name);if(!isPathInside(target,[IDEA_MEDIA_DIR]))return new Response("Not found",{status:404});
+      const stat=await fs.promises.stat(target),extension=path.extname(target).toLowerCase(),maximum=[".mp4",".webm",".mp3"].includes(extension)?128*1024*1024:20*1024*1024;if(!stat.isFile()||stat.size<1||stat.size>maximum)return new Response("Not found",{status:404});
+      const bytes=await fs.promises.readFile(target),type=_offlineMediaMime(path.extname(target).toLowerCase());
+      return new Response(bytes,{status:200,headers:{"Cache-Control":"private, max-age=3600","Content-Type":type,"Content-Length":String(bytes.length)}});
+    }catch(_){return new Response("Media unavailable",{status:404});}
+  });
+}
+
+function _ideaImageExtension(name,type){
+  const extension=path.extname(String(name||"")).toLowerCase();if(IDEA_IMAGE_EXTENSIONS.has(extension))return extension;
+  return {"image/jpeg":".jpg","image/png":".png","image/webp":".webp","image/gif":".gif"}[String(type||"").toLowerCase()]||"";
+}
+async function _storeIdeaImage(name,type,value){
+  const extension=_ideaImageExtension(name,type);if(!extension)throw new Error("Only JPG, PNG, WebP, and GIF images are supported");
+  const bytes=Buffer.isBuffer(value)?value:ArrayBuffer.isView(value)?Buffer.from(value.buffer,value.byteOffset,value.byteLength):value instanceof ArrayBuffer?Buffer.from(value):Buffer.alloc(0);
+  if(!bytes.length||bytes.length>20*1024*1024)throw new Error("Each idea image must be smaller than 20 MB");
+  const image=nativeImage.createFromBuffer(bytes);if(!image||image.isEmpty())throw new Error("That file is not a readable image");
+  const stored=crypto.createHash("sha256").update(bytes).digest("hex")+extension,target=path.join(IDEA_MEDIA_DIR,stored);fs.mkdirSync(IDEA_MEDIA_DIR,{recursive:true,mode:0o700});
+  if(!fs.existsSync(target))await fs.promises.writeFile(target,bytes,{mode:0o600,flag:"wx"}).catch(function(error){if(error&&error.code!=="EEXIST")throw error;});
+  return {name:path.basename(String(name||"idea-image"+extension)).slice(0,260),file:stored};
+}
+async function _pickIdeaImages(){
+  const picked=await dialog.showOpenDialog(mainWin,{title:"Add images to this idea",properties:["openFile","multiSelections"],filters:[{name:"Images",extensions:["jpg","jpeg","png","webp","gif"]}]});if(picked.canceled)return [];
+  const results=[];for(const source of picked.filePaths.slice(0,20)){const stat=await fs.promises.stat(source);if(!stat.isFile()||stat.size<1||stat.size>20*1024*1024)continue;results.push(await _storeIdeaImage(path.basename(source),"",await fs.promises.readFile(source)));}return results;
+}
+
+async function _copyIdeaImage(name){
+  name=String(name||"");if(!/^[a-f0-9]{64}\.(?:jpg|jpeg|png|webp|gif)$/i.test(name))return false;
+  const target=path.join(IDEA_MEDIA_DIR,name);if(!isPathInside(target,[IDEA_MEDIA_DIR]))return false;
+  const stat=await fs.promises.stat(target);if(!stat.isFile()||stat.size<1||stat.size>20*1024*1024)return false;
+  const image=nativeImage.createFromPath(target);if(!image||image.isEmpty())return false;clipboard.writeImage(image);return true;
 }
 
 function syncBrowserExtension(){
@@ -677,6 +621,7 @@ function createWindow(){
     icon:process.platform === "win32" ? undefined : WINDOW_ICON,
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:true, webSecurity:true }
   });
+  mainWin.webContents.setZoomFactor(1.16);
   if(process.platform === "win32"){
     const exe=app.getPath("exe");
     mainWin.setAppDetails({appId:APP_ID,appIconPath:exe,appIconIndex:0,relaunchCommand:'"'+exe+'"',relaunchDisplayName:"Sinrad"});
@@ -824,7 +769,37 @@ let _localServer = null;
 let _localHits=[];
 const CAPTURE_MAX_BYTES=256*1024*1024;
 const _captureSessions=new Map();
-function _localJson(res,status,data,origin){ if(origin) res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin"); res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}); res.end(JSON.stringify(data)); }
+let _extensionLastSeen=0;
+const _offlineActiveJobs=new Map();
+const _offlineUndoDeletes=new Map();
+function _stashOfflineDelete(items){const list=Array.isArray(items)?items.filter(Boolean):[];if(!list.length)return "";const token=crypto.randomUUID(),entry={items:list,timer:null};entry.timer=setTimeout(function(){const current=_offlineUndoDeletes.get(token);if(!current)return;_offlineUndoDeletes.delete(token);offlineFeed.purgeItems(current.items);},10*60*1000);if(entry.timer.unref)entry.timer.unref();_offlineUndoDeletes.set(token,entry);return token;}
+function _restoreOfflineDelete(token){const entry=_offlineUndoDeletes.get(String(token||""));if(!entry)return {ok:false,error:"That undo has expired"};_offlineUndoDeletes.delete(String(token));if(entry.timer)clearTimeout(entry.timer);const restored=offlineFeed.restoreItems(entry.items);_offlineNotify();return {ok:restored>0,restored:restored};}
+function _extensionStatus(){const age=_extensionLastSeen?Date.now()-_extensionLastSeen:Number.MAX_SAFE_INTEGER;return {connected:age<150000,lastSeen:_extensionLastSeen,version:EXTENSION_VERSION,method:"browser-extension"};}
+function _markExtensionSeen(){const wasConnected=_extensionStatus().connected;_extensionLastSeen=Date.now();if(!wasConnected)setImmediate(_offlineNotify);}
+function _offlineCanonicalUrl(value){try{const url=new URL(String(value||""));const match=url.pathname.match(/^\/r\/([A-Za-z0-9_]{2,21})\/comments\/([A-Za-z0-9]+)/i);return match?("https://www.reddit.com/r/"+match[1]+"/comments/"+match[2]+"/"):"";}catch(_){return "";}}
+function _offlinePostKey(value){try{const match=new URL(String(value||"")).pathname.match(/^\/r\/([A-Za-z0-9_]{2,21})\/comments\/([A-Za-z0-9]+)/i);return match?(match[1]+":"+match[2]).toLowerCase():"";}catch(_){return "";}}
+function _nextOfflineJob(){
+  const now=Date.now();let snapshot=offlineFeed.snapshot();
+  for(const [id,started] of _offlineActiveJobs.entries())if(now-started>20*60*1000)_offlineActiveJobs.delete(id);
+  while(true){
+    const source=snapshot.sources.find(function(entry){if(!entry.enabled||entry.platform!=="reddit"||entry.adapter!=="extension"||_offlineActiveJobs.has(entry.id))return false;return entry.syncRequestedAt>entry.lastSync||!entry.lastSync||now-entry.lastSync>=entry.intervalHours*60*60*1000;});
+    if(!source)return null;
+    const kept=snapshot.items.filter(function(item){return item.sourceId===source.id&&!item.favorite&&!item.read;}).length,needed=Math.max(0,source.limit-kept);
+    if(!needed){offlineFeed.updateSource(source.id,{lastSync:now,syncRequestedAt:0,lastError:""});snapshot=offlineFeed.snapshot();setImmediate(_offlineNotify);continue;}
+    _offlineActiveJobs.set(source.id,now);setImmediate(_offlineNotify);
+    const community=("r/"+source.handle).toLowerCase(),knownUrls=[];
+    snapshot.items.forEach(function(item){if(item.sourceId!==source.id&&String(item.community||"").toLowerCase()!==community)return;const url=_offlineCanonicalUrl(item.url);if(url&&!knownUrls.includes(url))knownUrls.push(url);});
+    return {sourceId:source.id,handle:source.handle,limit:needed,knownUrls:knownUrls,knownKeys:source.seenPostKeys||[]};
+  }
+}
+function _finishOfflineJob(data){
+  const sourceId=String(data&&data.sourceId||"");_offlineActiveJobs.delete(sourceId);
+  const source=offlineFeed.snapshot().sources.find(function(entry){return entry.id===sourceId&&entry.platform==="reddit";});if(!source)throw new Error("Offline source was removed");
+  const now=Date.now(),saved=Math.max(0,Number(data&&data.saved)||0),kept=offlineFeed.snapshot().items.filter(function(item){return item.sourceId===sourceId&&!item.favorite&&!item.read;}).length,continueRefill=saved>0&&kept<source.limit;
+  offlineFeed.updateSource(sourceId,{adapter:"extension",lastSync:now,syncRequestedAt:continueRefill?now+1:0,lastError:data&&data.ok?"":String(data&&data.error||"Browser extension sync failed").slice(0,500)});_offlineNotify();
+  return {ok:true,continueRefill:continueRefill,remaining:Math.max(0,source.limit-kept)};
+}
+function _localJson(res,status,data,origin){ if(origin) res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Access-Control-Expose-Headers","X-Sinrad-Extension-Version"); if(EXTENSION_VERSION)res.setHeader("X-Sinrad-Extension-Version",EXTENSION_VERSION); res.setHeader("Vary","Origin"); res.writeHead(status,{"Content-Type":"application/json; charset=utf-8","Cache-Control":"no-store"}); res.end(JSON.stringify(data)); }
 function _validBridgeKey(value){ try{ const supplied=Buffer.from(String(value||""),"utf8"), expected=Buffer.from(EXTENSION_BRIDGE_KEY,"utf8"); return supplied.length===expected.length&&crypto.timingSafeEqual(supplied,expected); }catch(_){return false;} }
 function _captureRemove(session){if(!session)return;_captureSessions.delete(session.id);try{if(fs.existsSync(session.temp))fs.unlinkSync(session.temp);}catch(_){}}
 function _captureCleanup(){const cutoff=Date.now()-15*60*1000;for(const session of _captureSessions.values())if(session.createdAt<cutoff)_captureRemove(session);}
@@ -848,17 +823,18 @@ function _captureMetadata(value,pageUrl,fallbackTitle){
     author:text(raw.author,200).replace(/^\/?u\//i,""),authorFlair:authorFlair,postFlair:postFlair,authorAvatarUrl:text(raw.authorAvatarUrl,4000),content:content,contentBlocks:contentBlocks,
     date:number(raw.date,Date.now(),0,Number.MAX_SAFE_INTEGER),score:number(raw.score,0,-1000000000,1000000000),
     commentCount:number(raw.commentCount,0,0,1000000000),mediaUrls:mediaUrls,
-    comments:(Array.isArray(raw.comments)?raw.comments:[]).slice(0,80).map(function(comment){const entry=comment&&typeof comment==="object"?comment:{},avatarUrl=RedditSource.redditMediaUrl(entry.avatarUrl),mediaUrls=[];(Array.isArray(entry.mediaUrls)?entry.mediaUrls:[]).forEach(function(value){const safe=RedditSource.redditMediaUrl(value);if(safe&&!mediaUrls.includes(safe)&&mediaUrls.length<4)mediaUrls.push(safe);});return {author:text(entry.author,200).replace(/^\/?u\//i,""),avatarUrl:avatarUrl,body:block(entry.body,12000),contentBlocks:commentBlocks(entry.contentBlocks),mediaUrls:mediaUrls,score:number(entry.score,0,-1000000000,1000000000),depth:number(entry.depth,0,0,12),date:number(entry.date,0,0,Number.MAX_SAFE_INTEGER)};}).filter(function(comment){return !!comment.body||comment.mediaUrls.length;})
+    comments:(Array.isArray(raw.comments)?raw.comments:[]).slice(0,80).map(function(comment){const entry=comment&&typeof comment==="object"?comment:{},avatarUrl=RedditSource.redditMediaUrl(entry.avatarUrl),mediaUrls=[],gifMediaUrls=[];(Array.isArray(entry.mediaUrls)?entry.mediaUrls:[]).forEach(function(value){const safe=RedditSource.redditMediaUrl(value);if(safe&&!mediaUrls.includes(safe)&&mediaUrls.length<4)mediaUrls.push(safe);});(Array.isArray(entry.gifMediaUrls)?entry.gifMediaUrls:[]).forEach(function(value){const safe=RedditSource.redditMediaUrl(value);if(safe&&mediaUrls.includes(safe)&&!gifMediaUrls.includes(safe))gifMediaUrls.push(safe);});return {author:text(entry.author,200).replace(/^\/?u\//i,""),avatarUrl:avatarUrl,body:block(entry.body,12000),contentBlocks:commentBlocks(entry.contentBlocks),mediaUrls:mediaUrls,gifMediaUrls:gifMediaUrls,score:number(entry.score,0,-1000000000,1000000000),depth:number(entry.depth,0,0,12),date:number(entry.date,0,0,Number.MAX_SAFE_INTEGER)};}).filter(function(comment){return !!comment.body||comment.mediaUrls.length;})
   };
 }
 function _captureStart(data){
   _captureCleanup();if(_captureSessions.size>=4)throw new Error("Too many page saves are already running");
   const url=normalizeHttpUrl(data&&data.url),title=String(data&&data.title||"").replace(/\0/g,"").slice(0,1000);
   const size=Math.round(Number(data&&data.size));if(!url)throw new Error("A web page URL is required");if(!Number.isFinite(size)||size<1||size>CAPTURE_MAX_BYTES)throw new Error("Saved page must be under 256 MB");
+  const sourceId=String(data&&data.sourceId||"").slice(0,120);if(sourceId&&!offlineFeed.snapshot().sources.some(function(source){return source.id===sourceId&&source.platform==="reddit"&&source.adapter==="extension";}))throw new Error("Offline source is invalid");
   fs.mkdirSync(offlineFeed.captureRoot,{recursive:true,mode:0o700});
   const id=crypto.randomBytes(24).toString("hex"),temp=path.join(offlineFeed.captureRoot,id+".part");
   fs.writeFileSync(temp,Buffer.alloc(0),{mode:0o600,flag:"wx"});
-  _captureSessions.set(id,{id:id,temp:temp,url:url,title:title||new URL(url).hostname,metadata:_captureMetadata(data&&data.metadata,url,title),size:size,received:0,nextIndex:0,hash:crypto.createHash("sha256"),createdAt:Date.now()});
+  _captureSessions.set(id,{id:id,temp:temp,url:url,title:title||new URL(url).hostname,sourceId:sourceId,metadata:_captureMetadata(data&&data.metadata,url,title),size:size,received:0,nextIndex:0,hash:crypto.createHash("sha256"),createdAt:Date.now()});
   return id;
 }
 function _captureAppend(id,index,bytes){
@@ -875,8 +851,10 @@ async function _captureFinish(id){
   if(fs.existsSync(target))fs.unlinkSync(session.temp);else fs.renameSync(session.temp,target);
   _captureSessions.delete(session.id);
   const existing=offlineFeed.snapshot().items.find(function(item){return !!item.captureRef&&item.url===session.url;});
-  const item=Object.assign({},session.metadata,{sourceKey:existing?existing.sourceKey:("capture:"+ref),captureRef:ref,captureMime:"multipart/related",captureSize:session.received,url:session.url,title:session.metadata.title||session.title});
-  await _cacheRedditMedia(item,20);offlineFeed.addCapture(item);_offlineNotify();
+  const item=Object.assign({},session.metadata,{sourceId:session.sourceId||"",sourceKey:existing?existing.sourceKey:("capture:"+ref),captureRef:ref,captureMime:"multipart/related",captureSize:session.received,url:session.url,title:session.metadata.title||session.title});
+  await _cacheRedditMedia(item,20);offlineFeed.addCapture(item);const pruned=offlineFeed.prune();(pruned.sourceIds||[]).forEach(function(sourceId){offlineFeed.updateSource(sourceId,{syncRequestedAt:Date.now(),lastError:""});});
+  if(session.sourceId){const source=offlineFeed.snapshot().sources.find(function(entry){return entry.id===session.sourceId;}),key=_offlinePostKey(session.url);if(source&&key)offlineFeed.updateSource(source.id,{seenPostKeys:(source.seenPostKeys||[]).concat(key).slice(-5000)});}
+  _offlineNotify();
   return {ok:true,itemCount:offlineFeed.snapshot().items.length};
 }
 function _readLocalBody(req,maximum,binary){return new Promise(function(resolve,reject){const chunks=[];let total=0,failed=false;req.on("data",function(chunk){if(failed)return;total+=chunk.length;if(total>maximum){failed=true;reject(new Error("request too large"));return;}chunks.push(Buffer.from(chunk));});req.on("end",function(){if(!failed){const body=Buffer.concat(chunks,total);resolve(binary?body:body.toString("utf8"));}});req.on("error",reject);});}
@@ -886,29 +864,21 @@ function _startLocalServer(){
     const http = require('http');
     _localServer = http.createServer(function(req, res){
       const origin=String(req.headers.origin||"");
-      if(req.method==="OPTIONS"){ if(origin)res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin"); res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS"); res.setHeader("Access-Control-Allow-Headers","Content-Type,X-Sinrad-Token,X-Sinrad-Bridge-Key"); res.writeHead(204); res.end(); return; }
+      if(req.method==="OPTIONS"){ if(origin)res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Access-Control-Expose-Headers","X-Sinrad-Extension-Version"); res.setHeader("Vary","Origin"); res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS"); res.setHeader("Access-Control-Allow-Headers","Content-Type,X-Sinrad-Token,X-Sinrad-Bridge-Key"); res.writeHead(204); res.end(); return; }
       const u=new URL(req.url,"http://localhost");
-      if(req.method==="GET"&&u.pathname==="/reddit/callback"){
-        const denied=u.searchParams.get("error"),code=u.searchParams.get("code"),state=u.searchParams.get("state");
-        Promise.resolve().then(function(){if(denied)throw new Error("Reddit connection was cancelled");return _redditCompleteAuth(code,state);}).then(function(){
-          res.writeHead(200,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'"});
-          res.end('<!doctype html><meta charset="utf-8"><title>Reddit connected</title><style>body{background:#080b12;color:#e9edf6;font:16px Segoe UI,sans-serif;display:grid;place-items:center;height:100vh;margin:0}main{padding:32px;border:1px solid #283348;background:#101622}b{color:#ff8b60}</style><main><b>Reddit connected to SINRAD</b><p>You can close this tab and return to Offline Mode.</p></main>');
-        }).catch(function(error){
-          const message=String(error&&error.message||error).replace(/[&<>"']/g,function(char){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char];});
-          res.writeHead(400,{"Content-Type":"text/html; charset=utf-8","Cache-Control":"no-store","Content-Security-Policy":"default-src 'none'; style-src 'unsafe-inline'"});
-          res.end('<!doctype html><meta charset="utf-8"><title>Connection failed</title><style>body{background:#080b12;color:#e9edf6;font:16px Segoe UI,sans-serif;display:grid;place-items:center;height:100vh;margin:0}main{padding:32px;border:1px solid #4a2730;background:#171014}b{color:#ff7185}</style><main><b>Could not connect Reddit</b><p>'+message+'</p></main>');
-        });
-        return;
-      }
       const bridgeTrusted=_validBridgeKey(req.headers["x-sinrad-bridge-key"]);
       if(!bridgeTrusted){ _localJson(res,403,{ok:false,error:"extension authentication required"}); return; }
       if(origin) res.setHeader("Access-Control-Allow-Origin",origin); res.setHeader("Vary","Origin");
+      res.setHeader("Access-Control-Expose-Headers","X-Sinrad-Extension-Version");
       res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers","Content-Type,X-Sinrad-Token,X-Sinrad-Bridge-Key");
-      if(req.method==="GET" && u.pathname==="/token"){ _localJson(res,200,{ok:true,token:LOCAL_TOKEN},origin); return; }
-      const allowedPosts=new Set(["/park","/capture/start","/capture/chunk","/capture/finish","/capture/cancel"]);
-      if(req.method!=="POST" || !allowedPosts.has(u.pathname)){ _localJson(res,404,{ok:false,error:"not found"},origin); return; }
+      if(req.method==="GET" && u.pathname==="/token"){ _markExtensionSeen();_localJson(res,200,{ok:true,token:LOCAL_TOKEN},origin); return; }
+      const allowedPosts=new Set(["/park","/capture/start","/capture/chunk","/capture/finish","/capture/cancel","/offline/job-finish","/offline/source-add"]);
+      const allowedGet=req.method==="GET"&&u.pathname==="/offline/jobs";
+      if(!allowedGet&&(req.method!=="POST" || !allowedPosts.has(u.pathname))){ _localJson(res,404,{ok:false,error:"not found"},origin); return; }
       if(req.headers["x-sinrad-token"]!==LOCAL_TOKEN){ _localJson(res,401,{ok:false,error:"invalid token"},origin); return; }
+      _markExtensionSeen();
+      if(allowedGet){_localJson(res,200,{ok:true,job:_nextOfflineJob()},origin);return;}
       if(u.pathname==="/capture/chunk"){
         _readLocalBody(req,1024*1024,true).then(function(bytes){const received=_captureAppend(u.searchParams.get("id"),Number(u.searchParams.get("index")),bytes);_localJson(res,200,{ok:true,received:received},origin);}).catch(function(error){_localJson(res,error&&error.message==="request too large"?413:400,{ok:false,error:String(error&&error.message||error)},origin);});return;
       }
@@ -922,6 +892,8 @@ function _startLocalServer(){
           if(u.pathname==="/capture/start"){const id=_captureStart(data);_localJson(res,200,{ok:true,captureId:id},origin);return;}
           if(u.pathname==="/capture/finish"){const result=await _captureFinish(data.captureId);_localJson(res,200,result,origin);return;}
           if(u.pathname==="/capture/cancel"){const session=_captureSessions.get(String(data.captureId||""));_captureRemove(session);_localJson(res,200,{ok:true},origin);return;}
+          if(u.pathname==="/offline/job-finish"){_localJson(res,200,_finishOfflineJob(data),origin);return;}
+          if(u.pathname==="/offline/source-add"){const handle=RedditSource.cleanSubreddit(data.handle),snapshot=offlineFeed.snapshot(),existing=snapshot.sources.find(function(source){return source.platform==="reddit"&&source.handle.toLowerCase()===handle.toLowerCase();}),source=existing?offlineFeed.updateSource(existing.id,{enabled:true,adapter:"extension",syncRequestedAt:Date.now(),lastError:""}):offlineFeed.addSource({platform:"reddit",adapter:"extension",handle:handle,label:"r/"+handle,limit:30,intervalHours:24,syncRequestedAt:Date.now()});_offlineNotify();_localJson(res,200,{ok:true,sourceId:source.id,existing:!!existing},origin);return;}
           const lot=data.lot===true;
           if(Array.isArray(data.tabs)){
             if(!lot){ _localJson(res,400,{ok:false,error:"tab batches are Parking Lot only"},origin); return; }
@@ -962,6 +934,7 @@ app.whenReady().then(()=>{
   if(!_gotLock) return;
   _installMonitorMediaProtocol();
   _installOfflineMediaProtocol();
+  _installIdeaMediaProtocol();
   migrateLegacyStore();
   syncBrowserExtension();
   fs.promises.mkdir(THUMBNAIL_DIR,{recursive:true,mode:0o700}).then(function(){ return pruneThumbnailCache(THUMBNAIL_DIR,THUMBNAIL_LIMITS); }).catch(function(){});
@@ -976,11 +949,11 @@ app.whenReady().then(()=>{
   const _st=readStore(); const _introOn=!(_st&&_st.settings&&_st.settings.introEnabled===false);
   if(vid && _introOn){ hasSplash=true; createSplash(vid); if(!splashWin) hasSplash=false; }
   createWindow();
+  try{offlineFeed.load();const cleanup=offlineFeed.removeBrokenExtensionCaptures(),pruned=offlineFeed.prune(),refillIds=Array.from(new Set(cleanup.sourceIds.concat(pruned.sourceIds||[])));refillIds.forEach(function(id){offlineFeed.updateSource(id,{lastSync:0,syncRequestedAt:Date.now(),lastError:cleanup.sourceIds.includes(id)?"Retrying after an incomplete Reddit page":"Refreshing posts older than three days"});});}catch(error){console.error("[sinrad] offline feed init failed:",error.message);}
+  const offlineVideoUpgradeTimer=setTimeout(function(){_upgradeLowQualityOfflineVideos().catch(function(){});},5000);if(offlineVideoUpgradeTimer.unref)offlineVideoUpgradeTimer.unref();
+  const offlineHistoryTimer=setInterval(function(){try{const result=offlineFeed.prune();(result.sourceIds||[]).forEach(function(id){offlineFeed.updateSource(id,{syncRequestedAt:Date.now(),lastError:""});});if(result.removed)_offlineNotify();}catch(_){}},15*60*1000);if(offlineHistoryTimer.unref)offlineHistoryTimer.unref();
   _startLocalServer();
-  try{offlineFeed.load();offlineFeed.prune();}catch(error){console.error("[sinrad] offline feed init failed:",error.message);}
   try{monitoringStore.load();monitoringStore.prune();}catch(error){console.error("[sinrad] monitoring init failed:",error.message);}
-  const offlineStartupTimer=setTimeout(function(){if(_redditAuthStatus().connected)_refreshOfflineFeed("",false).catch(function(){});},30000);if(offlineStartupTimer.unref)offlineStartupTimer.unref();
-  const offlineRefreshTimer=setInterval(function(){if(_redditAuthStatus().connected)_refreshOfflineFeed("",false).catch(function(){});},15*60*1000);if(offlineRefreshTimer.unref)offlineRefreshTimer.unref();
   const monitoringStartupTimer=setTimeout(function(){_refreshMonitoring("",false).catch(function(){});},45000);if(monitoringStartupTimer.unref)monitoringStartupTimer.unref();
   const monitoringRefreshTimer=setInterval(function(){_refreshMonitoring("",false).catch(function(){});},5*60*1000);if(monitoringRefreshTimer.unref)monitoringRefreshTimer.unref();
   var _protoArg=process.argv.find(function(a){return a.startsWith(PROTOCOL+"://");}); if(_protoArg){ mainWin.webContents.once("did-finish-load",function(){ _handleProtocolUrl(_protoArg); }); }
@@ -1000,7 +973,7 @@ function _fromPet(e){ return _from(e,petWin); }
 function _fromSplash(e){ return _from(e,splashWin); }
 ipcMain.on("boot-done", (e)=>{ if(_fromSplash(e)) finishBoot(); });
 ipcMain.on("protocol-park-ack",(e,requestId,ok)=>{ if(!_fromMain(e)||typeof requestId!=="string")return; const done=_pendingParkAcks.get(requestId); if(done){ _pendingParkAcks.delete(requestId); done(!!ok); } });
-app.on("before-quit", ()=>{ try{ _killPersist(); }catch(_){} });
+app.on("before-quit", ()=>{ try{ _killPersist(); }catch(_){} try{for(const entry of _offlineUndoDeletes.values())offlineFeed.purgeItems(entry.items);_offlineUndoDeletes.clear();}catch(_){} });
 app.on("window-all-closed", ()=>{ if(process.platform!=="darwin") app.quit(); });
 
 /* ---------- IPC: main window controls ---------- */
@@ -1016,6 +989,9 @@ ipcMain.handle("open-path", async (e,p)=>{ if(!(_fromMain(e)||_fromPet(e))||type
 ipcMain.handle("store-load", (e)=>_fromMain(e)?readStore():null);
 ipcMain.handle("store-security", (e)=>_fromMain(e)?storeSecurity():"unknown");
 ipcMain.handle("store-save", (e,data)=>_fromMain(e)?writeStore(data):false);
+ipcMain.handle("idea-images-pick",async(e)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized",items:[]};try{return {ok:true,items:await _pickIdeaImages()};}catch(error){return {ok:false,error:String(error&&error.message||error),items:[]};}});
+ipcMain.handle("idea-images-import",async(e,items)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized",items:[]};try{const input=Array.isArray(items)?items.slice(0,20):[],stored=[];for(const item of input)stored.push(await _storeIdeaImage(item&&item.name,item&&item.type,item&&item.bytes));return {ok:true,items:stored};}catch(error){return {ok:false,error:String(error&&error.message||error),items:[]};}});
+ipcMain.handle("idea-image-copy",async(e,name)=>{if(!_fromMain(e))return false;try{return await _copyIdeaImage(name);}catch(_){return false;}});
 ipcMain.handle("link-check", (e,url)=>_fromMain(e)?checkLink(url):{status:"blocked",code:0,error:"unauthorized"});
 ipcMain.handle("offline-load",(e)=>_fromMain(e)?_offlineState():null);
 ipcMain.handle("offline-storage-open",async(e)=>{if(!_fromMain(e))return false;try{_prepareOfflineRoot(offlineFeed.root);return !(await shell.openPath(offlineFeed.root));}catch(_){return false;}});
@@ -1024,33 +1000,24 @@ ipcMain.handle("offline-storage-choose",async(e)=>{
   if(_captureSessions.size)return {ok:false,error:"Wait for the current offline save to finish"};
   try{const picked=await dialog.showOpenDialog(mainWin,{title:"Choose the SINRAD offline folder",defaultPath:offlineFeed.root,properties:["openDirectory","createDirectory"]});if(picked.canceled||!picked.filePaths[0])return {ok:false,canceled:true};const snapshot=await _switchOfflineRoot(picked.filePaths[0]);_offlineNotify();return {ok:true,snapshot:snapshot};}catch(error){return {ok:false,error:String(error&&error.message||error)};}
 });
-ipcMain.handle("offline-auth-status",(e)=>_fromMain(e)?_redditAuthStatus():{connected:false});
-ipcMain.handle("offline-reddit-connect",async(e,input)=>{
-  if(!_fromMain(e))return {ok:false,error:"unauthorized"};
-  try{
-    const clientId=String(input&&input.clientId||"").trim(),username=RedditSource.cleanUsername(input&&input.username);
-    const state=crypto.randomBytes(24).toString("hex");
-    _redditPendingAuth={clientId:clientId,username:username,state:state,createdAt:Date.now()};
-    const url=RedditSource.authorizationUrl(clientId,state,REDDIT_REDIRECT);
-    await shell.openExternal(url);
-    return {ok:true};
-  }catch(error){_redditPendingAuth=null;return {ok:false,error:String(error&&error.message||error)};}
-});
-ipcMain.handle("offline-reddit-disconnect",(e)=>{if(!_fromMain(e))return false;_writeRedditAuth(null);_offlineNotify();return true;});
+ipcMain.handle("offline-extension-status",(e)=>_fromMain(e)?_extensionStatus():{connected:false,method:"browser-extension"});
 ipcMain.handle("offline-source-add",(e,input)=>{
   if(!_fromMain(e))return {ok:false,error:"unauthorized"};
   try{
     if(!input||input.platform!=="reddit")throw new Error("That source is not available yet");
-    if(!_redditAuthStatus().connected)throw new Error("Connect Reddit first");
     const subreddit=RedditSource.cleanSubreddit(input.handle);
-    const source=offlineFeed.addSource(Object.assign({},input,{platform:"reddit",handle:subreddit,label:"r/"+subreddit}));
-    _offlineNotify();setTimeout(function(){_refreshOfflineFeed(source.id,true).catch(function(){});},20);
+    const source=offlineFeed.addSource(Object.assign({},input,{platform:"reddit",adapter:"extension",handle:subreddit,label:"r/"+subreddit,syncRequestedAt:Date.now()}));
+    _offlineNotify();
     return {ok:true,source:source};
   }catch(error){return {ok:false,error:String(error&&error.message||error)};}
 });
 ipcMain.handle("offline-source-remove",(e,id,deleteItems)=>{if(!_fromMain(e))return false;const ok=offlineFeed.removeSource(String(id||""),!!deleteItems);if(ok)_offlineNotify();return ok;});
-ipcMain.handle("offline-settings",(e,input)=>{if(!_fromMain(e))return null;try{offlineFeed.configure(input);const data=_offlineState();_offlineNotify();return data;}catch(_){return null;}});
-ipcMain.handle("offline-item-update",(e,id,patch)=>{if(!_fromMain(e))return null;const item=offlineFeed.updateItem(String(id||""),patch);if(item)_offlineNotify();return item;});
+ipcMain.handle("offline-source-update",(e,id,patch)=>{if(!_fromMain(e))return null;let source=offlineFeed.updateSource(String(id||""),patch);if(source&&patch&&Object.prototype.hasOwnProperty.call(patch,"limit"))source=offlineFeed.updateSource(source.id,{syncRequestedAt:Date.now(),lastError:""});if(source)_offlineNotify();return source;});
+ipcMain.handle("offline-settings",(e,input)=>{if(!_fromMain(e))return null;try{offlineFeed.configure(input);const cleaned=offlineFeed.prune();(cleaned.sourceIds||[]).forEach(function(id){offlineFeed.updateSource(id,{syncRequestedAt:Date.now(),lastError:""});});const data=_offlineState();_offlineNotify();return data;}catch(_){return null;}});
+ipcMain.handle("offline-item-update",(e,id,patch)=>{if(!_fromMain(e))return null;const prior=offlineFeed.snapshot().items.find(function(entry){return entry.id===String(id||"");}),item=offlineFeed.updateItem(String(id||""),patch);if(item&&item.sourceId&&prior&&((!prior.read&&item.read)||(!prior.favorite&&item.favorite)))offlineFeed.updateSource(item.sourceId,{syncRequestedAt:Date.now(),lastError:""});if(item)_offlineNotify();return item;});
+ipcMain.handle("offline-item-remove",(e,id)=>{if(!_fromMain(e))return {ok:false};const item=offlineFeed.snapshot().items.find(function(entry){return entry.id===String(id||"");}),taken=item?offlineFeed.takeItems([item.id]):[],undoToken=_stashOfflineDelete(taken);if(item&&item.sourceId&&!item.read&&!item.favorite)offlineFeed.updateSource(item.sourceId,{syncRequestedAt:Date.now(),lastError:""});if(taken.length)_offlineNotify();return {ok:!!taken.length,undoToken:undoToken};});
+ipcMain.handle("offline-history-clear",(e)=>{if(!_fromMain(e))return {ok:false};const taken=offlineFeed.takeHistory(),undoToken=_stashOfflineDelete(taken);if(taken.length)_offlineNotify();return {ok:true,removed:taken.length,undoToken:undoToken};});
+ipcMain.handle("offline-item-restore",(e,token)=>_fromMain(e)?_restoreOfflineDelete(token):{ok:false,error:"unauthorized"});
 ipcMain.handle("offline-refresh",async(e,sourceId)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await _refreshOfflineFeed(String(sourceId||""),true);}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
 ipcMain.handle("offline-media",async(e,ref)=>{
   if(!_fromMain(e))return "";
@@ -1237,7 +1204,7 @@ function _sitePreviewIdentity(raw,mode){
   const normalized=normalizeHttpUrl(raw);if(!normalized)return null;
   mode=mode==="icon"?"icon":"rich";
   let identity=normalized;if(mode==="icon"){try{identity=new URL(normalized).origin+"/";}catch(_){}}
-  return {url:normalized,mode:mode,key:crypto.createHash("sha256").update("site-preview-v1\0"+mode+"\0"+identity).digest("hex")};
+  return {url:normalized,mode:mode,key:crypto.createHash("sha256").update("site-preview-v4\0"+mode+"\0"+identity).digest("hex")};
 }
 async function _readSitePreviewCache(key){
   for(const ext of ["jpg","png"]){
@@ -1261,7 +1228,7 @@ async function _sitePreview(raw,mode){
       await fs.promises.writeFile(path.join(SITE_PREVIEW_DIR,id.key+"."+ext),bytes,{mode:0o600});
       if(++_sitePreviewWrites%30===1)pruneThumbnailCache(SITE_PREVIEW_DIR,SITE_PREVIEW_LIMITS).catch(function(){});
       return {data:"data:image/"+(ext==="png"?"png":"jpeg")+";base64,"+bytes.toString("base64"),kind:icon?"icon":"rich"};
-    }catch(_){_sitePreviewMisses.set(id.key,Date.now()+30*60*1000);return null;}
+    }catch(error){try{console.warn("[sinrad] site preview failed:",id.url,String(error&&error.message||error));}catch(_){}_sitePreviewMisses.set(id.key,Date.now()+30*60*1000);return null;}
   });
   _sitePreviewInflight.set(id.key,task);try{return await task;}finally{_sitePreviewInflight.delete(id.key);}
 }
