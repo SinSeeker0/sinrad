@@ -1,0 +1,96 @@
+/* Approved Timeline presentation. Geometry and actions remain owned by the deck. */
+.deck-view{--timeline-column-gap:12px;/* Original approved spacing: 7px. */background-color:#050505;background-image:radial-gradient(circle,#333 0.75px,transparent .9px);background-size:9px 9px;color:#eeece5}
+#content:has(>.deck-view){background:#050505!important}
+.deck-view .deck-workspace-head{position:relative;height:126px;margin:0 28px 24px;padding:12px 0 22px;border-bottom:2px solid #bdb8a8;background:transparent}
+.deck-view .deck-workspace-head:after{content:"";position:absolute;bottom:-5px;left:0;width:115px;height:7px;background:#f2cb8c;pointer-events:none}
+.deck-view .deck-workspace-head h1{font:italic 900 48px/1.1 Georgia,serif;letter-spacing:-2px;text-transform:uppercase;color:#eeece5}
+.deck-view .deck-workspace-head span{margin-top:12px;color:#b7b3a8;font:10px/1.4 "Segoe UI",sans-serif;letter-spacing:2px;text-transform:uppercase}
+.deck-view .deck-workspace{gap:var(--timeline-column-gap);padding:6px 0 0!important;border-left:28px solid transparent;background:transparent;scrollbar-color:#77746b #181817;scroll-snap-type:none;cursor:grab}
+.deck-view .deck-workspace.panning,.deck-view .deck-workspace.panning *{cursor:grabbing!important}.deck-view .deck-workspace.panning{scroll-snap-type:none;user-select:none}.deck-view .deck-lane{transition:transform .16s ease,filter .16s ease}.deck-view .deck-workspace.panning .deck-lane{transform:translateY(-2px);filter:brightness(1.035)}.deck-view .deck-workspace.pan-gliding .deck-lane{transition-duration:.28s}
+.deck-view .deck-workspace:not(.single-feed)::after{content:"";display:block;align-self:stretch;flex:0 0 clamp(150px,14vw,220px);min-width:150px;pointer-events:none}
+.deck-view .deck-workspace.single-feed{justify-content:center;padding-inline:28px!important;border-left:0}
+.deck-view .deck-lane>.deck-column{border:0;border-radius:12px 0 0 0;background:transparent;box-shadow:none}
+.deck-view .deck-column>header{height:48px;min-height:48px;margin-bottom:14px;padding:0 7px;border:1px solid #8d887b;border-bottom:3px solid #d6d0be;border-radius:12px 0 0 0;background:#101010;box-shadow:none}
+.deck-view .deck-column>header:after{display:none}
+.deck-view .deck-lane>.deck-column+.deck-column:before{display:none}
+.deck-view .deck-title{position:relative;font:italic bold 24px/1.15 Georgia,serif;color:#eeece5;transition:color .16s ease,transform .16s ease,text-shadow .16s ease}
+.deck-view .deck-title:after{content:"›";display:inline-block;margin-left:7px;color:#f2cb8c;font:normal 18px/1 Georgia,serif;opacity:0;transform:translateX(-7px);transition:opacity .16s ease,transform .16s ease}
+.deck-view .deck-title:hover,.deck-view .deck-title:focus-visible{color:#f7e2b7;transform:translateX(3px);text-shadow:0 0 12px #f2cb8c44;outline:0}.deck-view .deck-title:hover:after,.deck-view .deck-title:focus-visible:after{opacity:1;transform:translateX(0)}
+.deck-view .deck-grip{color:#938d7f;font-size:13px}
+.deck-view .deck-source{color:#f2cb8c;font-size:10px}
+.deck-view .deck-menu-button{background:transparent;color:#b7b3a8;border-radius:0}
+.deck-view .deck-column-scroll{background:transparent;border-radius:0;scrollbar-color:#77746b transparent}
+.deck-view .deck-column-scroll::-webkit-scrollbar-track,.deck-view .deck-column-scroll::-webkit-scrollbar-corner{background:transparent}
+.deck-view .deck-monitoring-posts,.deck-view .deck-rows,.deck-view .deck-notifications{gap:16px;display:flex;flex-direction:column}
+.deck-view .deck-monitor-post,.deck-view .deck-row,.deck-view .deck-notification,.deck-view .deck-column .misskey-note{position:relative;flex-shrink:0;margin:0 0 3px;border:1px solid #5f5d55;border-bottom:3px solid transparent;border-radius:0;background:#1c1c19;color:#eeece5;box-shadow:none}
+.deck-view .deck-monitor-post,.deck-view .deck-row,.deck-view .deck-notification,.deck-view .deck-column .misskey-note{content-visibility:auto;contain-intrinsic-size:auto 420px}
+.deck-view .deck-row,.deck-view .deck-notification{contain-intrinsic-size:auto 90px}
+.deck-view .deck-column .misskey-note{margin-bottom:18px}
+.deck-view .deck-monitor-post:after,.deck-view .deck-row:after,.deck-view .deck-notification:after,.deck-view .deck-column .misskey-note:after{content:"";position:absolute;left:0;right:0;bottom:-3px;height:6px;background:#b8af99;clip-path:polygon(0 50%,100% 0,100% 50%,0 100%);pointer-events:none}
+.deck-view .deck-monitor-post:hover,.deck-view .deck-row:hover,.deck-view .deck-notification:hover,.deck-view .deck-column .misskey-note:hover{background:#25251f}
+.deck-view .deck-monitor-copy{padding:18px 16px}
+.deck-view .deck-monitor-post b,.deck-view .deck-row b{font:italic bold 18px/1.2 Georgia,serif;color:#eeece5}
+.deck-view .deck-notification b{font:normal 15px/1.3 Georgia,serif;color:#eeece5}
+.deck-view .deck-notification{padding:18px 12px;grid-template-columns:26px minmax(0,1fr);gap:9px}
+.deck-view .deck-notification time{grid-column:2;color:#aaa597;font-size:8px}
+.deck-view .deck-notification>i{width:25px;height:25px;border-radius:0;background:#30291f;color:#f2cb8c}
+.deck-view .deck-notification.fresh{background:#25251f;box-shadow:none}
+.deck-view .deck-row{padding:20px 16px}
+.deck-view .deck-monitor-post small,.deck-view .deck-row small,.deck-view .deck-notification small{color:#b7b3a8;font-size:9px}
+.deck-view .deck-monitor-post p{color:#b7b3a8;font-size:11px;line-height:1.6}
+.deck-view .deck-column .misskey-note h2{font:italic bold 17px/1.25 Georgia,serif;color:#eeece5}
+.deck-view .deck-column .misskey-note p{font-size:11px}
+.deck-view .deck-column .of-card-copy{color:#b7b3a8}
+.deck-view .deck-monitor-gallery,.deck-view .deck-monitor-gallery .deck-monitor-media,.deck-view .deck-column .misskey-note .of-media{background:#101010;border-radius:0}
+.deck-view .deck-monitor-gallery .deck-monitor-media{max-height:min(54vh,500px);cursor:pointer}
+.deck-view .deck-column[data-deck-id="reddit"] .misskey-note .of-media{max-height:540px}
+.deck-view .deck-workspace>.deck-lane:only-child .deck-column[data-deck-id="reddit"] .misskey-note{min-height:300px}
+.deck-view .deck-workspace>.deck-lane:only-child .deck-column[data-deck-id="reddit"] .misskey-note:has(.of-media){min-height:min(680px,calc(100vh - 220px))}
+.deck-view .deck-workspace>.deck-lane:only-child .deck-column[data-deck-id="reddit"] .misskey-note .of-card-copy{min-height:inherit;display:flex;flex-direction:column}
+.deck-view .deck-workspace>.deck-lane:only-child .deck-column[data-deck-id="reddit"] .misskey-note .of-card-foot{margin-top:auto}
+.deck-view .deck-floating-add,.deck-view .deck-new-posts{background:#30291f;border-color:#8c795c;color:#f2cb8c}
+.deck-view .deck-column .deck-new-posts{top:54px}
+/* Timeline controls share the workspace's cream and gold treatment. */
+.deck-view .deck-column.deck-drop-before:before,.deck-view .deck-column.deck-drop-after:after{background:#f2cb8c;box-shadow:0 0 8px #f2cb8c55}
+body:has(.deck-view) #ctxmenu{min-width:180px;max-width:220px;padding:5px!important;border:1px solid #777164!important;border-bottom:3px solid #b8af99!important;border-radius:10px 0 10px 0!important;background:#191916!important;box-shadow:0 16px 40px #0009!important;backdrop-filter:none}
+body:has(.deck-view) #ctxmenu .ci{min-height:28px;padding:4px 7px;color:#eeece5;font:12px/1.25 Georgia,serif;border-radius:4px}
+body:has(.deck-view) #ctxmenu .ci-ico,body:has(.deck-view) #ctxmenu .ci:hover .ci-ico{color:#f2cb8c}
+body:has(.deck-view) #ctxmenu .ci:hover{background:#332e23!important;color:#f2cb8c!important;transform:none}
+body:has(.deck-view) #ctxmenu .cdiv{background:#5f584b}
+body:has(.deck-view) #ctxmenu .ci.danger{color:#e58c83}
+.deck-view .deck-context-menu,.deck-view .deck-local-settings,.deck-view .deck-source-menu{border:1px solid #777164;border-bottom:3px solid #b8af99;border-radius:10px 0 10px 0;background:#191916;color:#eeece5;box-shadow:0 16px 40px #0009}
+.deck-view .deck-context-menu{width:236px;padding:8px;background:#191916 radial-gradient(circle,#454135 .65px,transparent .8px) 0 0/9px 9px}
+.deck-view .deck-context-menu button{height:35px;padding:0 8px;border-radius:4px;color:#eeece5;font:italic bold 13px/1.25 Georgia,serif}
+.deck-view .deck-context-menu button span{color:#f2cb8c;font:normal 12px/1 "Segoe UI",sans-serif}
+.deck-view .deck-context-menu button:first-child{height:39px;margin-bottom:4px;border-bottom:1px solid #706653;border-radius:0;font-size:16px}
+.deck-view .deck-context-menu .deck-menu-label{padding:9px 8px 4px;color:#d0b989;font-size:8px;letter-spacing:1.7px}
+.deck-view .deck-context-menu button:disabled{opacity:.42}
+.deck-view .deck-context-menu button:hover:not(:disabled),.deck-view .deck-context-menu button:focus-visible,.deck-view .deck-source-menu button:hover,.deck-view .deck-source-menu button:focus-visible{background:#332e23;color:#f2cb8c;outline:1px solid #8c795c;outline-offset:-1px}
+.deck-view .deck-menu-label,.deck-view .deck-source-menu>small{color:#b7ab91;font:9px/1.4 "Segoe UI",sans-serif;letter-spacing:1.5px}
+.deck-view .deck-context-menu button.danger{border-top-color:#5f584b;color:#e58c83}
+.deck-view .deck-switch{background:#4a473e}.deck-view .deck-switch:after{background:#c1b9a6}.deck-view .deck-switch.on{background:#76603b}.deck-view .deck-switch.on:after{background:#f2cb8c}
+.deck-view .deck-local-settings{width:242px;padding:14px}
+.deck-view .deck-local-settings>b{margin-bottom:12px;color:#eeece5;font:italic bold 19px/1.2 Georgia,serif}
+.deck-view .deck-local-settings label{border-color:#777164;border-radius:5px;background:#0e0e0c}
+.deck-view .deck-local-settings label:focus-within{border-color:#f2cb8c;box-shadow:0 0 0 2px #f2cb8c18}
+.deck-view .deck-local-settings input{color:#f2cb8c;font:16px Georgia,serif;height:38px}
+.deck-view .deck-local-settings label span,.deck-view .deck-local-settings small{color:#b7b3a8}.deck-view .deck-local-settings small{font-size:10px;line-height:1.5}
+.deck-view .deck-source-menu button{color:#eeece5}.deck-view .deck-source-menu button.active{background:#332e23;color:#f2cb8c}
+.modal:has(.deck-add-modal){width:min(300px,calc(100vw - 32px));border:1px solid #777164;border-bottom:3px solid #b8af99;border-radius:12px 0 12px 0;background-color:#171714;background-image:radial-gradient(circle,#4a4639 .65px,transparent .8px);background-size:9px 9px;box-shadow:0 24px 70px #000b}
+#overlay .modal:has(.deck-add-modal){background:radial-gradient(circle,#4a4639 .65px,transparent .8px) 0 0/9px 9px,#171714!important;border-color:#777164!important;border-bottom:3px solid #b8af99!important;border-radius:12px 0 12px 0!important}
+#overlay:has(.deck-add-modal) .modal-h{display:none}
+#overlay:has(.deck-add-modal) .modal-h{padding:20px 18px 14px;margin:0 12px;border-bottom:2px solid #b8af99!important;color:#eeece5;font:italic bold 25px/1.1 Georgia,serif;letter-spacing:0;text-transform:none}
+#overlay:has(.deck-add-modal) .modal-b{padding:6px 16px 14px}
+.deck-add-modal .deck-add-group{padding:10px 4px;border-bottom:1px solid #5f584b}
+.deck-add-modal .deck-add-group:last-child{border-bottom:0}
+.deck-add-modal .deck-add-group>div{color:#d0b989;font:9px/1.4 "Segoe UI",sans-serif;letter-spacing:1.4px}
+.deck-add-modal .deck-add-group button{padding:7px 8px;color:#eeece5;font:italic bold 16px/1.2 Georgia,serif;border-radius:4px;background:transparent}
+.deck-add-modal .deck-add-group button:hover,.deck-add-modal .deck-add-group button:focus-visible{background:transparent;color:#f2cb8c;outline:none;text-decoration:underline;text-underline-offset:3px}
+@media(max-width:760px){.deck-view .deck-workspace-head{margin-inline:14px;height:102px}.deck-view .deck-workspace-head h1{font-size:36px}.deck-view .deck-workspace{gap:var(--timeline-column-gap)}}
+
+
+/* Cached columns restore their own scroll position; browser anchoring must not apply a second correction. */
+.deck-column-scroll{overflow-anchor:none}
+
+/* Monitoring cards keep real layout heights while their images virtualize separately. */
+.deck-view .deck-monitor-post{content-visibility:visible;contain-intrinsic-size:none}

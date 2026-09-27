@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "S.I.R Quick Save",
-  "version": "1.3.3",
+  "version": "1.3.5",
   "description": "Save links, park tabs and capture pages for S.I.R offline use",
   "permissions": [
     "activeTab",

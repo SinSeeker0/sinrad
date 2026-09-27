@@ -1,7 +1,8 @@
 // Sinrad — preload bridge (safe API surface for the renderer & the pet window)
-const { contextBridge, ipcRenderer } = require("electron");
+const { contextBridge, ipcRenderer, webUtils } = require("electron");
 
 contextBridge.exposeInMainWorld("electronAPI", {
+  onDisplayLayoutChanged: (cb) => ipcRenderer.on("display-layout-changed",()=>cb()),
   // window controls
   winMin:   () => ipcRenderer.send("win-min"),
   winMax:   () => ipcRenderer.send("win-max"),
@@ -14,8 +15,30 @@ contextBridge.exposeInMainWorld("electronAPI", {
   shellOpen: (url) => ipcRenderer.send("shell-open", url),
   openPath:  (p)   => ipcRenderer.invoke("open-path", p),
 
+  // video and folder compression
+  compressionDropPath: (file) => webUtils.getPathForFile(file),
+  compressionPick: (kind) => ipcRenderer.invoke("compression-pick", kind),
+  compressionAnalyze: (source, preset) => ipcRenderer.invoke("compression-analyze", source, preset),
+  compressionStart: (input) => ipcRenderer.invoke("compression-start", input),
+  compressionCancel: () => ipcRenderer.invoke("compression-cancel"),
+  compressionStatus: () => ipcRenderer.invoke("compression-status"),
+  compressionReveal: (target) => ipcRenderer.invoke("compression-reveal",target),
+  compressionZip: (id) => ipcRenderer.invoke("compression-zip",id),
+  compressionBatchInspect: (source) => ipcRenderer.invoke("compression-batch-inspect",source),
+  compressionBatchStart: (input) => ipcRenderer.invoke("compression-batch-start",input),
+  compressionCleanup: (id) => ipcRenderer.invoke("compression-cleanup",id),
+  compressionHistoryRemove: (id) => ipcRenderer.invoke("compression-history-remove",id),
+  compressionDestinationChoose: () => ipcRenderer.invoke("compression-destination-choose"),
+  compressionDestinationReset: () => ipcRenderer.invoke("compression-destination-reset"),
+  compressionDestinationOpen: () => ipcRenderer.invoke("compression-destination-open"),
+  onCompressionProgress: (cb) => ipcRenderer.on("compression-progress", (_, data) => cb(data)),
+
+  onStoreWriteError: (cb) => ipcRenderer.on("store-write-error",(_,message)=>cb(message)),
   // persistent on-disk store
   storeLoad: () => ipcRenderer.invoke("store-load"),
+  passwordImportPick: () => ipcRenderer.invoke("password-import-pick"),
+  passwordImportConfirm: () => ipcRenderer.invoke("password-import-confirm"),
+  passwordImportCancel: () => ipcRenderer.invoke("password-import-cancel"),
   storeSecurity: () => ipcRenderer.invoke("store-security"),
   storeSave: (data) => ipcRenderer.invoke("store-save", data),
   ideaImagesPick: () => ipcRenderer.invoke("idea-images-pick"),
@@ -59,11 +82,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
   onProtocolPark: (cb) => ipcRenderer.on("protocol-park", (_, data) => cb(data)),
   protocolParkAck: (requestId, ok) => ipcRenderer.send("protocol-park-ack", requestId, !!ok),
   setAutostart: (enabled) => ipcRenderer.invoke("set-autostart", enabled),
+  getAutostart: () => ipcRenderer.invoke("get-autostart"),
   extDir: () => ipcRenderer.invoke("ext-dir"),
   extOpen: () => ipcRenderer.invoke("ext-open"),
   mediaAssets: () => ipcRenderer.invoke("media-assets"),
   mediaOpen: (kind) => ipcRenderer.invoke("media-open", kind),
   showNotif: (data) => ipcRenderer.send("show-notif", data),
+  setCensorMode: (enabled) => ipcRenderer.send("censor-mode", !!enabled),
   dataPath: (cb) => ipcRenderer.on("data-path", (_, pp) => cb(pp)),
 
   // pet recent / pinned folders
@@ -87,6 +112,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
   offlineItemRemove: (id) => ipcRenderer.invoke("offline-item-remove", id),
   offlineHistoryClear: () => ipcRenderer.invoke("offline-history-clear"),
   offlineItemRestore: (token) => ipcRenderer.invoke("offline-item-restore", token),
+  offlineItemDownload: (id) => ipcRenderer.invoke("offline-item-download", id),
+  offlineMediaDownload: (ref) => ipcRenderer.invoke("offline-media-download", ref),
   offlineRefresh: (sourceId) => ipcRenderer.invoke("offline-refresh", sourceId || ""),
   offlineMedia: (ref) => ipcRenderer.invoke("offline-media", ref),
   offlineCaptureOpen: (ref) => ipcRenderer.invoke("offline-capture-open", ref),

@@ -3,20 +3,23 @@ const { app, BrowserWindow, ipcMain, shell, screen, safeStorage, protocol, net, 
 const path = require("path");
 const { pathToFileURL } = require("url");
 app.commandLine.appendSwitch("autoplay-policy","no-user-gesture-required");
+if(process.platform==="win32")app.commandLine.appendSwitch("high-dpi-support","1");
 const PROTOCOL="sinrad";
 const MONITOR_MEDIA_PROTOCOL="sinrad-monitor";
 const OFFLINE_MEDIA_PROTOCOL="sinrad-offline";
 const IDEA_MEDIA_PROTOCOL="sinrad-idea";
-protocol.registerSchemesAsPrivileged([{scheme:MONITOR_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}},{scheme:OFFLINE_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}},{scheme:IDEA_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
+protocol.registerSchemesAsPrivileged([{scheme:MONITOR_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}},{scheme:OFFLINE_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true,stream:true}},{scheme:IDEA_MEDIA_PROTOCOL,privileges:{standard:true,secure:true,supportFetchAPI:true,corsEnabled:true}}]);
 if(!app.isPackaged) app.setPath("userData",path.join(app.getPath("appData"),"Sinrad-Dev"));
 else app.setAsDefaultProtocolClient(PROTOCOL);
 // Keep the packaged identity stable so Windows preserves installed shortcuts
 // and pinned taskbar entries across updates. Development uses a separate ID.
 const PACKAGED_APP_ID="com.sinrad.desktop";
 const APP_ID=app.isPackaged?PACKAGED_APP_ID:PACKAGED_APP_ID+".dev";
+app.setName("SINRAD");
 app.setAppUserModelId(APP_ID);
 const fs = require("fs");
 const crypto = require("crypto");
+const { spawn, spawnSync } = require("child_process");
 const WINDOW_ICON = app.isPackaged
   ? path.join(process.resourcesPath, process.platform === "win32" ? "icon.ico" : "icon.png")
   : path.join(__dirname, process.platform === "win32" ? "icon.ico" : "icon.png");
@@ -28,6 +31,7 @@ const { checkLink } = require("./lib/link-health.js");
 const SitePreview = require("./lib/site-preview.js");
 const { OfflineFeedStore } = require("./lib/offline-feed.js");
 const RedditSource = require("./lib/reddit-source.js");
+const MediaCompression = require("./lib/media-compression.js");
 const { MonitoringStore, Sources: MonitoringSources, MonitoringDownloadQueue } = require("./lib/monitoring/index.js");
 let autoUpdater=null; try{ autoUpdater=require("electron-updater").autoUpdater; }catch(_e){ try{ console.error("[sinrad] electron-updater unavailable:", _e&&_e.message); }catch(_){} }
 
@@ -43,11 +47,12 @@ try{EXTENSION_VERSION=String(JSON.parse(fs.readFileSync(path.join(EXTENSION_SOUR
 const THUMBNAIL_DIR = path.join(DATA_DIR,"thumbnail-cache");
 const SITE_PREVIEW_DIR = path.join(DATA_DIR,"site-preview-cache");
 const LEGACY_OFFLINE_DIR = path.join(DATA_DIR,"offline-feed");
-const DEFAULT_OFFLINE_DIR = app.isPackaged ? path.join(app.getPath("documents"),"Sinrad Offline") : LEGACY_OFFLINE_DIR;
+const DEFAULT_OFFLINE_DIR = app.isPackaged ? path.join(app.getPath("documents"),"SINRAD Offline Storage") : LEGACY_OFFLINE_DIR;
 const OFFLINE_LOCATION_FILE = path.join(DATA_DIR,"offline-location.json");
 function _prepareOfflineRoot(root){const resolved=path.resolve(root);fs.mkdirSync(resolved,{recursive:true,mode:0o700});fs.mkdirSync(path.join(resolved,"media"),{recursive:true,mode:0o700});fs.mkdirSync(path.join(resolved,"captures"),{recursive:true,mode:0o700});return resolved;}
 function _initialOfflineRoot(){
   let chosen="";try{const saved=JSON.parse(fs.readFileSync(OFFLINE_LOCATION_FILE,"utf8"));if(saved&&typeof saved.path==="string"&&path.isAbsolute(saved.path))chosen=saved.path;}catch(_){}
+  if(app.isPackaged){chosen=require("./lib/offline-location.js").resolveOfflineLocation(chosen,app.getPath("documents"));try{fs.mkdirSync(DATA_DIR,{recursive:true});fs.writeFileSync(OFFLINE_LOCATION_FILE,JSON.stringify({path:chosen}));}catch(_){}}
   if(!chosen)chosen=DEFAULT_OFFLINE_DIR;
   try{
     const resolved=path.resolve(chosen);
@@ -61,6 +66,8 @@ const ANIMATION_DIR = path.join(DATA_DIR,"animations");
 const IDEA_MEDIA_DIR = path.join(DATA_DIR,"ideas","media");
 const IDEA_IMAGE_EXTENSIONS=new Set([".jpg",".jpeg",".png",".webp",".gif"]);
 const monitoringStore = new MonitoringStore(MONITORING_DIR,app.getPath("downloads"));
+function reportStoreFailure(error){console.error('[sinrad] background save failed:',error.message);if(mainWin&&!mainWin.isDestroyed())mainWin.webContents.send('store-write-error',error.message);}
+offlineFeed.enableAsyncWrites(reportStoreFailure);monitoringStore.enableAsyncWrites(reportStoreFailure);
 const THUMBNAIL_LIMITS={maxFiles:1500,maxBytes:256*1024*1024,maxAgeMs:45*24*60*60*1000};
 const SITE_PREVIEW_LIMITS={maxFiles:1600,maxBytes:320*1024*1024,maxAgeMs:45*24*60*60*1000};
 function loadExtensionBridgeKey(){
@@ -144,35 +151,54 @@ function migrateLegacyStore(){
 let _monitoringSyncPromise=null;
 const _pawchivePreviewCache=new Map();
 
+let _offlineNotifyRevision=0,_offlineNotifyTimer;
 function _offlineNotify(){
-  try{ if(mainWin&&!mainWin.isDestroyed()) mainWin.webContents.send("offline-feed-changed",_offlineState()); }catch(_){}
+  const revision=++_offlineNotifyRevision,snapshot=_offlineState(true);
+  try{ if(mainWin&&!mainWin.isDestroyed()) mainWin.webContents.send("offline-feed-changed",snapshot); }catch(_){}
+  clearTimeout(_offlineNotifyTimer);_offlineNotifyTimer=setTimeout(async function(){
+    try{const fresh=offlineFeed.snapshot(),storage=await _offlineStorageSummaryAsync(fresh);if(revision!==_offlineNotifyRevision||JSON.stringify(snapshot.storage)===JSON.stringify(storage))return;const next=_offlineState(true);next.storage=storage;if(mainWin&&!mainWin.isDestroyed())mainWin.webContents.send("offline-feed-changed",next);}catch(_){}
+  },500);
 }
 let _offlineStorageCache={key:"",value:{bytes:0,files:0,captures:0,media:0}};
 function _offlineStorageSummary(snapshot){
   const refs=new Set(),captures=new Set();
   function media(ref){if(ref)refs.add(String(ref));}
   (snapshot.items||[]).forEach(function(item){(item.media||[]).forEach(media);media(item.authorAvatar);(item.comments||[]).forEach(function(comment){media(comment.avatar);(comment.media||[]).forEach(media);});if(item.captureRef)captures.add(String(item.captureRef));});
-  const key=offlineFeed.root+"|"+snapshot.updatedAt+"|"+Array.from(refs).sort().join(",")+"|"+Array.from(captures).sort().join(",");if(_offlineStorageCache.key===key)return _offlineStorageCache.value;
+  const key=offlineFeed.root+"|"+Array.from(refs).sort().join(",")+"|"+Array.from(captures).sort().join(",");if(_offlineStorageCache.key===key)return _offlineStorageCache.value;
   let bytes=0,files=0;refs.forEach(function(ref){try{const target=offlineFeed.resolveMedia(ref),stat=target&&fs.statSync(target);if(stat&&stat.isFile()){bytes+=stat.size;files++;}}catch(_){}});captures.forEach(function(ref){try{const target=offlineFeed.resolveCapture(ref),stat=target&&fs.statSync(target);if(stat&&stat.isFile()){bytes+=stat.size;files++;}}catch(_){}});
   const value={bytes:bytes,files:files,captures:captures.size,media:refs.size};_offlineStorageCache={key:key,value:value};return value;
 }
-function _offlineState(){const snapshot=offlineFeed.snapshot();snapshot.storagePath=offlineFeed.root;snapshot.storage=_offlineStorageSummary(snapshot);const queued=snapshot.sources.filter(function(source){return source.syncRequestedAt>source.lastSync;}).map(function(source){return source.id;});snapshot.sync={active:_offlineActiveJobs.size>0,queued:queued.length>0,activeSourceIds:Array.from(_offlineActiveJobs.keys()),queuedSourceIds:queued};return snapshot;}
+async function _offlineStorageSummaryAsync(snapshot){
+  const refs=new Set(),captures=new Set();function media(ref){if(ref)refs.add(String(ref));}
+  (snapshot.items||[]).forEach(function(item){(item.media||[]).forEach(media);media(item.authorAvatar);(item.comments||[]).forEach(function(comment){media(comment.avatar);(comment.media||[]).forEach(media);});if(item.captureRef)captures.add(String(item.captureRef));});
+  const key=offlineFeed.root+"|"+Array.from(refs).sort().join(",")+"|"+Array.from(captures).sort().join(",");if(_offlineStorageCache.key===key)return _offlineStorageCache.value;
+  let bytes=0,files=0;const inspect=async function(ref,kind){try{const target=kind==="capture"?offlineFeed.resolveCapture(ref):offlineFeed.resolveMedia(ref),stat=target&&await fs.promises.stat(target);if(stat&&stat.isFile()){bytes+=stat.size;files++;}}catch(_){}};
+  const jobs=Array.from(refs).map(ref=>[ref,"media"]).concat(Array.from(captures).map(ref=>[ref,"capture"]));let cursor=0;await Promise.all(Array.from({length:Math.min(8,jobs.length)},async()=>{while(cursor<jobs.length){const job=jobs[cursor++];await inspect(job[0],job[1]);}}));
+  const value={bytes:bytes,files:files,captures:captures.size,media:refs.size};_offlineStorageCache={key:key,value:value};return value;
+}
+function _offlineState(fast){const snapshot=offlineFeed.snapshot();snapshot.storagePath=offlineFeed.root;snapshot.storage=fast?_offlineStorageCache.value:_offlineStorageSummary(snapshot);const queued=snapshot.sources.filter(function(source){return source.syncRequestedAt>source.lastSync;}).map(function(source){return source.id;});snapshot.sync={active:_offlineActiveJobs.size>0,queued:queued.length>0,activeSourceIds:Array.from(_offlineActiveJobs.keys()),queuedSourceIds:queued};return snapshot;}
 async function _switchOfflineRoot(value){
   const target=path.resolve(String(value||"")),current=path.resolve(offlineFeed.root),root=path.parse(target).root;
   if(!value||!path.isAbsolute(String(value))||target===root)throw new Error("Choose a normal folder, not a drive root");
   if(target===current)return _offlineState();
-  if(target.startsWith(current+path.sep)||current.startsWith(target+path.sep))throw new Error("Choose a separate folder outside the current offline library");
-  if(fs.existsSync(target)&&fs.lstatSync(target).isSymbolicLink())throw new Error("Linked folders cannot be used for offline storage");
+  if(target.startsWith(current+path.sep)||current.startsWith(target+path.sep))throw new Error("Choose a separate folder outside the current Clipping library");
+  if(fs.existsSync(target)&&fs.lstatSync(target).isSymbolicLink())throw new Error("Linked folders cannot be used for Clipping storage");
+  await offlineFeed.flush();
   _prepareOfflineRoot(target);
   if(!fs.existsSync(path.join(target,"feed.json"))&&fs.existsSync(path.join(current,"feed.json")))await fs.promises.cp(current,target,{recursive:true,force:false,errorOnExist:false});
-  const next=new OfflineFeedStore(target);next.load();next.prune();offlineFeed=next;
+  const next=new OfflineFeedStore(target);next.load();next.enableAsyncWrites(reportStoreFailure);next.prune();offlineFeed=next;
   fs.mkdirSync(DATA_DIR,{recursive:true,mode:0o700});fs.writeFileSync(OFFLINE_LOCATION_FILE,JSON.stringify({path:target}),{encoding:"utf8",mode:0o600});
   return _offlineState();
 }
 
 async function _fetchWithTimeout(url,options,timeoutMs){
   const controller=new AbortController(),timer=setTimeout(function(){controller.abort();},timeoutMs||20000);
-  try{return await fetch(url,Object.assign({},options||{},{signal:controller.signal}));}finally{clearTimeout(timer);}
+  try{return await fetch(url,Object.assign({},options||{},{signal:controller.signal}));}catch(error){if(controller.signal.aborted)throw new Error("The request timed out");throw error;}finally{clearTimeout(timer);}
+}
+
+async function _netFetchWithTimeout(url,options,timeoutMs){
+  const controller=new AbortController(),timer=setTimeout(function(){controller.abort();},timeoutMs||20000);
+  try{return await net.fetch(url,Object.assign({},options||{},{signal:controller.signal}));}catch(error){if(controller.signal.aborted)throw new Error("The request timed out");throw error;}finally{clearTimeout(timer);}
 }
 
 
@@ -271,13 +297,27 @@ async function _monitorJson(url){
   const raw=await _responseTextLimited(response,8*1024*1024);try{return JSON.parse(raw);}catch(_){throw new Error("Pawchive returned invalid data");}
 }
 
+async function _monitorPawchivePage(url){
+  let lastError;
+  for(let attempt=0;attempt<2;attempt++){
+    try{
+      const response=await _netFetchWithTimeout(url,{headers:_monitorHeaders("html"),redirect:"follow"},30000);
+      if(!response.ok)throw new Error("Pawchive post failed (HTTP "+response.status+")");
+      const finalHost=new URL(response.url||url).hostname.toLowerCase();if(finalHost!=="pawchive.pw")throw new Error("Pawchive redirected somewhere unexpected");
+      return await _responseTextLimited(response,8*1024*1024);
+    }catch(error){lastError=error;if(attempt===0)await new Promise(function(resolve){setTimeout(resolve,350);});}
+  }
+  throw lastError||new Error("Could not load that Pawchive post");
+}
+
+function _pawchiveCreatorPage(target,offset){const base="https://pawchive.pw/"+encodeURIComponent(target.service)+"/user/"+encodeURIComponent(target.creatorId),number=Math.max(0,Number(offset)||0);return number?base+"?o="+number:base;}
+
+async function _pawchivePostsPage(target,offset){const html=await _monitorPawchivePage(_pawchiveCreatorPage(target,offset));return {html:html,items:MonitoringSources.parsePawchivePostsHtml(html,target,Date.now())};}
+
 async function _syncPawchiveMonitor(monitor){
-  const target=monitor.target,base="https://pawchive.pw/api/v1/"+encodeURIComponent(target.service)+"/user/"+encodeURIComponent(target.creatorId);
-  const results=await Promise.allSettled([_monitorJson(base),_monitorJson(base+"/profile")]);
-  if(results[0].status!=="fulfilled")throw results[0].reason;
-  const profile=results[1].status==="fulfilled"?results[1].value:null;
+  const target=monitor.target,page=await _pawchivePostsPage(target,0);
   const mediaBase="https://pawchive.pw/",service=encodeURIComponent(target.service),creator=encodeURIComponent(target.creatorId);
-  return {items:MonitoringSources.parsePawchivePosts(results[0].value,target,Date.now()),label:String(profile&&profile.name||monitor.label||target.key).slice(0,180),avatarUrl:mediaBase+"icons/"+service+"/"+creator,bannerUrl:mediaBase+"banners/"+service+"/"+creator};
+  return {items:page.items,label:String(MonitoringSources.pawchiveCreatorNameHtml(page.html)||monitor.label||target.key).slice(0,180),avatarUrl:mediaBase+"icons/"+service+"/"+creator,bannerUrl:mediaBase+"banners/"+service+"/"+creator};
 }
 
 function _pawchiveMonitorContext(monitorId){
@@ -287,13 +327,10 @@ function _pawchiveMonitorContext(monitorId){
 }
 
 async function _pawchiveAllPosts(monitor){
-  const target=monitor.target,base="https://pawchive.pw/api/v1/"+encodeURIComponent(target.service)+"/user/"+encodeURIComponent(target.creatorId),posts=[],seen=new Set();
-  for(let page=0;page<200;page+=4){
-    const pages=await Promise.all([0,1,2,3].filter(function(step){return page+step<200;}).map(function(step){return _monitorJson(base+"?o="+((page+step)*50));}));
-    let complete=false;pages.forEach(function(payload){const batch=MonitoringSources.parsePawchivePosts(payload,target,Date.now());batch.forEach(function(item){if(!seen.has(item.key)){seen.add(item.key);posts.push(item);}});if(batch.length<50)complete=true;});
-    if(complete)return posts.sort(function(a,b){return b.date-a.date||String(b.key).localeCompare(String(a.key));});
-  }
-  throw new Error("This artist has more than 10,000 posts; SINRAD stopped at its safety limit");
+  const target=monitor.target,first=await _pawchivePostsPage(target,0),total=MonitoringSources.pawchivePostCountHtml(first.html)||first.items.length;if(total>10000)throw new Error("This artist has more than 10,000 posts; SINRAD stopped at its safety limit");
+  const pages=[first],offsets=[];for(let offset=50;offset<total;offset+=50)offsets.push(offset);
+  for(let index=0;index<offsets.length;index+=4)pages.push.apply(pages,await Promise.all(offsets.slice(index,index+4).map(function(offset){return _pawchivePostsPage(target,offset);})));const seen=new Set(),posts=[];
+  pages.forEach(function(page){page.items.forEach(function(item){if(!seen.has(item.key)){seen.add(item.key);posts.push(item);}});});return posts.sort(function(a,b){return b.date-a.date||String(b.key).localeCompare(String(a.key));});
 }
 
 async function _pawchiveArtistDetail(monitorId){
@@ -353,13 +390,14 @@ async function _syncF95Monitor(monitor){
   return {items:items,label:MonitoringSources.f95Title(html,monitor.label)};
 }
 
+let censorModeEnabled=false;
 function _showMonitoringNotification(events){
-  if(!events.length||!monitoringStore.snapshot().settings.notifications)return;
+  if(censorModeEnabled||!events.length||!monitoringStore.snapshot().settings.notifications)return;
   try{
     const NotificationClass=require("electron").Notification;if(!NotificationClass.isSupported())return;
     const first=events[0],title=events.length===1?"New monitored update":events.length+" monitored updates";
     const body=events.length===1?first.title:(first.title+" and "+(events.length-1)+" more");
-    const notification=new NotificationClass({title:title,body:String(body||"").slice(0,500),silent:true});
+    const notification=new NotificationClass({title:title,body:String(body||"").slice(0,500),silent:true,icon:WINDOW_ICON});
     notification.on("click",function(){try{if(mainWin&&!mainWin.isDestroyed()){if(mainWin.isMinimized())mainWin.restore();mainWin.show();mainWin.focus();mainWin.webContents.send("monitoring-open-event",first.id);}}catch(_){}});
     notification.show();
   }catch(error){try{console.error("[sinrad] monitoring notification:",error.message);}catch(_){}}
@@ -368,6 +406,7 @@ function _showMonitoringNotification(events){
 async function _syncOneMonitor(monitor){
   const result=monitor.kind==="f95"?await _syncF95Monitor(monitor):await _syncPawchiveMonitor(monitor);
   const items=result.items||[],newest=items[0],now=Date.now();
+  if(monitor.kind==="pawchive")monitoringStore.refreshEventMediaPaths(monitor.id,items);
   let avatarRef=monitor.avatarRef||"",bannerRef=monitor.bannerRef||"";
   if(monitor.kind==="pawchive"&&(!avatarRef||!bannerRef)){
     const cached=await Promise.all([avatarRef?Promise.resolve(avatarRef):_cacheMonitoringImage(result.avatarUrl,monitor.key,"avatar"),bannerRef?Promise.resolve(bannerRef):_cacheMonitoringImage(result.bannerUrl,monitor.key,"banner")]);
@@ -378,6 +417,15 @@ async function _syncOneMonitor(monitor){
     const history=items.slice(0,24).reverse().map(function(item){return Object.assign({},item,{kind:monitor.kind,discoveredAt:now,read:true,meta:Object.assign({},item.meta||{},{baseline:true})});});
     for(let index=0;index<history.length;index+=3){await Promise.all(history.slice(index,index+3).map(async function(item){if(item.mediaUrl)item.mediaRef=await _cacheMonitoringImage(item.mediaUrl,item.key,"preview");delete item.mediaUrl;}));}
     monitoringStore.mergeEvents(monitor.id,history);gallerySeeded=true;
+  }
+  if(monitor.kind==="pawchive"){
+    const events=monitoringStore.snapshot().events.filter(entry=>entry.monitorId===monitor.id),known=new Set(events.map(entry=>entry.key)),active=events.filter(entry=>!entry.readAt||now-entry.readAt<3600000);let needed=Math.max(0,24-active.length),candidates=items.slice();
+    for(let page=0;needed>0&&page<20;page++){
+      if(page)candidates=(await _pawchivePostsPage(monitor.target,page*50)).items;
+      const replacements=candidates.filter(entry=>!known.has(entry.key)&&(!monitor.initialized||entry.date<=monitor.lastSeenAt)).slice(0,needed);
+      for(const entry of replacements){known.add(entry.key);if(entry.mediaUrl)entry.mediaRef=await _cacheMonitoringImage(entry.mediaUrl,entry.key,"preview");delete entry.mediaUrl;}
+      monitoringStore.mergeEvents(monitor.id,replacements);needed-=replacements.length;if(candidates.length<50)break;
+    }
   }
   const monitorPatch={lastChecked:now,lastError:"",label:result.label||monitor.label,avatarRef:avatarRef,bannerRef:bannerRef,gallerySeeded:gallerySeeded};
   if(!newest){monitoringStore.updateMonitor(monitor.id,monitorPatch);return {added:0,baseline:false};}
@@ -398,7 +446,9 @@ async function _refreshMonitoring(monitorId,force){
     const snapshot=monitoringStore.snapshot(),now=Date.now();let checked=0,added=0,baselined=0,lastError="";
     const monitors=snapshot.monitors.filter(function(item){return item.enabled&&(!monitorId||item.id===monitorId);});
     for(const monitor of monitors){
-      if(!force&&!monitorId&&monitor.lastChecked&&now-monitor.lastChecked<monitor.intervalMinutes*60000)continue;
+      const needsRefill=monitor.kind==="pawchive"&&snapshot.events.filter(item=>item.monitorId===monitor.id&&(!item.readAt||now-item.readAt<3600000)).length<24;
+      const needsMediaBackfill=monitor.kind==="pawchive"&&snapshot.events.filter(item=>item.monitorId===monitor.id).slice(0,50).some(item=>item.mediaRef&&!(item.meta&&item.meta.mediaPath));
+      if(!force&&!monitorId&&!needsRefill&&!needsMediaBackfill&&monitor.lastChecked&&now-monitor.lastChecked<monitor.intervalMinutes*60000)continue;
       try{const result=await _syncOneMonitor(monitor);checked++;added+=result.added;if(result.baseline)baselined++;}
       catch(error){lastError=String(error&&error.message||error);monitoringStore.updateMonitor(monitor.id,{lastChecked:Date.now(),lastError:lastError});}
     }
@@ -417,12 +467,14 @@ function _pawchiveEventContext(eventId){
 
 async function _pawchivePostDetailForMonitor(monitor,postId,withPreviews){
   const target=monitor.target,id=String(postId||"");if(!id||id.length>120)throw new Error("That Pawchive post ID is invalid");
-  const url="https://pawchive.pw/api/v1/"+encodeURIComponent(target.service)+"/user/"+encodeURIComponent(target.creatorId)+"/post/"+encodeURIComponent(id);
-  const detail=MonitoringSources.parsePawchiveDetail(await _monitorJson(url));
+  const pageUrl=MonitoringSources.pawchivePostUrl(target,id);
+  const detail=MonitoringSources.parsePawchiveDetailHtml(await _monitorPawchivePage(pageUrl));
   detail.monitorId=monitor.id;detail.postId=id;detail.creator=monitor.label;detail.originalUrl=MonitoringSources.pawchivePostUrl(target,id);
   detail.files=await Promise.all(detail.files.map(async function(file){
-    const preview=withPreviews!==false&&file.kind==="image"?await _pawchiveImagePreview(file):"";
-    return Object.assign({},file,{src:preview||(file.kind==="video"||file.kind==="audio"?MONITOR_MEDIA_PROTOCOL+"://file"+file.path:"")});
+    const animated=file.kind==="image"&&/\.gif$/i.test(String(file.name||file.path||""));
+    const preview=withPreviews!==false&&file.kind==="image"&&!animated?MONITOR_MEDIA_PROTOCOL+"://thumb"+file.path:"";
+    const original=file.kind==="video"?MonitoringSources.pawchiveFileUrl(file):((file.kind==="audio"||animated)?MONITOR_MEDIA_PROTOCOL+"://file"+file.path:"");
+    return Object.assign({},file,{src:preview||original});
   }));
   return detail;
 }
@@ -444,10 +496,14 @@ async function _availableDownloadPath(folder,name){
   return target;
 }
 
+function _trustedPawchiveMediaUrl(value){
+  try{const host=new URL(String(value||"")).hostname.toLowerCase();return host==="file.pawchive.pw"||host.endsWith(".file.pawchive.pw")||host==="img.pawchive.pw"||host.endsWith(".img.pawchive.pw");}catch(_){return false;}
+}
+
 async function _writePawchiveDownload(file,destination){
   const remote=MonitoringSources.pawchiveFileUrl(file);if(!remote)throw new Error("That Pawchive file path is invalid");
   const response=await _fetchWithTimeout(remote,{headers:{"Accept":"*/*","User-Agent":"Sinrad/"+app.getVersion()+" monitor-download"},redirect:"follow"},120000);
-  if(!response.ok||new URL(response.url||remote).hostname.toLowerCase()!=="file.pawchive.pw")throw new Error("Pawchive download failed (HTTP "+response.status+")");
+  if(!response.ok||!_trustedPawchiveMediaUrl(response.url||remote))throw new Error("Pawchive download failed (HTTP "+response.status+")");
   const declared=Number(response.headers.get("content-length")||0);if(declared>4*1024*1024*1024)throw new Error("That file is larger than 4 GB");
   const temp=destination+".sinrad-part-"+crypto.randomBytes(6).toString("hex"),stream=fs.createWriteStream(temp,{flags:"wx",mode:0o600});let total=0;
   try{
@@ -463,52 +519,46 @@ async function _writePawchiveDownload(file,destination){
 }
 
 async function _monitoringOutputFolder(){
-  const folder=path.resolve(monitoringStore.snapshot().settings.downloadFolder||app.getPath("downloads"));await fs.promises.mkdir(folder,{recursive:true,mode:0o700});return folder;
-}
-
-function _postDownloadFolder(root,detail,index,artistName){
-  const artist=path.join(root,_safeDownloadName(artistName||detail.creator||"Pawchive artist",0)),stamp=new Date(detail.date||Date.now()).toISOString().slice(0,10);
-  return path.join(artist,_safeDownloadName(stamp+" - "+(detail.title||"Untitled post")+" - "+(detail.postId||"post"),index||0));
+  const folder=path.resolve(app.getPath("downloads"));await fs.promises.mkdir(folder,{recursive:true,mode:0o700});return folder;
 }
 
 async function _downloadDetailFiles(detail,report){
   if(!detail.files.length)throw new Error("This post has no downloadable attachments");
-  const postFolder=_postDownloadFolder(await _monitoringOutputFolder(),detail,0);await fs.promises.mkdir(postFolder,{recursive:true,mode:0o700});let bytes=0;if(report)report({label:detail.creator+" · "+detail.title,total:detail.files.length,done:0,files:0});
-  for(let index=0;index<detail.files.length;index++){const file=detail.files[index],target=await _availableDownloadPath(postFolder,_safeDownloadName(file.name,index));bytes+=await _writePawchiveDownload(file,target);if(report)report({done:index+1,files:index+1});}
-  return {ok:true,count:detail.files.length,bytes:bytes,folder:postFolder};
+  const folder=await _monitoringOutputFolder();let bytes=0;if(report)report({label:detail.creator+" · "+detail.title,total:detail.files.length,done:0,files:0});
+  for(let index=0;index<detail.files.length;index++){const file=detail.files[index],target=await _availableDownloadPath(folder,_safeDownloadName(file.name,index));bytes+=await _writePawchiveDownload(file,target);if(report)report({done:index+1,files:index+1});}
+  return {ok:true,count:detail.files.length,bytes:bytes,folder:folder};
 }
 
 async function _downloadPawchiveFile(eventId,fileIndex,report){
   const detail=await _pawchivePostDetail(eventId,false),index=Number(fileIndex),file=detail.files[index];if(!file)throw new Error("That attachment was not found");
-  const picked=await dialog.showSaveDialog(mainWin,{title:"Save Pawchive attachment",defaultPath:path.join(await _monitoringOutputFolder(),_safeDownloadName(file.name,index))});if(picked.canceled||!picked.filePath)return {ok:false,canceled:true};
-  if(report)report({label:file.name,total:1,done:0,files:0});const bytes=await _writePawchiveDownload(file,picked.filePath);if(report)report({done:1,files:1});return {ok:true,count:1,bytes:bytes};
+  const target=await _availableDownloadPath(await _monitoringOutputFolder(),_safeDownloadName(file.name,index));
+  if(report)report({label:file.name,total:1,done:0,files:0});const bytes=await _writePawchiveDownload(file,target);if(report)report({done:1,files:1});return {ok:true,count:1,bytes:bytes,file:target};
 }
 
 async function _downloadAllPawchiveFiles(eventId,report){return _downloadDetailFiles(await _pawchivePostDetail(eventId,false),report);}
 
 async function _downloadArtistPostFile(monitorId,postId,fileIndex,report){
   const detail=await _pawchiveArtistPostDetail(monitorId,postId,false),index=Number(fileIndex),file=detail.files[index];if(!file)throw new Error("That attachment was not found");
-  const picked=await dialog.showSaveDialog(mainWin,{title:"Save Pawchive attachment",defaultPath:path.join(await _monitoringOutputFolder(),_safeDownloadName(file.name,index))});if(picked.canceled||!picked.filePath)return {ok:false,canceled:true};
-  if(report)report({label:file.name,total:1,done:0,files:0});const bytes=await _writePawchiveDownload(file,picked.filePath);if(report)report({done:1,files:1});return {ok:true,count:1,bytes:bytes};
+  const target=await _availableDownloadPath(await _monitoringOutputFolder(),_safeDownloadName(file.name,index));
+  if(report)report({label:file.name,total:1,done:0,files:0});const bytes=await _writePawchiveDownload(file,target);if(report)report({done:1,files:1});return {ok:true,count:1,bytes:bytes,file:target};
 }
 
 async function _downloadArtistPostFiles(monitorId,postId,report){return _downloadDetailFiles(await _pawchiveArtistPostDetail(monitorId,postId,false),report);}
 
 async function _downloadPawchiveArtist(monitorId,fromDate,toDate,report){
   const monitor=_pawchiveMonitorContext(monitorId),allPosts=await _pawchiveAllPosts(monitor),posts=fromDate||toDate?MonitoringSources.filterPostsByDate(allPosts,fromDate,toDate):allPosts;if(!posts.length)throw new Error("No works were found in that date range");
-  const outputRoot=await _monitoringOutputFolder(),artistFolder=path.join(outputRoot,_safeDownloadName(monitor.label||"Pawchive artist",0));await fs.promises.mkdir(artistFolder,{recursive:true,mode:0o700});
+  const outputRoot=await _monitoringOutputFolder();
   let bytes=0,count=0,postCount=0,failed=0;
   const progress=function(done){if(report)report({label:monitor.label,total:posts.length,done:done,files:count,failed:failed});};progress(0);
   for(let postIndex=0;postIndex<posts.length;postIndex++){
     const post=posts[postIndex];try{
       const detail=await _pawchivePostDetailForMonitor(monitor,post.meta.postId,false);if(!detail.files.length)continue;
-      const postFolder=_postDownloadFolder(outputRoot,detail,postIndex,monitor.label);await fs.promises.mkdir(postFolder,{recursive:true,mode:0o700});
-      for(let fileIndex=0;fileIndex<detail.files.length;fileIndex++){const file=detail.files[fileIndex],target=await _availableDownloadPath(postFolder,_safeDownloadName(file.name,fileIndex));bytes+=await _writePawchiveDownload(file,target);count++;}
+      for(let fileIndex=0;fileIndex<detail.files.length;fileIndex++){const file=detail.files[fileIndex],target=await _availableDownloadPath(outputRoot,_safeDownloadName(file.name,fileIndex));bytes+=await _writePawchiveDownload(file,target);count++;}
       postCount++;
     }catch(_){failed++;}if(postIndex%5===0||postIndex===posts.length-1)progress(postIndex+1);
   }
   if(!count&&failed)throw new Error("No files could be downloaded");
-  return {ok:true,count:count,postCount:postCount,failed:failed,bytes:bytes,folder:artistFolder};
+  return {ok:true,count:count,postCount:postCount,failed:failed,bytes:bytes,folder:outputRoot};
 }
 
 function _openOfflineCapture(ref){
@@ -523,10 +573,19 @@ function _openOfflineCapture(ref){
 function _installMonitorMediaProtocol(){
   protocol.handle(MONITOR_MEDIA_PROTOCOL,async function(request){
     try{
-      const parsed=new URL(request.url);if(parsed.hostname!=="file"&&parsed.hostname!=="thumb")return new Response("Not found",{status:404});
+      const parsed=new URL(request.url);
+      if(parsed.hostname==="cache"){
+        const name=decodeURIComponent(parsed.pathname).replace(/^\/+/,"");if(!/^[a-f0-9]{64}\.(?:jpg|jpeg|png|webp|gif)$/i.test(name))return new Response("Not found",{status:404});
+        const target=monitoringStore.resolveMedia("media/"+name);if(!target)return new Response("Not found",{status:404});
+        const stat=await fs.promises.stat(target);if(!stat.isFile()||stat.size<1||stat.size>8*1024*1024)return new Response("Not found",{status:404});
+        const bytes=await fs.promises.readFile(target),headers={"Cache-Control":"private, max-age=3600","Content-Length":String(bytes.length),"Content-Type":_offlineMediaMime(path.extname(target).toLowerCase())};
+        return new Response(request.method==="HEAD"?null:bytes,{status:200,headers:headers});
+      }
+      if(parsed.hostname!=="file"&&parsed.hostname!=="thumb")return new Response("Not found",{status:404});
       const remote=parsed.hostname==="thumb"?MonitoringSources.pawchiveThumbnailUrl({path:parsed.pathname}):MonitoringSources.pawchiveFileUrl(parsed.pathname);if(!remote)return new Response("Not found",{status:404});
-      const headers={"Accept":"*/*","User-Agent":"Sinrad/"+app.getVersion()+" monitor-viewer"},range=request.headers.get("range");if(range)headers.Range=range;
-      const response=await net.fetch(remote,{headers:headers,redirect:"error"});return response;
+      const headers={"Accept":"*/*","Accept-Encoding":"identity","User-Agent":"Sinrad/"+app.getVersion()+" monitor-viewer"},range=request.headers.get("range");if(range)headers.Range=range;
+      const response=await net.fetch(remote,{headers:headers,redirect:"follow"});if(!response.ok||!_trustedPawchiveMediaUrl(response.url||remote))return new Response("Media unavailable",{status:502});
+      const responseHeaders=new Headers(response.headers),mediaType=_offlineMediaMime(path.extname(parsed.pathname).toLowerCase());if(mediaType!=="application/octet-stream")responseHeaders.set("Content-Type",mediaType);responseHeaders.delete("Content-Disposition");responseHeaders.set("Cache-Control","private, max-age=3600");return new Response(response.body,{status:response.status,statusText:response.statusText,headers:responseHeaders});
     }catch(_){return new Response("Media unavailable",{status:502});}
   });
 }
@@ -608,7 +667,7 @@ function syncBrowserExtension(){
 let mainWin = null;
 const monitoringDownloads=new MonitoringDownloadQueue({
   onUpdate:function(progress){try{if(mainWin&&!mainWin.isDestroyed())mainWin.webContents.send("monitoring-download-progress",progress);}catch(_){}},
-  onComplete:function(progress,result,error){try{const NotificationClass=require("electron").Notification;if(!NotificationClass.isSupported())return;const failed=progress.status==="failed",body=failed?String(error&&error.message||"The download could not finish").slice(0,400):(String(result&&result.count||progress.files||0)+" item"+(Number(result&&result.count||progress.files||0)===1?"":"s")+" saved to Monitoring downloads");new NotificationClass({title:failed?"Monitoring download failed":"Monitoring download complete",body:body,silent:true}).show();}catch(_){}
+  onComplete:function(progress,result,error){try{monitoringStore.recordDownload(progress,result,error);_monitoringNotify();}catch(saveError){console.error("Download history save failed",saveError.message);}try{if(censorModeEnabled)return;const NotificationClass=require("electron").Notification;if(!NotificationClass.isSupported())return;const failed=progress.status==="failed",body=failed?String(error&&error.message||"The download could not finish").slice(0,400):(String(result&&result.count||progress.files||0)+" item"+(Number(result&&result.count||progress.files||0)===1?"":"s")+" saved to Monitoring downloads");new NotificationClass({title:failed?"Monitoring download failed":"Monitoring download complete",body:body,silent:true,icon:WINDOW_ICON}).show();}catch(_){}
   }
 });
 let petWin = null;
@@ -622,17 +681,42 @@ function createWindow(){
     webPreferences:{ preload:path.join(__dirname,"preload.js"), contextIsolation:true, nodeIntegration:false, sandbox:true, webSecurity:true }
   });
   mainWin.webContents.setZoomFactor(1.16);
+  let activeDisplayId=null,displayRefreshTimer=null;
+  function refreshDisplayScale(){
+    if(!mainWin||mainWin.isDestroyed())return;
+    const display=screen.getDisplayMatching(mainWin.getBounds());
+    if(!display)return;
+    const displaySignature=JSON.stringify([display.id,display.scaleFactor,display.bounds,display.workArea,mainWin.getContentBounds()]);if(displaySignature===activeDisplayId)return;
+    activeDisplayId=displaySignature;
+    clearTimeout(displayRefreshTimer);
+    displayRefreshTimer=setTimeout(function(){
+      if(!mainWin||mainWin.isDestroyed())return;
+      mainWin.webContents.setZoomFactor(1.16);
+      mainWin.webContents.send("display-layout-changed");
+    },40);
+  }
+  mainWin.on("move",refreshDisplayScale);
+  mainWin.on("resize",refreshDisplayScale);
+  mainWin.on("show",refreshDisplayScale);
+  mainWin.webContents.on("did-finish-load",function(){activeDisplayId=null;refreshDisplayScale();});
+  mainWin.on("maximize",refreshDisplayScale);
+  mainWin.on("unmaximize",refreshDisplayScale);
+  screen.on("display-metrics-changed",refreshDisplayScale);
+  refreshDisplayScale();
   if(process.platform === "win32"){
     const exe=app.getPath("exe");
     mainWin.setAppDetails({appId:APP_ID,appIconPath:exe,appIconIndex:0,relaunchCommand:'"'+exe+'"',relaunchDisplayName:"Sinrad"});
   }
   lockNavigation(mainWin,"index.html");
+  mainWin.webContents.on("context-menu",(_event,params)=>{if(params.isEditable){require("electron").Menu.buildFromTemplate([{role:"undo"},{role:"redo"},{type:"separator"},{role:"cut"},{role:"copy"},{role:"paste"},{role:"selectAll"}]).popup({window:mainWin});}else if(params.selectionText){require("electron").Menu.buildFromTemplate([{role:"copy"}]).popup({window:mainWin});}});
   mainWin.webContents.on("before-input-event",function(event,input){
     if(!_hotkeyCapture&&input&&input.type==="keyDown"&&_inputHotkey(input)===_runtimeHotkeys.commandPalette){
       event.preventDefault();
       try{ mainWin.webContents.send("command-palette"); }catch(_){}
     }
   });
+  mainWin.once("ready-to-show",()=>{ mainReady=true; if(!hasSplash || bootFinished){ bootFinished=true; showMain(); } });
+  mainWin.webContents.once("did-finish-load",()=>{mainReady=true;if(!hasSplash||bootFinished)finishBootAndShow();});
   mainWin.loadFile(path.join(__dirname,"index.html"));
   mainWin.webContents.on("did-start-loading",function(){ _mainRendererReady=false; });
   // Auto-undock pet if setting is enabled; also flush parks queued during boot
@@ -647,7 +731,7 @@ function createWindow(){
   });
   try{ mainWin.webContents.setAudioMuted(true); }catch(e){}   // keep the app silent during the intro video; showMain() un-mutes it
   mainWin.on("focus", function(){ try{ mainWin.webContents.send("app-focus"); }catch(_){} });
-  mainWin.on("closed", ()=>{ mainWin=null; if(petWin){ try{petWin.close();}catch(e){} petWin=null; } });
+  mainWin.on("closed", ()=>{ screen.removeListener("display-metrics-changed",refreshDisplayScale);clearTimeout(displayRefreshTimer);mainWin=null; if(petWin){ try{petWin.close();}catch(e){} petWin=null; } });
 }
 
 /* ---------- floating desktop pet window ---------- */
@@ -715,6 +799,7 @@ function createSplash(vid){ try{ splashWin=new BrowserWindow({ width:720, height
    video is done, so the user always gets to see the boot video. */
 let mainReady=false, bootFinished=false, hasSplash=false;
 function showMain(){ if(mainWin && !mainWin.isDestroyed()){ try{ mainWin.webContents.setAudioMuted(false); }catch(e){} try{ if(!mainWin.isMaximized()) mainWin.maximize(); }catch(e){} mainWin.show(); try{ mainWin.focus(); }catch(e){} } }
+function finishBootAndShow(){finishBoot();if(mainReady)showMain();}
 function finishBoot(){ if(bootFinished) return; bootFinished=true; try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(e){} splashWin=null; if(mainReady) showMain(); }
 // --- single instance + protocol URL handling ---
 const _gotLock=app.requestSingleInstanceLock();
@@ -780,22 +865,25 @@ function _offlineCanonicalUrl(value){try{const url=new URL(String(value||""));co
 function _offlinePostKey(value){try{const match=new URL(String(value||"")).pathname.match(/^\/r\/([A-Za-z0-9_]{2,21})\/comments\/([A-Za-z0-9]+)/i);return match?(match[1]+":"+match[2]).toLowerCase():"";}catch(_){return "";}}
 function _nextOfflineJob(){
   const now=Date.now();let snapshot=offlineFeed.snapshot();
+  if(snapshot.settings.collectionPaused)return null;
   for(const [id,started] of _offlineActiveJobs.entries())if(now-started>20*60*1000)_offlineActiveJobs.delete(id);
   while(true){
-    const source=snapshot.sources.find(function(entry){if(!entry.enabled||entry.platform!=="reddit"||entry.adapter!=="extension"||_offlineActiveJobs.has(entry.id))return false;return entry.syncRequestedAt>entry.lastSync||!entry.lastSync||now-entry.lastSync>=entry.intervalHours*60*60*1000;});
+    const rotationDue=entry=>now-(entry.lastRotationAttempt||0)>=86400000&&snapshot.items.some(item=>item.sourceId===entry.id&&!item.read&&!item.favorite&&(item.downloadedAt||item.updatedAt||item.date)<=now-86400000);
+    const source=snapshot.sources.find(function(entry){if(!entry.enabled||entry.platform!=="reddit"||entry.adapter!=="extension"||_offlineActiveJobs.has(entry.id))return false;return entry.syncRequestedAt>entry.lastSync||!entry.lastSync||rotationDue(entry)||snapshot.items.some(item=>item.sourceId===entry.id&&item.historyAt&&item.historyAt<=now&&item.historyAt>entry.lastSync)||now-entry.lastSync>=Math.min(24,entry.intervalHours)*60*60*1000;});
     if(!source)return null;
-    const kept=snapshot.items.filter(function(item){return item.sourceId===source.id&&!item.favorite&&!item.read;}).length,needed=Math.max(0,source.limit-kept);
+    const kept=offlineFeed.activeSourceCount(source.id,now,true),needed=Math.max(0,source.limit-kept);
     if(!needed){offlineFeed.updateSource(source.id,{lastSync:now,syncRequestedAt:0,lastError:""});snapshot=offlineFeed.snapshot();setImmediate(_offlineNotify);continue;}
     _offlineActiveJobs.set(source.id,now);setImmediate(_offlineNotify);
+    if(rotationDue(source))offlineFeed.updateSource(source.id,{lastRotationAttempt:now});
     const community=("r/"+source.handle).toLowerCase(),knownUrls=[];
     snapshot.items.forEach(function(item){if(item.sourceId!==source.id&&String(item.community||"").toLowerCase()!==community)return;const url=_offlineCanonicalUrl(item.url);if(url&&!knownUrls.includes(url))knownUrls.push(url);});
-    return {sourceId:source.id,handle:source.handle,limit:needed,knownUrls:knownUrls,knownKeys:source.seenPostKeys||[]};
+    return {sourceId:source.id,handle:source.handle,limit:needed,knownUrls:knownUrls,knownKeys:offlineFeed.recentPostKeys(source.id,now)};
   }
 }
 function _finishOfflineJob(data){
   const sourceId=String(data&&data.sourceId||"");_offlineActiveJobs.delete(sourceId);
-  const source=offlineFeed.snapshot().sources.find(function(entry){return entry.id===sourceId&&entry.platform==="reddit";});if(!source)throw new Error("Offline source was removed");
-  const now=Date.now(),saved=Math.max(0,Number(data&&data.saved)||0),kept=offlineFeed.snapshot().items.filter(function(item){return item.sourceId===sourceId&&!item.favorite&&!item.read;}).length,continueRefill=saved>0&&kept<source.limit;
+  const source=offlineFeed.snapshot().sources.find(function(entry){return entry.id===sourceId&&entry.platform==="reddit";});if(!source)throw new Error("Clipping source was removed");
+  const now=Date.now(),saved=Math.max(0,Number(data&&data.saved)||0);if(saved>0)offlineFeed.retireReplacedPosts(sourceId,now);const kept=offlineFeed.activeSourceCount(sourceId,now,true),continueRefill=saved>0&&kept<source.limit;
   offlineFeed.updateSource(sourceId,{adapter:"extension",lastSync:now,syncRequestedAt:continueRefill?now+1:0,lastError:data&&data.ok?"":String(data&&data.error||"Browser extension sync failed").slice(0,500)});_offlineNotify();
   return {ok:true,continueRefill:continueRefill,remaining:Math.max(0,source.limit-kept)};
 }
@@ -827,10 +915,11 @@ function _captureMetadata(value,pageUrl,fallbackTitle){
   };
 }
 function _captureStart(data){
+  if(offlineFeed.snapshot().settings.collectionPaused)throw new Error("Clip collection is paused");
   _captureCleanup();if(_captureSessions.size>=4)throw new Error("Too many page saves are already running");
   const url=normalizeHttpUrl(data&&data.url),title=String(data&&data.title||"").replace(/\0/g,"").slice(0,1000);
   const size=Math.round(Number(data&&data.size));if(!url)throw new Error("A web page URL is required");if(!Number.isFinite(size)||size<1||size>CAPTURE_MAX_BYTES)throw new Error("Saved page must be under 256 MB");
-  const sourceId=String(data&&data.sourceId||"").slice(0,120);if(sourceId&&!offlineFeed.snapshot().sources.some(function(source){return source.id===sourceId&&source.platform==="reddit"&&source.adapter==="extension";}))throw new Error("Offline source is invalid");
+  const sourceId=String(data&&data.sourceId||"").slice(0,120);if(sourceId&&!offlineFeed.snapshot().sources.some(function(source){return source.id===sourceId&&source.platform==="reddit"&&source.adapter==="extension";}))throw new Error("Clipping source is invalid");
   fs.mkdirSync(offlineFeed.captureRoot,{recursive:true,mode:0o700});
   const id=crypto.randomBytes(24).toString("hex"),temp=path.join(offlineFeed.captureRoot,id+".part");
   fs.writeFileSync(temp,Buffer.alloc(0),{mode:0o600,flag:"wx"});
@@ -853,7 +942,7 @@ async function _captureFinish(id){
   const existing=offlineFeed.snapshot().items.find(function(item){return !!item.captureRef&&item.url===session.url;});
   const item=Object.assign({},session.metadata,{sourceId:session.sourceId||"",sourceKey:existing?existing.sourceKey:("capture:"+ref),captureRef:ref,captureMime:"multipart/related",captureSize:session.received,url:session.url,title:session.metadata.title||session.title});
   await _cacheRedditMedia(item,20);offlineFeed.addCapture(item);const pruned=offlineFeed.prune();(pruned.sourceIds||[]).forEach(function(sourceId){offlineFeed.updateSource(sourceId,{syncRequestedAt:Date.now(),lastError:""});});
-  if(session.sourceId){const source=offlineFeed.snapshot().sources.find(function(entry){return entry.id===session.sourceId;}),key=_offlinePostKey(session.url);if(source&&key)offlineFeed.updateSource(source.id,{seenPostKeys:(source.seenPostKeys||[]).concat(key).slice(-5000)});}
+  if(session.sourceId){const source=offlineFeed.snapshot().sources.find(function(entry){return entry.id===session.sourceId;}),key=_offlinePostKey(session.url);if(source&&key)offlineFeed.rememberPost(source.id,key);}
   _offlineNotify();
   return {ok:true,itemCount:offlineFeed.snapshot().items.length};
 }
@@ -873,12 +962,12 @@ function _startLocalServer(){
       res.setHeader("Access-Control-Allow-Methods","GET,POST,OPTIONS");
       res.setHeader("Access-Control-Allow-Headers","Content-Type,X-Sinrad-Token,X-Sinrad-Bridge-Key");
       if(req.method==="GET" && u.pathname==="/token"){ _markExtensionSeen();_localJson(res,200,{ok:true,token:LOCAL_TOKEN},origin); return; }
-      const allowedPosts=new Set(["/park","/capture/start","/capture/chunk","/capture/finish","/capture/cancel","/offline/job-finish","/offline/source-add"]);
-      const allowedGet=req.method==="GET"&&u.pathname==="/offline/jobs";
+      const allowedPosts=new Set(["/park","/capture/start","/capture/chunk","/capture/finish","/capture/cancel","/offline/job-finish","/offline/source-add","/monitoring/source-add"]);
+      const allowedGet=req.method==="GET"&&(u.pathname==="/offline/jobs"||u.pathname==="/offline/status");
       if(!allowedGet&&(req.method!=="POST" || !allowedPosts.has(u.pathname))){ _localJson(res,404,{ok:false,error:"not found"},origin); return; }
       if(req.headers["x-sinrad-token"]!==LOCAL_TOKEN){ _localJson(res,401,{ok:false,error:"invalid token"},origin); return; }
       _markExtensionSeen();
-      if(allowedGet){_localJson(res,200,{ok:true,job:_nextOfflineJob()},origin);return;}
+      if(allowedGet){_localJson(res,200,u.pathname==="/offline/status"?{ok:true,paused:!!offlineFeed.snapshot().settings.collectionPaused}:{ok:true,job:_nextOfflineJob()},origin);return;}
       if(u.pathname==="/capture/chunk"){
         _readLocalBody(req,1024*1024,true).then(function(bytes){const received=_captureAppend(u.searchParams.get("id"),Number(u.searchParams.get("index")),bytes);_localJson(res,200,{ok:true,received:received},origin);}).catch(function(error){_localJson(res,error&&error.message==="request too large"?413:400,{ok:false,error:String(error&&error.message||error)},origin);});return;
       }
@@ -889,6 +978,7 @@ function _startLocalServer(){
       _readLocalBody(req,jsonLimit,false).then(async function(body){
         try{
           const data=JSON.parse(body||"{}");
+          if(u.pathname==="/monitoring/source-add"){const result=_addMonitoringSource(data);_localJson(res,result.ok?200:400,result,origin);return;}
           if(u.pathname==="/capture/start"){const id=_captureStart(data);_localJson(res,200,{ok:true,captureId:id},origin);return;}
           if(u.pathname==="/capture/finish"){const result=await _captureFinish(data.captureId);_localJson(res,200,result,origin);return;}
           if(u.pathname==="/capture/cancel"){const session=_captureSessions.get(String(data.captureId||""));_captureRemove(session);_localJson(res,200,{ok:true},origin);return;}
@@ -947,13 +1037,14 @@ app.whenReady().then(()=>{
   try{ if(autoUpdater){ autoUpdater.autoDownload=false; autoUpdater.autoInstallOnAppQuit=true; autoUpdater.allowDowngrade=false; autoUpdater.allowPrerelease=false; try{ autoUpdater.setFeedURL({provider:"github",owner:"SinSeeker0",repo:"sinrad"}); }catch(_){} autoUpdater.on("error", function(e){ try{ console.error("[sinrad] autoUpdater:", e&&e.message); }catch(_){} }); } }catch(_e){ try{ console.error("[sinrad] autoUpdater config failed:", _e&&_e.message); }catch(_){} }
   const vid=pickBootVideo();
   const _st=readStore(); const _introOn=!(_st&&_st.settings&&_st.settings.introEnabled===false);
-  if(vid && _introOn){ hasSplash=true; createSplash(vid); if(!splashWin) hasSplash=false; }
+  hasSplash=!!(vid&&_introOn);
   createWindow();
-  try{offlineFeed.load();const cleanup=offlineFeed.removeBrokenExtensionCaptures(),pruned=offlineFeed.prune(),refillIds=Array.from(new Set(cleanup.sourceIds.concat(pruned.sourceIds||[])));refillIds.forEach(function(id){offlineFeed.updateSource(id,{lastSync:0,syncRequestedAt:Date.now(),lastError:cleanup.sourceIds.includes(id)?"Retrying after an incomplete Reddit page":"Refreshing posts older than three days"});});}catch(error){console.error("[sinrad] offline feed init failed:",error.message);}
+  if(hasSplash){createSplash(vid);if(!splashWin){hasSplash=false;finishBoot();}}
+  try{offlineFeed.load();const cleanup=offlineFeed.removeBrokenExtensionCaptures(),pruned=offlineFeed.prune(),refillIds=Array.from(new Set(cleanup.sourceIds.concat(pruned.sourceIds||[])));refillIds.forEach(function(id){offlineFeed.updateSource(id,{lastSync:0,syncRequestedAt:Date.now(),lastError:cleanup.sourceIds.includes(id)?"Retrying after an incomplete Reddit page":"Refreshing older cached posts"});});}catch(error){console.error("[sinrad] offline feed init failed:",error.message);dialog.showErrorBox("Clipping storage needs recovery",error.message);}
   const offlineVideoUpgradeTimer=setTimeout(function(){_upgradeLowQualityOfflineVideos().catch(function(){});},5000);if(offlineVideoUpgradeTimer.unref)offlineVideoUpgradeTimer.unref();
   const offlineHistoryTimer=setInterval(function(){try{const result=offlineFeed.prune();(result.sourceIds||[]).forEach(function(id){offlineFeed.updateSource(id,{syncRequestedAt:Date.now(),lastError:""});});if(result.removed)_offlineNotify();}catch(_){}},15*60*1000);if(offlineHistoryTimer.unref)offlineHistoryTimer.unref();
   _startLocalServer();
-  try{monitoringStore.load();monitoringStore.prune();}catch(error){console.error("[sinrad] monitoring init failed:",error.message);}
+  try{monitoringStore.load();monitoringStore.prune();}catch(error){console.error("[sinrad] monitoring init failed:",error.message);dialog.showErrorBox("Monitoring storage needs recovery",error.message);}
   const monitoringStartupTimer=setTimeout(function(){_refreshMonitoring("",false).catch(function(){});},45000);if(monitoringStartupTimer.unref)monitoringStartupTimer.unref();
   const monitoringRefreshTimer=setInterval(function(){_refreshMonitoring("",false).catch(function(){});},5*60*1000);if(monitoringRefreshTimer.unref)monitoringRefreshTimer.unref();
   var _protoArg=process.argv.find(function(a){return a.startsWith(PROTOCOL+"://");}); if(_protoArg){ mainWin.webContents.once("did-finish-load",function(){ _handleProtocolUrl(_protoArg); }); }
@@ -962,7 +1053,7 @@ app.whenReady().then(()=>{
   var _rgTries=0;
   function _closeSplash(){ try{ if(splashWin && !splashWin.isDestroyed()) splashWin.close(); }catch(_){} splashWin=null; }
   if(mainWin&&mainWin.webContents) mainWin.webContents.on("render-process-gone", function(_e, details){ try{ console.error("[sinrad] renderer gone:", details&&details.reason); _closeSplash(); if(_rgTries++ < 3){ setTimeout(function(){ try{ if(mainWin&&!mainWin.isDestroyed()){ mainWin.reload(); mainWin.show(); } }catch(_){} }, 1500); } else { try{ mainWin.show(); }catch(_){} } }catch(_){} });
-  mainWin.once("ready-to-show",()=>{ mainReady=true; if(!hasSplash || bootFinished){ bootFinished=true; showMain(); } });
+
   // pure anti-brick guard: never stay stuck on the splash forever (10 min cap)
   setTimeout(finishBoot, 600000);
   app.on("activate", ()=>{ if(BrowserWindow.getAllWindows().length===0) createWindow(); });
@@ -973,7 +1064,9 @@ function _fromPet(e){ return _from(e,petWin); }
 function _fromSplash(e){ return _from(e,splashWin); }
 ipcMain.on("boot-done", (e)=>{ if(_fromSplash(e)) finishBoot(); });
 ipcMain.on("protocol-park-ack",(e,requestId,ok)=>{ if(!_fromMain(e)||typeof requestId!=="string")return; const done=_pendingParkAcks.get(requestId); if(done){ _pendingParkAcks.delete(requestId); done(!!ok); } });
-app.on("before-quit", ()=>{ try{ _killPersist(); }catch(_){} try{for(const entry of _offlineUndoDeletes.values())offlineFeed.purgeItems(entry.items);_offlineUndoDeletes.clear();}catch(_){} });
+let storesFlushedForQuit=false,storesFlushing=false;
+app.on('before-quit',event=>{if(storesFlushedForQuit)return;event.preventDefault();if(storesFlushing)return;storesFlushing=true;Promise.all([offlineFeed.flush(),monitoringStore.flush()]).then(()=>{storesFlushedForQuit=true;app.quit();},error=>{storesFlushing=false;dialog.showErrorBox('Could not save before closing',error.message+'\nSinrad remains open so your unsaved data is not discarded.');});});
+app.on("before-quit", ()=>{ try{ _interruptCompressionOnExit(); }catch(_){} try{ _killPersist(); }catch(_){} try{for(const entry of _offlineUndoDeletes.values())offlineFeed.purgeItems(entry.items);_offlineUndoDeletes.clear();}catch(_){} });
 app.on("window-all-closed", ()=>{ if(process.platform!=="darwin") app.quit(); });
 
 /* ---------- IPC: main window controls ---------- */
@@ -985,7 +1078,209 @@ ipcMain.on("win-close",(e)=>{ if(_fromMain(e)) mainWin.close(); });
 ipcMain.on("shell-open", (e,url)=>{ if(!_fromMain(e)) return; const safe=normalizeHttpUrl(url); if(safe) shell.openExternal(safe); });
 ipcMain.handle("open-path", async (e,p)=>{ if(!(_fromMain(e)||_fromPet(e))||typeof p!=="string"||!p||p.indexOf("\0")>=0) return false; try{ const resolved=path.resolve(p); if(!fs.existsSync(resolved)) return false; const err=await shell.openPath(resolved); if(err) return false; try{ _recordRecentFolder(resolved); }catch(_){} return true; }catch(err){ return false; } });
 
+/* ---------- media compression ---------- */
+let _compressionJob=null;
+function _compressionSend(payload){try{if(mainWin&&!mainWin.isDestroyed())mainWin.webContents.send("compression-progress",payload);}catch(_){}}
+function _findFfmpeg(){
+  const candidates=[process.env.SINRAD_FFMPEG,"C:\\ytdl\\ffmpeg.exe","C:\\ffmpeg\\bin\\ffmpeg.exe",path.join(app.getPath("home"),"ffmpeg","bin","ffmpeg.exe")].filter(Boolean);
+  for(const candidate of candidates){try{if(fs.statSync(candidate).isFile())return candidate;}catch(_){}}
+  try{const command=process.platform==="win32"?"where.exe":"which",result=spawnSync(command,["ffmpeg"],{encoding:"utf8",windowsHide:true,timeout:3000}),found=String(result.stdout||"").split(/\r?\n/)[0].trim();if(found&&fs.existsSync(found))return found;}catch(_){ }
+  return "";
+}
+function _compressionPublic(status){const copy=Object.assign({},status);delete copy.completed;copy.history=_compressionHistory.slice();copy.settings=Object.assign({},_compressionSettings);return copy;}
+function _compressionStatus(){const status=_compressionPublic(_compressionJob?_compressionJob.public:_compressionLast);try{const batch=JSON.parse(fs.readFileSync(COMPRESSION_BATCH_FILE,"utf8"));if(!batch.finished)status.batchPending={stage:batch.stage,error:batch.error,index:batch.index,total:batch.sources.length};}catch(_){}return status;}
+function _safeCompressionSource(value){if(typeof value!=="string"||!value||value.indexOf("\0")>=0)throw new Error("Choose a valid folder or video");return path.resolve(value);}
+async function _compressionPick(kind){
+  const isFile=kind==="file",picked=await dialog.showOpenDialog(mainWin,{title:isFile?"Choose a video to compress":"Choose a folder to compress",properties:[isFile?"openFile":"openDirectory"],filters:isFile?[{name:"Videos",extensions:["mp4","m4v","mov","mkv","zip"]}]:undefined});
+  return picked.canceled||!picked.filePaths[0]?"":picked.filePaths[0];
+}
+async function _copyCompressionFile(source,target,mtime){await fs.promises.mkdir(path.dirname(target),{recursive:true});await fs.promises.copyFile(source,target,fs.constants.COPYFILE_EXCL);try{await fs.promises.utimes(target,mtime,mtime);}catch(_){}}
+function _runFfmpeg(executable,args,job,onProgress){
+  return new Promise(resolve=>{
+    const child=spawn(executable,args,{windowsHide:true,stdio:["ignore","pipe","pipe"]});job.child=child;let detail="";
+    child.stdout.on("data",MediaCompression.progressParser(onProgress));
+    child.stderr.on("data",chunk=>{detail=(detail+String(chunk)).slice(-3000);});
+    child.on("error",error=>resolve({ok:false,error:String(error.message||error)}));
+    child.on("close",code=>{job.child=null;resolve({ok:code===0&&!job.cancelled,error:job.cancelled?"Cancelled":detail.trim()||("Encoder exited with code "+code)});});
+  });
+}
+const COMPRESSION_LAST_FILE=path.join(DATA_DIR,"compression-last.json");
+const COMPRESSION_HISTORY_FILE=path.join(DATA_DIR,"compression-history.json");
+const COMPRESSION_SETTINGS_FILE=path.join(DATA_DIR,"compression-settings.json");
+let _compressionLast={active:false};
+let _compressionHistory=[];
+let _compressionSettings={outputFolder:""};
+let _compressionSaveAt=0;
+function _saveCompressionState(status,force){const now=Date.now();if(!force&&now-_compressionSaveAt<2000)return;_compressionSaveAt=now;try{fs.mkdirSync(DATA_DIR,{recursive:true});const temp=COMPRESSION_LAST_FILE+".tmp";fs.writeFileSync(temp,JSON.stringify(status));fs.copyFileSync(temp,COMPRESSION_LAST_FILE);fs.unlinkSync(temp);}catch(_){}}
+function _writeCompressionJson(file,value){try{fs.mkdirSync(DATA_DIR,{recursive:true});const temp=file+".tmp";fs.writeFileSync(temp,JSON.stringify(value));fs.copyFileSync(temp,file);fs.unlinkSync(temp);return true;}catch(_){return false;}}
+function _compressionRecord(status){const first=(status.results||[]).find(item=>item&&item.type==="video")||(status.results||[])[0]||{},source=String(status.source||"");let kind=status.kind==="folder"?"folder":"video";try{if(source&&fs.statSync(source).isDirectory())kind="folder";}catch(_){}return {id:String(status.historyId||crypto.randomUUID()),kind,name:String(status.sourceName||path.basename(source||status.output||"Compressed output")),source,output:String(status.output||""),preset:String(status.preset||"ultra"),inputBytes:Number(status.totalBytes)||0,outputBytes:Number(status.outputBytes)||0,files:Number(status.total)||0,videos:Number(status.videos)||0,failed:Number(status.failed)||0,finishedAt:Number(status.finishedAt)||Date.now(),zipPath:String(status.zipPath||""),zipBytes:Number(status.zipBytes)||0,previewPath:first.type==="video"?String(first.path||""):"",previewUrl:first.type==="video"?String(first.url||""):""};}
+function _saveCompressionHistory(){if(!_writeCompressionJson(COMPRESSION_HISTORY_FILE,_compressionHistory))throw Error("Could not save compression output history");}
+function _upsertCompressionHistory(status){const record=_compressionRecord(status),same=_compressionHistory.find(item=>item.id===record.id||item.output===record.output);if(same)record.id=same.id;status.historyId=record.id;_compressionHistory=[record].concat(_compressionHistory.filter(item=>item.id!==record.id&&item.output!==record.output));_saveCompressionHistory();return record;}
+try{const saved=JSON.parse(fs.readFileSync(COMPRESSION_LAST_FILE,"utf8"));if(saved&&Array.isArray(saved.results)){_compressionLast=Object.assign(saved,{active:false});if(saved.active&&!saved.finished){_compressionLast.interrupted=true;_compressionLast.error="";_compressionLast.current="Interrupted — ready to resume";}}}catch(_){}
+try{const saved=JSON.parse(fs.readFileSync(COMPRESSION_HISTORY_FILE,"utf8"));if(Array.isArray(saved))_compressionHistory=saved.filter(item=>item&&typeof item.id==="string"&&typeof item.output==="string");}catch(_){}
+try{const saved=JSON.parse(fs.readFileSync(COMPRESSION_SETTINGS_FILE,"utf8"));if(saved&&typeof saved.outputFolder==="string")_compressionSettings.outputFolder=saved.outputFolder;}catch(_){}
+if(!fs.existsSync(COMPRESSION_HISTORY_FILE)&&_compressionLast.finished&&_compressionLast.output)_upsertCompressionHistory(_compressionLast);
+function _interruptCompressionOnExit(){if(!_compressionJob)return;_compressionJob.cancelled=true;Object.assign(_compressionJob.public,{active:true,interrupted:true,current:"Interrupted — ready to resume"});_saveCompressionState(Object.assign({},_compressionJob.public,{completed:_compressionJob.completed}),true);try{if(_compressionJob.child)_compressionJob.child.kill();}catch(_){}}
+async function _startCompression(input,internal){
+  if((_compressionBatch&&!internal)||_compressionArchiveJob)return {ok:false,error:"Another compression operation is running"};
+  if(_compressionJob)return {ok:false,error:"Another compression is already running"};
+  const job={cancelled:false,child:null,completed:[],public:{active:true,current:"Inspecting videos…",total:0,done:0,compressed:0,copied:0,keptOriginal:0,failed:0,results:[],outputBytes:0,inputBytesDone:0,percent:0,startedAt:Date.now()}};
+  _compressionJob=job;_compressionSend(job.public);
+  try{
+    const source=_safeCompressionSource(input&&input.source),presetName=String(input&&input.preset||"ultra").toLowerCase(),capFps=!!input.capFps,turbo=input.turbo!==false;
+    if(!MediaCompression.PRESETS[presetName])throw Error("Choose Ultra or Extreme");
+    const ffmpeg=_findFfmpeg();if(!ffmpeg)throw Error("FFmpeg was not found");
+    const destination=input.resume&&_compressionLast.interrupted&&_compressionLast.source===source?(_compressionLast.destination||""):(_compressionSettings.outputFolder||""),analysis=await MediaCompression.analyze(source,presetName,ffmpeg,destination),summary=analysis.summary,output=internal&&internal.output||summary.output;
+    if(job.cancelled)throw Error("Compression cancelled");
+    if(!summary.videos)throw Error("No supported videos were found");
+    const recovery=!!(input.resume&&_compressionLast.interrupted&&_compressionLast.source===source&&_compressionLast.output===output&&_compressionLast.preset===presetName&&!!_compressionLast.capFps===capFps&&(_compressionLast.turbo!==false)===turbo);
+    if(fs.existsSync(output)&&!recovery)throw Error("The output already exists: "+output);
+    const priorCompleted=recovery?(_compressionLast.completed||_compressionLast.results||[]).filter(item=>item&&typeof item.path==="string"&&fs.existsSync(item.path)):[];
+    if(recovery&&priorCompleted.some(item=>{const sourceFile=analysis.files.find(file=>MediaCompression.targetPathFor(source,summary.kind,output,file.relative)===item.path);return !sourceFile||sourceFile.size!==item.inputBytes;}))throw Error("The source changed after interruption. Existing output was preserved; choose a new output name before restarting.");
+    job.completed=priorCompleted.slice();const priorResults=priorCompleted.slice(-200);
+    Object.assign(job.public,{source,sourceName:internal&&internal.sourceName||summary.name,kind:summary.kind,destination,output,preset:presetName,capFps,turbo,total:summary.files,videos:summary.videos,totalBytes:summary.bytes,results:priorResults,done:priorCompleted.length,compressed:priorCompleted.filter(r=>r.status==="Compressed").length,copied:priorCompleted.filter(r=>r.status==="Copied unchanged").length,keptOriginal:priorCompleted.filter(r=>/Original kept/.test(r.status)).length,failed:priorCompleted.filter(r=>/failed/.test(r.status)).length,outputBytes:priorCompleted.reduce((n,r)=>n+(r.outputBytes||0),0),inputBytesDone:priorCompleted.reduce((n,r)=>n+(r.inputBytes||0),0),resumed:recovery});
+    _saveCompressionState(Object.assign({},job.public,{completed:job.completed}),true);
+    if(!fs.existsSync(output))await fs.promises.mkdir(output,{recursive:false});
+    for(const file of analysis.files){
+      if(job.cancelled)throw Error("Compression cancelled");
+      const target=MediaCompression.targetPathFor(source,summary.kind,output,file.relative);let status="Copied unchanged",warning="";
+      if(recovery&&priorCompleted.some(item=>item.path===target)){job.public.percent=100*job.public.inputBytesDone/Math.max(1,summary.bytes);_compressionSend(job.public);continue;}
+      job.public.current=file.relative;job.public.filePercent=0;job.public.etaSeconds=null;_compressionSend(job.public);
+      if(file.type!=="video")await _copyCompressionFile(file.path,target,file.mtime);
+      else{
+        await fs.promises.mkdir(path.dirname(target),{recursive:true});
+        const parsed=path.parse(target),temp=path.join(parsed.dir,parsed.name+".sinrad-part"+parsed.ext);
+        if(fs.existsSync(temp))await fs.promises.unlink(temp);
+        const duration=file.media&&file.media.duration||0,args=MediaCompression.encodingArgs(file.path,temp,presetName,!!(capFps&&file.media&&file.media.fps>60),turbo);
+        const result=await _runFfmpeg(ffmpeg,args,job,progress=>{
+          const fraction=duration?Math.min(.995,progress.seconds/duration):0;
+          Object.assign(job.public,{filePercent:duration?Math.round(fraction*100):null,percent:Math.min(99,100*(job.public.inputBytesDone+file.size*fraction)/Math.max(1,summary.bytes)),currentBytes:progress.bytes,speed:progress.speed,frame:progress.frame,etaSeconds:duration&&progress.speed>0?Math.max(0,(duration-progress.seconds)/progress.speed):null,current:progress.seconds>=duration&&duration?"Finishing "+file.relative:file.relative});
+          _compressionSend(job.public);
+          _saveCompressionState(Object.assign({},job.public,{completed:job.completed}),false);
+        });
+        if(job.cancelled){try{await fs.promises.unlink(temp);}catch(_){}throw Error("Compression cancelled");}
+        if(result.ok){
+          const encoded=await fs.promises.stat(temp);
+          if(encoded.size<file.size){try{await fs.promises.link(temp,target);}catch(linkError){if(linkError.code==="EEXIST")throw linkError;await fs.promises.copyFile(temp,target,fs.constants.COPYFILE_EXCL);}await fs.promises.unlink(temp);try{await fs.promises.utimes(target,file.mtime,file.mtime);}catch(_){}job.public.compressed++;status="Compressed";}
+          else{await fs.promises.unlink(temp);await _copyCompressionFile(file.path,target,file.mtime);job.public.keptOriginal++;status="Original kept (smaller)";}
+        }else{try{await fs.promises.unlink(temp);}catch(_){}await _copyCompressionFile(file.path,target,file.mtime);job.public.failed++;status="Encoding failed — original copied";warning=result.error;}
+      }
+      const outputBytes=(await fs.promises.stat(target)).size;
+      const completed={path:target,url:pathToFileURL(target).href,name:file.relative,type:file.type,inputBytes:file.size,outputBytes,status,warning};job.completed.push(completed);job.public.results.push(completed);
+      if(job.public.results.length>200)job.public.results.shift();
+      job.public.outputBytes+=outputBytes;job.public.inputBytesDone+=file.size;job.public.currentBytes=0;
+      job.public.done++;if(file.type!=="video")job.public.copied++;job.public.percent=job.public.done===summary.files?100:100*job.public.inputBytesDone/Math.max(1,summary.bytes);_compressionSend(job.public);
+      _saveCompressionState(Object.assign({},job.public,{completed:job.completed}),true);
+    }
+    Object.assign(job.public,{active:false,finished:true,current:"",etaSeconds:null,finishedAt:Date.now()});_upsertCompressionHistory(job.public);_compressionSend(_compressionPublic(job.public));return {ok:true,status:_compressionPublic(job.public)};
+  }catch(error){Object.assign(job.public,{active:false,cancelled:job.cancelled,interrupted:!!job.public.source,error:String(error.message||error),current:job.cancelled?"Paused — ready to resume":"Interrupted — ready to resume"});_compressionSend(job.public);return {ok:false,error:job.public.error,status:{...job.public}};}
+  finally{_compressionLast={...job.public,completed:job.completed,active:false};_saveCompressionState(_compressionLast,true);_compressionJob=null;}
+}
+let _compressionArchiveJob=false;
+let _compressionBatch=null;
+const COMPRESSION_BATCH_FILE=path.join(DATA_DIR,"compression-batch.json");
+function _zipWorker(mode,source,destination){
+  if(process.platform!=="win32")return Promise.reject(Error("Archive automation currently requires Windows"));
+  return new Promise((resolve,reject)=>{
+    const script=path.join(__dirname,"lib","zip-worker.ps1").replace("app.asar"+path.sep,"app.asar.unpacked"+path.sep);
+    const child=spawn("powershell.exe",["-NoProfile","-NonInteractive","-ExecutionPolicy","Bypass","-File",script,"-Mode",mode,"-Source",source].concat(destination?["-Destination",destination]:[]),{windowsHide:true,stdio:["ignore","pipe","pipe"]});
+    let stdout="",stderr="";child.stdout.on("data",bytes=>{stdout=(stdout+bytes).slice(-100000);});child.stderr.on("data",bytes=>{stderr=(stderr+bytes).slice(-4000);});child.on("error",reject);child.on("close",code=>{if(code!==0)return reject(Error(stderr||"Archive operation failed"));try{resolve(JSON.parse(stdout.trim()));}catch(_){reject(Error("Archive tool returned no result"));}});
+  });
+}
+async function _archiveCompressionOutput(historyId){
+  if(_compressionJob||_compressionArchiveJob)return {ok:false,error:"Wait for the current operation to finish"};
+  const record=historyId?_compressionHistory.find(item=>item.id===historyId):_compressionHistory[0],folder=String(record&&record.output||"");
+  if(!record||!folder||!fs.existsSync(folder)||!fs.lstatSync(folder).isDirectory())return {ok:false,error:"The output folder no longer exists"};
+  const target=folder+".zip",temp=folder+".sinrad-zip-"+crypto.randomUUID()+".zip";
+  if(fs.existsSync(target))return {ok:false,error:"That ZIP already exists",path:target};
+  _compressionArchiveJob=true;
+  try{
+    await _zipWorker("pack",folder,temp);
+    try{await fs.promises.link(temp,target);}catch(error){if(error.code==="EEXIST")throw error;await fs.promises.copyFile(temp,target,fs.constants.COPYFILE_EXCL);}await fs.promises.unlink(temp);
+    record.zipPath=target;record.zipBytes=fs.statSync(target).size;record.zipVerified=true;_saveCompressionHistory();
+    if(_compressionLast.historyId===record.id){Object.assign(_compressionLast,{zipPath:target,zipBytes:record.zipBytes});_saveCompressionState(_compressionLast,true);}
+    return {ok:true,path:target,bytes:record.zipBytes,history:_compressionHistory.slice()};
+  }catch(error){return {ok:false,error:String(error.message||error)};}finally{_compressionArchiveJob=false;}
+}
+async function _offerCompressionCleanup(record){
+  if(!record||!record.zipVerified||!fs.existsSync(record.zipPath))return;
+  for(const [field,label]of [["output","compressed unzipped folder"],["source","original folder"]]){
+    const target=record[field];if(!target||!fs.existsSync(target)||!fs.lstatSync(target).isDirectory()||record[field+"Removed"])continue;
+    const resolved=path.resolve(target),blocked=[path.parse(resolved).root,app.getPath("home"),app.getPath("documents"),app.getPath("downloads"),DATA_DIR,__dirname].map(p=>path.resolve(p).toLowerCase());
+    if(blocked.includes(resolved.toLowerCase())||isPathInside(record.zipPath,[resolved]))continue;
+    async function check(current){const stat=await fs.promises.lstat(current);if(stat.isSymbolicLink())throw Error("Linked folders cannot be removed");if(stat.isDirectory())for(const name of await fs.promises.readdir(current))await check(path.join(current,name));}
+    try{await check(resolved);}catch(_){continue;}
+    const answer=await dialog.showMessageBox(mainWin,{type:"question",title:"Compression cleanup",message:"Delete the "+label+"?",detail:resolved+"\n\nThe verified ZIP will be kept. This uses the Windows Recycle Bin.",buttons:["Keep folder","Move to Recycle Bin"],defaultId:0,cancelId:0,noLink:true});
+    if(answer.response!==1)continue;
+    try{await check(resolved);await shell.trashItem(resolved);record[field+"Removed"]=true;_saveCompressionHistory();}catch(error){await dialog.showMessageBox(mainWin,{type:"error",message:"Could not remove folder",detail:String(error.message||error)});break;}
+  }
+}
+function _batchCandidates(source){
+  const resolved=_safeCompressionSource(source);const stat=fs.lstatSync(resolved);if(stat.isSymbolicLink())throw Error("Linked sources are not supported");
+  if(stat.isFile())return /\.zip$/i.test(resolved)?[resolved]:[];
+  const entries=fs.readdirSync(resolved,{withFileTypes:true}).filter(entry=>!entry.isSymbolicLink());
+  const zips=entries.filter(entry=>entry.isFile()&&/\.zip$/i.test(entry.name)&&!/ compressed (ultra|extreme)\.zip$/i.test(entry.name));
+  const dirs=entries.filter(entry=>entry.isDirectory()&&!/ compressed (ultra|extreme)$|^\.sinrad-/i.test(entry.name));
+  return (zips.length?zips:dirs).map(entry=>path.join(resolved,entry.name));
+}
+async function _runCompressionBatch(input){
+  if(_compressionJob||_compressionArchiveJob||_compressionBatch)return {ok:false,error:"Another compression operation is running"};
+  let batch;
+  try{
+    if(input.resume){batch=JSON.parse(fs.readFileSync(COMPRESSION_BATCH_FILE,"utf8"));if(!batch||batch.finished)throw Error("No unfinished batch");}
+    else{
+      const sources=Array.isArray(input.sources)?input.sources.map(_safeCompressionSource).filter(source=>{const stat=fs.lstatSync(source);return stat.isDirectory()||(stat.isFile()&&/\.zip$/i.test(source));}):_batchCandidates(input.source);if(!sources.length)throw Error("Choose folders or ZIP archives");
+      const answer=await dialog.showMessageBox(mainWin,{type:"question",title:"Compress archive batch",message:"Compress and ZIP these "+sources.length+" items individually?",detail:"Each item gets its own compressed folder and verified ZIP. Cleanup choices are asked separately after each ZIP.",buttons:["Cancel","Compress and ZIP individually"],defaultId:0,cancelId:0,noLink:true});
+      if(answer.response!==1)return {ok:false,canceled:true};
+      batch={sources,preset:input.preset||"ultra",turbo:input.turbo!==false,capFps:!!input.capFps,destination:_compressionSettings.outputFolder||"",index:0,finished:false,steps:[],source:input.source};
+    }
+    _compressionBatch=batch;
+    const publish=stage=>{batch.stage=stage;_writeCompressionJson(COMPRESSION_BATCH_FILE,batch);_compressionSend({active:true,batch:true,current:stage,total:batch.sources.length,done:batch.index,percent:100*batch.index/batch.sources.length,results:[]});};
+    for(;batch.index<batch.sources.length;batch.index++){
+      const source=batch.sources[batch.index],isZip=/\.zip$/i.test(source),outputRoot=batch.destination||path.dirname(source);
+      let step=batch.steps[batch.index];if(!step){step={source,working:isZip?path.join(outputRoot,".sinrad-extract-"+crypto.randomUUID()):source,output:path.join(outputRoot,path.basename(source,isZip?path.extname(source):undefined)+" compressed "+batch.preset)};batch.steps[batch.index]=step;}
+      if(step.done)continue;
+      if(isZip&&!step.extracted){publish("Inspecting "+path.basename(source));const info=await _zipWorker("inspect",source);const disk=fs.statfsSync(outputRoot);if(Number(disk.bavail)*Number(disk.bsize)<info.bytes*3+512*1024*1024)throw Error("Not enough free space to extract and compress "+path.basename(source));if(fs.existsSync(step.working))throw Error("An interrupted extraction remains at "+step.working+". Preserve or remove it before retrying.");
+        publish("Extracting "+path.basename(source));await _zipWorker("extract",source,step.working);step.extracted=true;
+      }
+      if(!step.historyId){publish("Compressing "+path.basename(source));const result=await _startCompression({source:step.working,preset:batch.preset,turbo:batch.turbo,capFps:batch.capFps,resume:true},{output:step.output,sourceName:path.basename(source)});if(!result.ok)throw Error(result.error);step.historyId=result.status.historyId;_writeCompressionJson(COMPRESSION_BATCH_FILE,batch);}
+      const record=_compressionHistory.find(item=>item.id===step.historyId);if(!record)throw Error("Batch output record is missing");
+      if(!record.zipVerified){publish("Creating and verifying "+path.basename(source)+".zip");const result=await _archiveCompressionOutput(record.id);if(!result.ok)throw Error(result.error);}
+      publish("ZIP ready — cleanup choices");await _offerCompressionCleanup(record);step.done=true;_writeCompressionJson(COMPRESSION_BATCH_FILE,batch);
+    }
+    batch.finished=true;batch.stage="Batch complete";_writeCompressionJson(COMPRESSION_BATCH_FILE,batch);return {ok:true,status:_compressionStatus()};
+  }catch(error){if(batch){batch.error=String(error.message||error);_writeCompressionJson(COMPRESSION_BATCH_FILE,batch);}return {ok:false,error:String(error.message||error),batch:true};}
+  finally{_compressionBatch=null;_compressionSend(_compressionStatus());}
+}
+ipcMain.handle("compression-pick",async(e,kind)=>{if(!_fromMain(e))return "";try{return await _compressionPick(kind);}catch(_){return "";}});
+ipcMain.handle("compression-analyze",async(e,source,presetName)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{const analysis=await MediaCompression.analyze(_safeCompressionSource(source),presetName,_findFfmpeg(),_compressionSettings.outputFolder||"");return {ok:true,summary:analysis.summary,encoder:!!_findFfmpeg()};}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
+ipcMain.handle("compression-start",async(e,input)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await _startCompression(input||{});}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
+ipcMain.handle("compression-cancel",(e)=>{if(!_fromMain(e)||!_compressionJob)return false;_compressionJob.cancelled=true;try{if(_compressionJob.child)_compressionJob.child.kill();}catch(_){}return true;});
+ipcMain.handle("compression-status",(e)=>_fromMain(e)?_compressionStatus():{active:false});
+ipcMain.handle("compression-reveal",(e,target)=>{if(!_fromMain(e)||typeof target!=="string")return false;const results=(_compressionStatus().results||[]).concat(_compressionLast.results||[]),allowed=results.some(item=>item.path===target)||_compressionHistory.some(item=>item.output===target||item.zipPath===target||item.previewPath===target);if(!allowed||!fs.existsSync(target))return false;shell.showItemInFolder(target);return true;});
+ipcMain.handle("compression-zip",async(e,id)=>_fromMain(e)?await _archiveCompressionOutput(typeof id==="string"?id:""):{ok:false,error:"unauthorized"});
+ipcMain.handle("compression-cleanup",async(e,id)=>{if(!_fromMain(e))return {ok:false};await _offerCompressionCleanup(_compressionHistory.find(item=>item.id===id));return {ok:true,history:_compressionHistory.slice()};});
+ipcMain.handle("compression-batch-inspect",(e,source)=>{if(!_fromMain(e))return {ok:false};try{const sources=_batchCandidates(source);return {ok:true,count:sources.length,zips:sources.filter(file=>/\.zip$/i.test(file)).length};}catch(error){return {ok:false,error:error.message};}});
+ipcMain.handle("compression-batch-start",async(e,input)=>_fromMain(e)?await _runCompressionBatch(input||{}):{ok:false,error:"unauthorized"});
+ipcMain.handle("compression-history-remove",(e,id)=>{if(!_fromMain(e)||typeof id!=="string")return {ok:false};const before=_compressionHistory.length;_compressionHistory=_compressionHistory.filter(item=>item.id!==id);if(_compressionHistory.length===before)return {ok:false,error:"Output entry not found"};_saveCompressionHistory();return {ok:true,history:_compressionHistory.slice()};});
+ipcMain.handle("compression-destination-choose",async e=>{if(!_fromMain(e))return {ok:false};const picked=await dialog.showOpenDialog(mainWin,{title:"Choose compression output destination",defaultPath:_compressionSettings.outputFolder||app.getPath("videos"),properties:["openDirectory","createDirectory"]});if(picked.canceled||!picked.filePaths[0])return {ok:false,canceled:true};_compressionSettings.outputFolder=path.resolve(picked.filePaths[0]);_writeCompressionJson(COMPRESSION_SETTINGS_FILE,_compressionSettings);return {ok:true,settings:Object.assign({},_compressionSettings)};});
+ipcMain.handle("compression-destination-reset",e=>{if(!_fromMain(e))return {ok:false};_compressionSettings.outputFolder="";_writeCompressionJson(COMPRESSION_SETTINGS_FILE,_compressionSettings);return {ok:true,settings:Object.assign({},_compressionSettings)};});
+ipcMain.handle("compression-destination-open",async e=>{if(!_fromMain(e)||!_compressionSettings.outputFolder||!fs.existsSync(_compressionSettings.outputFolder))return false;return !(await shell.openPath(_compressionSettings.outputFolder));});
+
 /* ---------- IPC: store ---------- */
+let passwordImportDraft=null;
+ipcMain.handle("password-import-pick",async(e)=>{if(!_fromMain(e))return {ok:false};passwordImportDraft=null;
+  try{const picked=await dialog.showOpenDialog(mainWin,{title:"Import browser passwords",properties:["openFile"],filters:[{name:"Browser password CSV",extensions:["csv"]}]});if(picked.canceled)return {canceled:true};
+    const file=picked.filePaths[0];if(fs.statSync(file).size>5*1024*1024)throw Error("CSV exceeds the 5 MB import limit");
+    const result=require("./lib/password-import.js").parsePasswordCsv(fs.readFileSync(file,"utf8"));
+    passwordImportDraft={entries:result.entries,at:Date.now()};return {ok:true,count:result.entries.length,skipped:result.skipped};
+  }catch(error){return {ok:false,error:error.message};}});
+ipcMain.handle("password-import-cancel",e=>{if(_fromMain(e))passwordImportDraft=null;});
+ipcMain.handle("password-import-confirm",e=>{if(!_fromMain(e)||!passwordImportDraft)return {ok:false,error:"Choose the CSV again"};
+  const draft=passwordImportDraft;passwordImportDraft=null;if(Date.now()-draft.at>600000)return {ok:false,error:"Import preview expired"};
+  const data=JSON.parse(JSON.stringify(readStore()||{}));data.vault=data.vault||[];let added=0,duplicates=0;
+  for(const entry of draft.entries){if(data.vault.some(v=>v.url===entry.url&&v.username===entry.username&&v.password===entry.password)){duplicates++;continue;}data.vault.push(Object.assign({id:crypto.randomUUID(),created:Date.now(),favorite:false,priority:false},entry));added++;}
+  if(!writeStore(data))return {ok:false,error:"Passwords could not be saved"};return {ok:true,added,duplicates};});
 ipcMain.handle("store-load", (e)=>_fromMain(e)?readStore():null);
 ipcMain.handle("store-security", (e)=>_fromMain(e)?storeSecurity():"unknown");
 ipcMain.handle("store-save", (e,data)=>_fromMain(e)?writeStore(data):false);
@@ -997,8 +1292,8 @@ ipcMain.handle("offline-load",(e)=>_fromMain(e)?_offlineState():null);
 ipcMain.handle("offline-storage-open",async(e)=>{if(!_fromMain(e))return false;try{_prepareOfflineRoot(offlineFeed.root);return !(await shell.openPath(offlineFeed.root));}catch(_){return false;}});
 ipcMain.handle("offline-storage-choose",async(e)=>{
   if(!_fromMain(e))return {ok:false,error:"unauthorized"};
-  if(_captureSessions.size)return {ok:false,error:"Wait for the current offline save to finish"};
-  try{const picked=await dialog.showOpenDialog(mainWin,{title:"Choose the SINRAD offline folder",defaultPath:offlineFeed.root,properties:["openDirectory","createDirectory"]});if(picked.canceled||!picked.filePaths[0])return {ok:false,canceled:true};const snapshot=await _switchOfflineRoot(picked.filePaths[0]);_offlineNotify();return {ok:true,snapshot:snapshot};}catch(error){return {ok:false,error:String(error&&error.message||error)};}
+  if(_captureSessions.size)return {ok:false,error:"Wait for the current Clipping save to finish"};
+  try{const picked=await dialog.showOpenDialog(mainWin,{title:"Choose the SINRAD Clipping folder",defaultPath:offlineFeed.root,properties:["openDirectory","createDirectory"]});if(picked.canceled||!picked.filePaths[0])return {ok:false,canceled:true};const snapshot=await _switchOfflineRoot(picked.filePaths[0]);_offlineNotify();return {ok:true,snapshot:snapshot};}catch(error){return {ok:false,error:String(error&&error.message||error)};}
 });
 ipcMain.handle("offline-extension-status",(e)=>_fromMain(e)?_extensionStatus():{connected:false,method:"browser-extension"});
 ipcMain.handle("offline-source-add",(e,input)=>{
@@ -1014,10 +1309,40 @@ ipcMain.handle("offline-source-add",(e,input)=>{
 ipcMain.handle("offline-source-remove",(e,id,deleteItems)=>{if(!_fromMain(e))return false;const ok=offlineFeed.removeSource(String(id||""),!!deleteItems);if(ok)_offlineNotify();return ok;});
 ipcMain.handle("offline-source-update",(e,id,patch)=>{if(!_fromMain(e))return null;let source=offlineFeed.updateSource(String(id||""),patch);if(source&&patch&&Object.prototype.hasOwnProperty.call(patch,"limit"))source=offlineFeed.updateSource(source.id,{syncRequestedAt:Date.now(),lastError:""});if(source)_offlineNotify();return source;});
 ipcMain.handle("offline-settings",(e,input)=>{if(!_fromMain(e))return null;try{offlineFeed.configure(input);const cleaned=offlineFeed.prune();(cleaned.sourceIds||[]).forEach(function(id){offlineFeed.updateSource(id,{syncRequestedAt:Date.now(),lastError:""});});const data=_offlineState();_offlineNotify();return data;}catch(_){return null;}});
-ipcMain.handle("offline-item-update",(e,id,patch)=>{if(!_fromMain(e))return null;const prior=offlineFeed.snapshot().items.find(function(entry){return entry.id===String(id||"");}),item=offlineFeed.updateItem(String(id||""),patch);if(item&&item.sourceId&&prior&&((!prior.read&&item.read)||(!prior.favorite&&item.favorite)))offlineFeed.updateSource(item.sourceId,{syncRequestedAt:Date.now(),lastError:""});if(item)_offlineNotify();return item;});
+ipcMain.handle("offline-item-update",(e,id,patch)=>{if(!_fromMain(e))return null;const prior=offlineFeed.snapshot().items.find(function(entry){return entry.id===String(id||"");}),item=offlineFeed.updateItem(String(id||""),patch);if(item&&item.sourceId&&prior&&(!prior.read&&item.read))offlineFeed.updateSource(item.sourceId,{syncRequestedAt:Date.now(),lastError:""});if(item)_offlineNotify();return item;});
 ipcMain.handle("offline-item-remove",(e,id)=>{if(!_fromMain(e))return {ok:false};const item=offlineFeed.snapshot().items.find(function(entry){return entry.id===String(id||"");}),taken=item?offlineFeed.takeItems([item.id]):[],undoToken=_stashOfflineDelete(taken);if(item&&item.sourceId&&!item.read&&!item.favorite)offlineFeed.updateSource(item.sourceId,{syncRequestedAt:Date.now(),lastError:""});if(taken.length)_offlineNotify();return {ok:!!taken.length,undoToken:undoToken};});
 ipcMain.handle("offline-history-clear",(e)=>{if(!_fromMain(e))return {ok:false};const taken=offlineFeed.takeHistory(),undoToken=_stashOfflineDelete(taken);if(taken.length)_offlineNotify();return {ok:true,removed:taken.length,undoToken:undoToken};});
 ipcMain.handle("offline-item-restore",(e,token)=>_fromMain(e)?_restoreOfflineDelete(token):{ok:false,error:"unauthorized"});
+ipcMain.handle("offline-item-download",async(e,id)=>{
+  if(!_fromMain(e))return {ok:false,error:"unauthorized"};
+  try{
+    const item=offlineFeed.snapshot().items.find(function(entry){return String(entry.id)===String(id||"");});
+    if(!item)throw new Error("That saved post could not be found");
+    const refs=Array.isArray(item.media)?item.media.filter(Boolean):[];
+    if(!refs.length)throw new Error("This post has no cached media to download");
+    const folder=path.resolve(app.getPath("downloads"));await fs.promises.mkdir(folder,{recursive:true,mode:0o700});let count=0;
+    for(let index=0;index<refs.length;index++){
+      const source=offlineFeed.resolveMedia(refs[index]);if(!source||!fs.existsSync(source))continue;
+      const extension=path.extname(source).toLowerCase()||".bin",target=await _availableDownloadPath(folder,_safeDownloadName((item.title||"Saved post")+(refs.length>1?" - "+(index+1):"")+extension,index));
+      await fs.promises.copyFile(source,target);count++;
+    }
+    if(!count)throw new Error("The cached media for this post is missing. Open the original post to save it again.");
+    return {ok:true,count:count,folder:folder};
+  }catch(error){return {ok:false,error:String(error&&error.message||error)};}
+});
+ipcMain.handle("offline-media-download",async(e,ref)=>{
+  if(!_fromMain(e))return {ok:false,error:"unauthorized"};
+  try{
+    const mediaRef=String(ref||""),source=offlineFeed.resolveMedia(mediaRef);
+    if(!source||!fs.existsSync(source))throw new Error("That cached image is missing. Open the original post to save it again.");
+    const item=offlineFeed.snapshot().items.find(function(entry){return Array.isArray(entry.media)&&entry.media.includes(mediaRef);}),extension=path.extname(source).toLowerCase()||".img";
+    if(![".jpg",".jpeg",".png",".webp",".gif"].includes(extension))throw new Error("That item is not a downloadable image");
+    const folder=path.resolve(app.getPath("downloads"));await fs.promises.mkdir(folder,{recursive:true,mode:0o700});
+    const mediaIndex=item&&item.media.indexOf(mediaRef),remote=item&&Array.isArray(item.mediaUrls)&&mediaIndex>=0?item.mediaUrls[mediaIndex]:"";let original="";try{original=decodeURIComponent(path.basename(new URL(remote).pathname));}catch(_){}if(!original||!path.extname(original))original=(item&&item.title||"Saved image")+extension;
+    const name=_safeDownloadName(original,0),target=await _availableDownloadPath(folder,name);
+    await fs.promises.copyFile(source,target);return {ok:true,count:1,file:target};
+  }catch(error){return {ok:false,error:String(error&&error.message||error)};}
+});
 ipcMain.handle("offline-refresh",async(e,sourceId)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return await _refreshOfflineFeed(String(sourceId||""),true);}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
 ipcMain.handle("offline-media",async(e,ref)=>{
   if(!_fromMain(e))return "";
@@ -1025,14 +1350,14 @@ ipcMain.handle("offline-media",async(e,ref)=>{
 });
 ipcMain.handle("offline-capture-open",async(e,ref)=>{if(!_fromMain(e))return {ok:false,error:"unauthorized"};try{return {ok:_openOfflineCapture(String(ref||""))};}catch(error){return {ok:false,error:String(error&&error.message||error)};}});
 ipcMain.handle("monitoring-load",(e)=>_fromMain(e)?monitoringStore.snapshot():null);
-ipcMain.handle("monitoring-add",(e,input)=>{
-  if(!_fromMain(e))return {ok:false,error:"unauthorized"};
+function _addMonitoringSource(input){
   try{
     const target=MonitoringSources.parseTarget(input&&input.url),snapshot=monitoringStore.snapshot();
     const monitor=monitoringStore.add({target:target,label:String(input&&input.label||target.label||"").trim(),intervalMinutes:Number(input&&input.intervalMinutes)||snapshot.settings.defaultIntervalMinutes});
     _monitoringNotify();setTimeout(function(){_refreshMonitoring(monitor.id,true).catch(function(){});},30);return {ok:true,monitor:monitor};
   }catch(error){return {ok:false,error:String(error&&error.message||error)};}
-});
+}
+ipcMain.handle("monitoring-add",(e,input)=>_fromMain(e)?_addMonitoringSource(input):{ok:false,error:"unauthorized"});
 ipcMain.handle("monitoring-remove",(e,id)=>{if(!_fromMain(e))return false;const ok=monitoringStore.remove(String(id||""));if(ok)_monitoringNotify();return ok;});
 ipcMain.handle("monitoring-monitor-update",(e,id,patch)=>{if(!_fromMain(e))return null;const result=monitoringStore.updateMonitor(String(id||""),patch||{});if(result)_monitoringNotify();return result;});
 ipcMain.handle("monitoring-event-update",(e,id,patch)=>{if(!_fromMain(e))return null;const result=monitoringStore.updateEvent(String(id||""),patch||{});if(result)_monitoringNotify();return result;});
@@ -1463,12 +1788,22 @@ ipcMain.handle("clip-clear-if", async (e,value)=>{ if(!_fromMain(e)||typeof valu
 ipcMain.handle("hotkey-toggle", (e, enabled)=>{ if(!_fromMain(e))return {ok:false,enabled:false}; _hkEnabled=!!enabled; if(_hkEnabled){ _hkRegister(); } else { _hkUnregister(); } try{ if(mainWin) mainWin.webContents.send("hotkey-status",{ok:_hkOk,combo:_hkCombo,enabled:_hkEnabled}); }catch(_){} return {ok:_hkOk,enabled:_hkEnabled,combo:_hkCombo}; });
 ipcMain.handle("hotkeys-update",(e,value)=>{if(!_fromMain(e))return {ok:false,hotkeys:Object.assign({},_runtimeHotkeys)};const hotkeys=_applyHotkeys(value);try{if(mainWin)mainWin.webContents.send("hotkey-status",{ok:_hkOk,combo:_hkCombo,enabled:_hkEnabled});}catch(_){}return {ok:true,registered:_hkOk,hotkeys:hotkeys};});
 ipcMain.on("hotkey-capture",(e,active)=>{if(!_fromMain(e))return;_hotkeyCapture=!!active;if(_hotkeyCapture)_hkUnregister();else _hkRegister();});
-ipcMain.handle("set-autostart", (e, enabled)=>{ if(!_fromMain(e))return false; try{ app.setLoginItemSettings({openAtLogin:!!enabled}); }catch(_){} try{ return app.getLoginItemSettings().openAtLogin; }catch(_){ return !!enabled; } });
+ipcMain.on("censor-mode",(e,enabled)=>{if(!_fromMain(e))return;censorModeEnabled=!!enabled;});
+function _autostartSettings(){
+  try{const settings=app.getLoginItemSettings({path:process.execPath,args:[]}),enabled=!!settings.openAtLogin&&settings.executableWillLaunchAtLogin!==false;return {ok:true,enabled:enabled,openAtLogin:!!settings.openAtLogin};}
+  catch(error){return {ok:false,enabled:false,error:String(error&&error.message||error)};}
+}
+ipcMain.handle("get-autostart",e=>_fromMain(e)?_autostartSettings():{ok:false,enabled:false,error:"unauthorized"});
+ipcMain.handle("set-autostart",(e,enabled)=>{
+  if(!_fromMain(e))return {ok:false,enabled:false,error:"unauthorized"};
+  try{app.setLoginItemSettings({openAtLogin:!!enabled,path:process.execPath,args:[],name:app.getName()});const current=_autostartSettings();return Object.assign({},current,{ok:current.ok&&current.enabled===!!enabled,error:current.ok&&current.enabled!==!!enabled?"Windows did not apply the startup setting":current.error});}
+  catch(error){const current=_autostartSettings();return {ok:false,enabled:current.enabled,error:String(error&&error.message||error)};}
+});
 ipcMain.handle("ext-dir", (e)=> _fromMain(e)?EXTENSION_DIR:"");
 ipcMain.handle("ext-open", (e)=>{ if(!_fromMain(e))return false; try{ syncBrowserExtension(); require("electron").shell.openPath(EXTENSION_DIR); return true; }catch(_){ return false; } });
 ipcMain.handle("media-assets",(e)=>_fromMain(e)?animationAssets():{});
 ipcMain.handle("media-open",async(e,kind)=>{if(!_fromMain(e))return false;const folder=kind==="intros"?BOOT_DIR:kind==="animations"?ANIMATION_DIR:"";if(!folder)return false;try{fs.mkdirSync(folder,{recursive:true});const error=await shell.openPath(folder);return !error;}catch(_){return false;}});
-ipcMain.on("show-notif", (e, data)=>{ if(!_fromMain(e))return; try{ const {Notification:nN}=require('electron'); const n=new nN({title:String(data&&data.title||'S.I.R').slice(0,100), body:String(data&&data.body||'').slice(0,500), silent:true}); n.show(); }catch(er){ try{console.error('[sinrad] notif:',er.message);}catch(_){} } });
+ipcMain.on("show-notif", (e, data)=>{ if(!_fromMain(e)||censorModeEnabled)return; try{ const {Notification:nN}=require('electron'); const n=new nN({title:String(data&&data.title||'SINRAD').slice(0,100), body:String(data&&data.body||'').slice(0,500), silent:true,icon:WINDOW_ICON}); n.show(); }catch(er){ try{console.error('[sinrad] notif:',er.message);}catch(_){} } });
 
 const activeScans = new Map();
 ipcMain.handle("fs-home", (e)=> _fromMain(e)?app.getPath("home"):"");
@@ -1535,6 +1870,7 @@ ipcMain.handle("update-check", async function(e, rendererVer){
     return {ok:false, error:String(err&&err.message||err), current:cur, platform:process.platform};
   }
 });
+let downloadedUpdateVersion="";
 ipcMain.handle("update-download", async function(e, payload){
   if(!_fromMain(e)) return {manual:false,error:"unauthorized"};
   if(autoUpdater && app.isPackaged){
@@ -1542,9 +1878,11 @@ ipcMain.handle("update-download", async function(e, payload){
     autoUpdater.on("download-progress", onProg);
     try{
       const info=await autoUpdater.checkForUpdates();
-      if(info && info.updateInfo){ await autoUpdater.downloadUpdate(); return {temp:true}; }
+      downloadedUpdateVersion="";
+      if(info && info.updateInfo && updCmp(updVerTuple(info.updateInfo.version),updVerTuple(app.getVersion()))>0){const files=await autoUpdater.downloadUpdate();if(!files||!files.length)throw Error("Update download did not produce an installer");downloadedUpdateVersion=info.updateInfo.version;return {temp:true};}
+      return {error:"No newer update is available. Check again."};
     }catch(err){
-      try{ console.error("[sinrad] update download:", err&&err.message); }catch(_){}
+      return {error:String(err&&err.message||err)};
     }finally{
       try{ autoUpdater.removeListener("download-progress", onProg); }catch(_){}
     }
@@ -1555,8 +1893,10 @@ ipcMain.handle("update-download", async function(e, payload){
 ipcMain.handle("update-install", async function(e){
   if(!_fromMain(e)) return {ok:false,error:"unauthorized"};
   if(autoUpdater && app.isPackaged){
-    try{ autoUpdater.quitAndInstall(true,true); return {ok:true,silent:true}; }catch(err){ try{ console.error("[sinrad] update install:", err&&err.message); }catch(_){} }
+    if(!downloadedUpdateVersion||updCmp(updVerTuple(downloadedUpdateVersion),updVerTuple(app.getVersion()))<=0)return {ok:false,error:"Download the newer update before installing"};
+    let failure=null;const onError=error=>{failure=error;};autoUpdater.on("error",onError);
+    try{autoUpdater.quitAndInstall(true,true);if(failure)return {ok:false,error:String(failure.message||failure)};return {ok:true,silent:true};}catch(err){return {ok:false,error:String(err&&err.message||err)};}finally{autoUpdater.removeListener("error",onError);}
   }
   try{ shell.openExternal(UPD_PAGE); }catch(_){}
-  return {manual:true};
+  return {ok:false,error:"Automatic installation is only available in the installed app"};
 });

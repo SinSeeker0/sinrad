@@ -1,3 +1,5 @@
+function removeNativeHoverText(root){if(!root)return;if(root.nodeType===1&&root.hasAttribute("title"))root.removeAttribute("title");if(root.querySelectorAll)root.querySelectorAll("[title]").forEach(function(node){node.removeAttribute("title");});}
+removeNativeHoverText(document);new MutationObserver(function(changes){changes.forEach(function(change){if(change.type==="attributes")change.target.removeAttribute("title");else change.addedNodes.forEach(removeNativeHoverText);});}).observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:["title"]});
 const E = window.electronAPI || {};
 const pet = document.getElementById("pet");
 const menu = document.getElementById("menu");

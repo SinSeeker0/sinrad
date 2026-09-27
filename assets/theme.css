@@ -1,0 +1,35 @@
+/* Shared application palette. Category and error colors remain independent. */
+:root {
+  --page:#0b110e;
+  --win:#0f1712;
+  --win-border:#34483a;
+  --titlebar:#101a14;
+  --side:#132019;
+  --content:#0f1712;
+  --panel:#17251d;
+  --panel-2:#1d2e23;
+  --input:#111d16;
+  --border:#3c5142;
+  --border-soft:#2b3e32;
+  --txt:#e8f0e9;
+  --muted:#b1c2b5;
+  --dim:#9aad9f;
+  --cyan:var(--accent);
+  --cyan-2:var(--accent-hover);
+  --pink:#ff4d8d;
+  --violet:#7c5cff;
+  --yellow:var(--accent);
+  --green:#82ba91;
+  --red:#d86565;
+  --c-anime:#ff5470;
+  --c-interesting:#4d9bff;
+  --c-checkout:#e8e8ef;
+  --radius:8px;
+  --glow:none;
+  --font:"Segoe UI Variable Text","Segoe UI",Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+  --accent:#a9df52;
+  --accent-hover:#c2ed82;
+  --accent-soft:#283d20;
+  --accent-border:#6a8e42;
+}

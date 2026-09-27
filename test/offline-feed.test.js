@@ -92,12 +92,12 @@ test("storage cleanup deletes oldest history first and protects unread posts", f
   });
 });
 
-test("three-day freshness removes old nonfavorites and reports sources to refill", function(){
+test("managed Reddit keeps stale posts until replacements have been saved", function(){
   withStore(function(store){
     const source=store.addSource({platform:"reddit",handle:"AskReddit"}),now=Date.now(),old=now-4*24*60*60*1000;store.configure({freshnessDays:3});
     store.mergeItems(source.id,[{sourceKey:"reddit:t3_stale",platform:"reddit",title:"Stale",downloadedAt:old},{sourceKey:"reddit:t3_fresh",platform:"reddit",title:"Fresh",downloadedAt:now},{sourceKey:"reddit:t3_old_favorite",platform:"reddit",title:"Favorite",downloadedAt:old,favorite:true}]);
     const favorite=store.data.items.find(function(item){return item.sourceKey==="reddit:t3_old_favorite";});favorite.favorite=true;store.save();
-    const result=store.cleanupStale(now),keys=store.snapshot().items.map(function(item){return item.sourceKey;}).sort();assert.equal(result.removed,1);assert.deepEqual(result.sourceIds,[source.id]);assert.deepEqual(keys,["reddit:t3_fresh","reddit:t3_old_favorite"]);
+    const result=store.cleanupStale(now);assert.equal(result.removed,0);assert.equal(store.snapshot().items.length,3);store.data.sources.find(entry=>entry.id===source.id).limit=1;assert.equal(store.retireReplacedPosts(source.id,now).removed,1);assert.deepEqual(store.snapshot().items.map(item=>item.sourceKey).sort(),["reddit:t3_fresh","reddit:t3_old_favorite"]);
   });
 });
 
@@ -124,6 +124,8 @@ test("sync cleanup deletes read posts and files but keeps unread and favorites",
     const store=new OfflineFeedStore(root),source=store.addSource({platform:"reddit",handle:"AskReddit"}),readMedia=await store.writeMedia("reddit:t3_read",0,Buffer.from("read"),".jpg"),favMedia=await store.writeMedia("reddit:t3_fav",0,Buffer.from("favorite"),".jpg");
     store.mergeItems(source.id,[{sourceKey:"reddit:t3_read",platform:"reddit",title:"Read",date:3,media:[readMedia]},{sourceKey:"reddit:t3_fav",platform:"reddit",title:"Favorite",date:2,media:[favMedia]},{sourceKey:"reddit:t3_unread",platform:"reddit",title:"Unread",date:1}]);
     const read=store.snapshot().items.find(function(item){return item.sourceKey==="reddit:t3_read";}),favorite=store.snapshot().items.find(function(item){return item.sourceKey==="reddit:t3_fav";});store.updateItem(read.id,{read:true});store.updateItem(favorite.id,{read:true,favorite:true});
+    assert.equal(store.removeReadItems([source.id]).removed,0,"Recently read posts stay for one hour");
+    store.data.items.find(item=>item.id===read.id).historyAt=Date.now()-1;store.save();
     const result=store.removeReadItems([source.id]),keys=store.snapshot().items.map(function(item){return item.sourceKey;});
     assert.equal(result.removed,1);assert.deepEqual(keys.sort(),["reddit:t3_fav","reddit:t3_unread"]);assert.equal(fs.existsSync(store.resolveMedia(readMedia)),false);assert.equal(fs.existsSync(store.resolveMedia(favMedia)),true);
   }finally{fs.rmSync(root,{recursive:true,force:true});}
@@ -209,4 +211,21 @@ test("broken automatic Reddit shells are removed without touching real captures"
     const result=store.removeBrokenExtensionCaptures();
     assert.equal(result.removed,1);assert.deepEqual(result.sourceIds,[source.id]);assert.equal(store.snapshot().items.length,1);assert.equal(store.snapshot().items[0].title,"Real post");assert.equal(fs.existsSync(path.join(root,brokenRef)),false);assert.equal(fs.existsSync(path.join(root,realRef)),true);
   });
+});
+
+
+test("Clip collection pause survives restart and unrelated settings updates", async function(){
+  const root=fs.mkdtempSync(path.join(os.tmpdir(),"sinrad-pause-test-"));
+  try {
+    const store=new OfflineFeedStore(root);
+    assert.equal(store.snapshot().settings.collectionPaused,false);
+    store.configure({collectionPaused:true});
+    store.configure({feedLayout:"scroll"});
+    await store.flush();
+    const restored=new OfflineFeedStore(root);
+    assert.equal(restored.snapshot().settings.collectionPaused,true);
+    restored.configure({collectionPaused:false});
+    await restored.flush();
+    assert.equal(new OfflineFeedStore(root).snapshot().settings.collectionPaused,false);
+  } finally {fs.rmSync(root,{recursive:true,force:true});}
 });

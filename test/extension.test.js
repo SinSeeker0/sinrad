@@ -29,7 +29,7 @@ test("extension keeps Links saving separate from Parking Lot bulk actions", func
   const root = path.resolve(__dirname, "..", "extension");
   const manifest = JSON.parse(fs.readFileSync(path.join(root, "manifest.json"), "utf8"));
   const background = fs.readFileSync(path.join(root, "background.js"), "utf8");
-  assert.equal(manifest.version, "1.3.3");
+  assert.equal(manifest.version, "1.3.5");
   assert.match(background, /id: 'sinrad-quick-save'[\s\S]*title: 'S\.I\.R Quick Save → Links'[\s\S]*contexts: \['page', 'link', 'selection'\]/);
   assert.match(background, /id: 'sinrad-park-all'[\s\S]*contexts: \['page'\]/);
   assert.match(background, /id: 'sinrad-park-all-close'[\s\S]*contexts: \['page'\]/);
@@ -40,6 +40,13 @@ test("extension keeps Links saving separate from Parking Lot bulk actions", func
   assert.match(background, /X-Sinrad-Extension-Version/);
   assert.match(background, /chrome\.runtime\.reload\(\)/);
   assert.doesNotMatch(background, /sinrad-parked-/);
+});
+
+test("Monitoring is available throughout normal website context menus", function () {
+  const root = path.resolve(__dirname, "..", "extension");
+  const background = fs.readFileSync(path.join(root, "background.js"), "utf8");
+  assert.match(background, /id: 'sinrad-add-artist-monitoring',title:'Add artist to Monitoring',contexts:\['all'\]/);
+  assert.match(background, /info\.linkUrl\|\|info\.pageUrl\|\|info\.frameUrl\|\|\(tab&&tab\.url\)\|\|info\.srcUrl/);
 });
 
 test("extension automatically saves subscribed Reddit posts without the Reddit API", function () {
@@ -58,7 +65,7 @@ test("extension automatically saves subscribed Reddit posts without the Reddit A
   assert.match(background, /https:\/\/old\.reddit\.com\/r\//);
   assert.match(background, /chrome\.tabs\.update\(tabId,\{url:snapshot\.next\}\)/);
   assert.match(background, /Reddit did not expose any unseen posts/);
-  assert.match(background, /title: 'Offline Reddit needs attention'/);
+  assert.match(background, /title: 'Clipping Reddit needs attention'/);
   assert.match(background, /gatherRedditCandidates\(listing\.id, job\.handle, known, target, source\.kind\)/);
   assert.match(background, /window\.scrollBy/);
   assert.match(background, /comments \* 8/);
@@ -87,7 +94,7 @@ test("extension captures the current page into SINRAD without another archiver",
   assert.doesNotMatch(background, /\[slot="text-body"\],\.md/);
   assert.match(background, /slice\(0, 20\)/);
   assert.match(background, /id: 'sinrad-add-subreddit-offline'/);
-  assert.match(background, /title: 'Add subreddit to Offline'/);
+  assert.match(background, /title: 'Add subreddit to Clipping'/);
   assert.match(background, /postJson\('\/offline\/source-add'/);
   assert.match(background, /postJson\('\/capture\/start',[\s\S]*metadata/);
   assert.match(background, /authorizedRequest\('\/capture\/chunk\?id='/);

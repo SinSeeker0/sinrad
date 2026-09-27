@@ -1,0 +1,524 @@
+/* Video and folder compression — edit #242 */
+  .compress-page {
+  margin:0 auto;
+  padding-bottom:50px
+}
+.compress-drop {
+  min-height:170px;
+  display:flex;
+  min-width:0;
+  flex-direction:column;
+  align-items:center;
+  justify-content:center;
+  margin-top:18px;
+  padding:28px;
+  border:1px dashed var(--border);
+  background:var(--content);
+  text-align:center;
+  transition:border-color .15s,background .15s
+}
+.compress-drop.dragging {
+  border-color:var(--accent);
+  background:var(--panel-2)
+}
+.compress-drop-icon {
+  width:45px;
+  height:45px;
+  color:var(--accent)
+}
+.compress-drop-icon svg {
+  width:100%;
+  height:100%
+}
+.compress-drop h2 {
+  width:100%;
+  max-width:820px;
+  margin:13px 0 6px;
+  overflow-wrap:anywhere;
+  color:var(--txt);
+  font-size:14px;
+  line-height:1.45;
+  white-space:normal
+}
+.compress-drop p {
+  margin:0;
+  color:var(--muted);
+  font-size:11px
+}
+.compress-drop>div:last-child {
+  display:flex;
+  gap:8px;
+  margin-top:18px
+}
+.compress-options {
+  margin-top:12px;
+  padding:14px;
+  border:1px solid var(--border-soft);
+  background:var(--panel)
+}
+.compress-control-row {
+  display:flex;
+  align-items:stretch;
+  flex-wrap:wrap;
+  gap:7px
+}
+.compress-presets {
+  display:flex;
+  gap:7px
+}
+.compress-presets button {
+  width:128px;
+  min-height:48px;
+  padding:8px 10px;
+  border:1px solid var(--border);
+  background:var(--content);
+  color:var(--muted);
+  text-align:left;
+  cursor:pointer
+}
+.compress-presets button:hover {
+  border-color:var(--border)
+}
+.compress-presets button.active {
+  border-color:var(--accent);
+  background:var(--panel-2);
+  color:var(--txt)
+}
+.compress-presets b,.compress-presets span {
+  display:block
+}
+.compress-presets b {
+  font-size:11px
+}
+.compress-presets span {
+  margin-top:3px;
+  color:var(--dim);
+  font-size:11px
+}
+.compress-presets button.active span {
+  color:var(--muted)
+}
+.compress-stats {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  margin-top:12px;
+  border-top:1px solid var(--border-soft);
+  border-left:1px solid var(--border-soft)
+}
+.compress-stats>div {
+  min-width:0;
+  padding:12px;
+  border-right:1px solid var(--border-soft);
+  border-bottom:1px solid var(--border-soft)
+}
+.compress-stats small,.compress-stats b {
+  display:block
+}
+.compress-stats small {
+  color:var(--dim);
+  font:11px var(--mono);
+  text-transform:uppercase
+}
+.compress-stats b {
+  margin-top:6px;
+  overflow:hidden;
+  color:var(--txt);
+  font-size:11px;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+.compress-output {
+  display:grid;
+  grid-template-columns:70px minmax(0,1fr);
+  align-items:center;
+  gap:10px;
+  padding:10px 0;
+  border-bottom:1px solid var(--border-soft)
+}
+.compress-output small {
+  color:var(--dim);
+  font:11px var(--mono);
+  text-transform:uppercase
+}
+.compress-output span {
+  overflow-wrap:anywhere;
+  color:var(--muted);
+  font:11px/1.45 var(--mono);
+  user-select:text
+}
+.compress-actions {
+  display:flex;
+  justify-content:flex-end;
+  gap:8px;
+  padding-top:10px
+}
+.compress-progress {
+  margin-top:12px;
+  padding:13px;
+  border-left:2px solid var(--accent);
+  background:var(--panel)
+}
+.compress-progress.complete {
+  border-left-color:#5d9669
+}
+.compress-progress.failed {
+  border-left-color:#bc5d5d
+}
+.compress-progress>div:first-child {
+  display:flex;
+  justify-content:space-between;
+  gap:12px
+}
+.compress-progress b {
+  overflow:hidden;
+  color:var(--txt);
+  font-size:11px;
+  text-overflow:ellipsis;
+  white-space:nowrap
+}
+.compress-progress span {
+  color:var(--accent);
+  font:11px var(--mono)
+}
+.compress-progress small {
+  display:block;
+  margin-top:7px;
+  color:var(--dim);
+  font:11px var(--mono)
+}
+.compress-bar {
+  height:4px;
+  margin-top:9px;
+  overflow:hidden;
+  background:var(--panel-2)
+}
+.compress-bar i {
+  display:block;
+  height:100%;
+  background:var(--accent);
+  transition:width .2s
+}
+.compress-progress.complete .compress-bar i {
+  background:#659a70
+}
+.compress-note {
+  display:flex;
+  gap:13px;
+  margin-top:12px;
+  padding:12px;
+  border-top:1px solid var(--border-soft);
+  color:var(--dim);
+  font-size:11px;
+  line-height:1.5
+}
+.compress-note b {
+  flex:0 0 auto;
+  color:var(--accent)
+}
+.compress-note span {
+  min-width:0
+}
+.compress-page {
+  display:grid;
+  grid-template-columns:minmax(0,1.2fr) minmax(300px,.8fr);
+  align-items:start;
+  gap:18px;
+  max-width:none
+}
+.compress-work {
+  min-width:0
+}
+.compress-checks {
+  display:flex;
+  align-items:stretch;
+  gap:7px
+}
+.compress-check {
+  display:flex;
+  min-width:128px;
+  align-items:center;
+  gap:8px;
+  padding:8px 10px;
+  border:1px solid var(--border-soft);
+  background:var(--content);
+  color:var(--muted);
+  font-size:11px;
+  cursor:pointer
+}
+.compress-check:hover {
+  border-color:var(--border)
+}
+.compress-check.active {
+  border-color:var(--accent-soft);
+  color:var(--txt)
+}
+.compress-check input {
+  position:absolute;
+  width:1px;
+  height:1px;
+  opacity:0;
+  pointer-events:none
+}
+.compress-check i {
+  position:relative;
+  width:14px;
+  height:14px;
+  flex:0 0 14px;
+  border:1px solid var(--border);
+  background:var(--content)
+}
+.compress-check input:checked+i {
+  border-color:var(--accent);
+  background:var(--panel-2)
+}
+.compress-check input:checked+i:after {
+  content:"";
+  position:absolute;
+  left:3px;
+  top:0;
+  width:5px;
+  height:9px;
+  border-right:2px solid var(--accent);
+  border-bottom:2px solid var(--accent);
+  transform:rotate(42deg)
+}
+.compress-check:has(input:disabled) {
+  cursor:not-allowed;
+  opacity:.5
+}
+.compress-results {
+  min-width:0;
+  max-height:calc(100vh - 150px);
+  overflow:auto;
+  padding:14px;
+  border-left:1px solid var(--border-soft);
+  background:var(--content)
+}
+.compress-results-head {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin-bottom:10px
+}
+.compress-results h2 {
+  margin:0;
+  color:var(--txt);
+  font-size:15px
+}
+.compress-results-head small {
+  color:var(--dim);
+  font:11px var(--mono)
+}
+.compress-results>small,.compress-empty,.compress-estimate-note {
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.5
+}
+.compress-job {
+  margin-bottom:7px;
+  padding:10px 11px;
+  border:1px solid var(--border-soft);
+  border-left:3px solid var(--accent-border);
+  background:var(--panel);
+  cursor:pointer
+}
+.compress-job.video {
+  border-left-color:#9a72c7;
+  background:#18151c
+}
+.compress-job.folder {
+  border-left-color:#57a181;
+  background:#131a17
+}
+.compress-job:hover,.compress-job.selected {
+  border-top-color:var(--dim);
+  border-right-color:var(--dim);
+  border-bottom-color:var(--dim)
+}
+.compress-job-top {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:8px
+}
+.compress-job-top span {
+  color:#b98ae9;
+  font:11px var(--mono);
+  letter-spacing:.08em;
+  text-transform:uppercase
+}
+.compress-job.folder .compress-job-top span {
+  color:#6fc49d
+}
+.compress-job time {
+  color:var(--dim);
+  font:11px var(--mono)
+}
+.compress-job>b,.compress-job>small,.compress-job>p,.compress-job>em {
+  display:block;
+  overflow-wrap:anywhere
+}
+.compress-job>b {
+  margin-top:6px;
+  color:var(--txt);
+  font-size:11px
+}
+.compress-job>small {
+  margin-top:4px;
+  color:var(--muted);
+  font-size:11px
+}
+.compress-job>p {
+  margin:5px 0 0;
+  color:var(--dim);
+  font:11px/1.4 var(--mono)
+}
+.compress-job>em {
+  margin-top:6px;
+  color:var(--accent);
+  font-size:11px;
+  font-style:normal;
+  text-transform:uppercase
+}
+#compress-preview video,#compress-preview img {
+  display:block;
+  width:100%;
+  max-height:240px;
+  object-fit:contain;
+  background:var(--content)
+}
+#compress-preview p {
+  overflow-wrap:anywhere;
+  user-select:text;
+  color:var(--muted);
+  font-size:11px
+}
+#compress-preview small {
+  display:block;
+  font-size:11px;
+  color:var(--muted);
+  line-height:1.5
+}
+.compress-results>small {
+  display:block;
+  margin-top:11px
+}
+.compress-zip {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:10px;
+  margin:8px 0;
+  padding:8px 9px;
+  border-left:2px solid var(--accent);
+  background:var(--panel)
+}
+.compress-zip>span {
+  min-width:0
+}
+.compress-zip b,.compress-zip small {
+  display:block
+}
+.compress-zip b {
+  color:var(--txt);
+  font-size:11px
+}
+.compress-zip small {
+  margin-top:2px;
+  overflow-wrap:anywhere;
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.4
+}
+.compress-visual {
+  margin-top:14px;
+  padding-top:12px;
+  border-top:1px solid var(--border-soft)
+}
+.compress-stages {
+  display:grid;
+  grid-template-columns:repeat(4,1fr);
+  gap:1px;
+  margin-bottom:12px
+}
+.compress-stages span {
+  padding:6px;
+  background:var(--panel-2);
+  color:var(--dim);
+  font:11px var(--mono);
+  text-align:center
+}
+.compress-stages span.on {
+  background:var(--accent-soft);
+  color:var(--accent)
+}
+.compress-size-row {
+  display:grid;
+  grid-template-columns:55px minmax(0,1fr) 70px;
+  align-items:center;
+  gap:8px;
+  margin-top:7px;
+  color:var(--muted);
+  font:11px var(--mono)
+}
+.compress-size-row i {
+  height:7px;
+  background:var(--panel-2)
+}
+.compress-size-row b {
+  display:block;
+  height:100%;
+  background:var(--dim)
+}
+.compress-size-row.output b {
+  background:var(--accent)
+}
+.compress-size-row em {
+  font-style:normal;
+  text-align:right
+}
+@media(max-width:980px) {
+  .compress-page {
+    grid-template-columns:1fr
+  }
+  .compress-results {
+    max-height:none;
+    border-left:0;
+    border-top:1px solid var(--border-soft)
+  }
+}
+@media(max-width:760px) {
+  .compress-stats {
+    grid-template-columns:1fr 1fr
+  }
+  .compress-drop {
+    min-height:160px
+  }
+  .compress-control-row,.compress-presets,.compress-checks {
+    display:grid;
+    grid-template-columns:1fr 1fr
+  }
+  .compress-presets button,.compress-check {
+    width:auto;
+    min-width:0
+  }
+  .compress-drop h2 {
+    max-width:100%
+  }
+}
+.compress-drop,.compress-options,.compress-results,.compress-job,.compress-progress {
+  border-radius:8px
+}
+.compress-presets button,.compress-check {
+  border-radius:8px
+}
+.compress-presets button.active {
+  background:var(--accent-soft);
+  border-color:var(--accent-border);
+  color:var(--txt)
+}
+.compress-check input:checked+i {
+  background:var(--accent-soft);
+  border-color:var(--accent)
+}

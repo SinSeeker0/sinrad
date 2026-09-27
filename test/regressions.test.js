@@ -12,6 +12,11 @@ const renderer = fs.readFileSync(path.join(root, "assets", "renderer.js"), "utf8
 const splash = fs.readFileSync(path.join(root, "assets", "splash.js"), "utf8");
 const html = fs.readFileSync(path.join(root, "index.html"), "utf8");
 const css = fs.readFileSync(path.join(root, "assets", "index.css"), "utf8");
+const shellCss = fs.readFileSync(path.join(root, "assets", "shell.css"), "utf8");
+const timelineCss = fs.readFileSync(path.join(root, "assets", "timeline.css"), "utf8");
+const timelineRefinementCss = fs.readFileSync(path.join(root, "assets", "timeline-refinement.css"), "utf8");
+const deckCss = fs.readFileSync(path.join(root, "assets", "deck.css"), "utf8");
+const notificationsCss = fs.readFileSync(path.join(root, "assets", "notifications-refinement.css"), "utf8");
 const splashCss = fs.readFileSync(path.join(root, "assets", "splash.css"), "utf8");
 const petCss = fs.readFileSync(path.join(root, "assets", "pet.css"), "utf8");
 const extension = fs.readFileSync(path.join(root, "extension", "background.js"), "utf8");
@@ -44,7 +49,22 @@ test("deleted category is also removed from the active filter", function () {
 
 test("large views use browser-backed rendering virtualization", function () {
   const css=fs.readFileSync(path.join(root,"assets","index.css"),"utf8");
+  const timelineCss=fs.readFileSync(path.join(root,"assets","timeline-refinement.css"),"utf8");
+  const monitoringCss=fs.readFileSync(path.join(root,"assets","notifications-refinement.css"),"utf8");
   assert.match(css,/content-visibility:auto/);
+  assert.match(timelineCss,/\.deck-view \.deck-monitor-post[^\n]*content-visibility:auto/);
+  assert.match(timelineCss,/\.deck-view \.deck-column \.misskey-note[^\n]*content-visibility:auto/);
+  assert.match(monitoringCss,/\.monitoring-mode \.mon-event[^\n]*content-visibility:auto/);
+});
+
+test("monitoring feed cards do not use the global image zoom", function () {
+  assert.doesNotMatch(renderer,/const selector="[^"]*mon-event-preview/);
+  assert.doesNotMatch(renderer,/const selector="[^"]*mon-artist-preview/);
+  assert.doesNotMatch(renderer,/const selector="[^"]*\.deck-view \.deck-monitor-media/);
+  assert.doesNotMatch(renderer,/const selector="[^"]*\.mon-reader img\.mon-reader-media/);
+  assert.match(renderer,/monitoringId:monitoringCard&&monitoringCard\.dataset\.id/);
+  assert.match(timelineRefinementCss,/\.deck-view \.deck-monitor-gallery \.deck-monitor-media\{[^}]*cursor:pointer/);
+  assert.match(timelineCss,/@keyframes clippingLightboxFade[\s\S]*@keyframes clippingLightboxImageIn/);
 });
 
 test("the removed player has no remaining app or package wiring", function () {
@@ -85,12 +105,68 @@ test("Electron forwards Ctrl+Shift+P before the page can lose it", function () {
 });
 
 test("Offline Reader is a dedicated mode backed by privileged IPC", function () {
-  assert.match(renderer,/function setOfflineMode\(enabled(?:,quiet)?\)/);
+  assert.match(renderer,/function setOfflineMode\(enabled,quiet,useLoadedData\)/);
   assert.match(renderer,/classList\.toggle\("offline-mode",offlineMode\)/);
   assert.match(renderer,/function renderOfflineView\(\)/);
   assert.match(preload,/offlineLoad:[\s\S]*offlineRefresh:[\s\S]*onOfflineChanged:/);
   assert.match(main,/let offlineFeed = new OfflineFeedStore\(_initialOfflineRoot\(\)\)/);
   assert.match(main,/ipcMain\.handle\("offline-refresh"/);
+});
+
+test("Offline posts and individual feed images expose distinct downloads", function () {
+  assert.match(renderer,/mi\("offline-item-download",item\.id,"Download post"/);
+  assert.match(renderer,/data-ctx="monitor-event"/);
+  assert.match(renderer,/mi\("monitoring-event-download",item\.id,"Download whole post"/);
+  assert.match(renderer,/data-ctx="offline-media"/);
+  assert.match(renderer,/data-post-id=/);
+  assert.match(renderer,/mi\("offline-media-download",id,"Download image"/);
+  assert.doesNotMatch(renderer,/mi\("offline-item-open",item\.id,"Open post"/);
+  assert.doesNotMatch(renderer,/mi\("monitoring-event-open",item\.id,"Open post"/);
+  assert.match(renderer,/!offlineMode&&!monitoringMode&&currentView==="home"\)[\s\S]*openTimelineRedditReader\(item\.id\)/);
+  assert.match(preload,/offlineItemDownload: \(id\) => ipcRenderer\.invoke\("offline-item-download", id\)/);
+  assert.match(preload,/offlineMediaDownload: \(ref\) => ipcRenderer\.invoke\("offline-media-download", ref\)/);
+  assert.match(main,/ipcMain\.handle\("offline-item-download"/);
+  assert.match(main,/ipcMain\.handle\("offline-media-download"/);
+  assert.doesNotMatch(main,/SINRAD Offline Downloads/);
+  assert.doesNotMatch(main,/function _postDownloadFolder/);
+  assert.match(renderer,/String\(item\.id\)===String\(id\)/);
+  assert.match(renderer,/case "offline-item-open"[\s\S]*openTimelineRedditReader\(item\.id\)/);
+  assert.match(renderer,/function removeTimelineOfflineItem\(id\)/);
+  assert.match(renderer,/case "offline-item-remove"[\s\S]*removeTimelineOfflineItem\(id\)/);
+});
+
+test("Monitoring reader enlarges images in place and eagerly plays GIFs", function () {
+  assert.match(deckCss,/\.deck-monitoring-posts\{display:flex;flex-direction:column;gap:12px\}/);
+  assert.match(renderer,/data-action="monitoring-image-expand"/);
+  assert.match(renderer,/loading="lazy" decoding="async"/);
+  assert.match(renderer,/\.gif\(\?:\$\|\\\?\)/);
+  assert.match(renderer,/figure\.classList\.toggle\("expanded"\)/);
+  assert.match(notificationsCss,/max-height:calc\(100dvh - 96px\)/);
+  assert.match(renderer,/media\.tagName==='IMG'&&media\.naturalWidth\)\{ready\(\);return;\}/);
+  assert.match(main,/const animated=file\.kind==="image"&&\/\\\.gif\$\/i/);
+  assert.match(main,/file\.kind==="video"\?MonitoringSources\.pawchiveFileUrl\(file\)/);
+  assert.match(main,/file\.kind==="audio"\|\|animated\)\?MONITOR_MEDIA_PROTOCOL\+":\/\/file"\+file\.path/);
+  assert.match(main,/MONITOR_MEDIA_PROTOCOL,privileges:\{[^}]*stream:true/);
+  assert.match(main,/responseHeaders\.set\("Content-Type",mediaType\)/);
+  assert.match(deckCss,/width:min\(1800px,90vw\)/);
+  assert.match(css,/#ctxmenu\{z-index:120000\}/);
+  assert.match(deckCss,/\.deck-preview-panel \.mon-file\{width:min\(820px,100%\)/);
+  assert.match(deckCss,/\.mon-file\.expanded\{width:100%}/);
+  assert.match(notificationsCss,/\.monitoring-mode \.mon-file\.expanded\{width:100%}/);
+  assert.match(css,/\.mon-media-frame\{[^}]*background:transparent/);
+  assert.match(css,/\.mon-reader-media\{[^}]*background:transparent/);
+  assert.match(css,/\.mon-file figcaption\{[^}]*width:min\(820px,100%\)/);
+  assert.match(renderer,/viewMonitoringDetail\(monitoringDetail,false\)/);
+});
+
+test("App navigation, monitoring shuffle, fullscreen video, and tooltip guards stay wired", function () {
+  assert.match(html,/id="appBackButton"[\s\S]*id="appForwardButton"/);
+  assert.match(renderer,/function navigateAppHistory\(direction\)/);
+  assert.match(renderer,/setInterval\(refreshTimelineMonitoringShuffle,2\*60\*60\*1000\)/);
+  assert.match(renderer,/config\.source!=="inbox"/);
+  assert.match(renderer,/video\.controls=true[\s\S]*requestFullscreen/);
+  assert.match(renderer,/fullscreenchange[\s\S]*video\.controls=document\.fullscreenElement===video/);
+  assert.match(renderer,/new MutationObserver[\s\S]*attributeFilter:\["title"\]/);
 });
 
 test("Monitoring is a dedicated mode backed by privileged IPC", function () {
@@ -102,11 +178,15 @@ test("Monitoring is a dedicated mode backed by privileged IPC", function () {
   assert.match(main,/ipcMain\.handle\("monitoring-refresh"/);
   assert.match(main,/ipcMain\.handle\("monitoring-media"/);
   assert.match(main,/items\.slice\(0,24\)[\s\S]*baseline:true/);
+  assert.match(renderer,/data-tab="collections">Folders/);
+  assert.match(renderer,/monitoringTab==='collections'[\s\S]*mon-collections-blank/);
+  assert.match(notificationsCss,/mon-collections-tab\{margin-right:18px\}/);
 });
 
 test("Pawchive posts open and download inside the privileged Monitor reader", function () {
   assert.match(preload,/monitoringPostDetail:[\s\S]*monitoringDownload:[\s\S]*monitoringDownloadAll:[\s\S]*monitoringArtistDetail:[\s\S]*monitoringArtistPostDetail:[\s\S]*monitoringArtistDownloadAll:/);
   assert.match(main,/protocol\.handle\(MONITOR_MEDIA_PROTOCOL/);
+  assert.match(main,/"Accept-Encoding":"identity"[\s\S]*redirect:"follow"/);
   assert.match(main,/ipcMain\.handle\("monitoring-post-detail"/);
   assert.match(main,/ipcMain\.handle\("monitoring-download-all"/);
   assert.match(main,/ipcMain\.handle\("monitoring-artist-detail"/);
@@ -116,34 +196,42 @@ test("Pawchive posts open and download inside the privileged Monitor reader", fu
   assert.match(main,/ipcMain\.handle\("monitoring-output-open"/);
   assert.match(main,/ipcMain\.handle\("monitoring-output-choose"/);
   assert.match(preload,/monitoringOutputOpen:[\s\S]*monitoringOutputChoose:/);
-  assert.match(renderer,/function viewMonitoringDetail\(detail\)/);
+  assert.match(renderer,/function viewMonitoringDetail\(detail,showBack\)/);
   assert.match(renderer,/item\.kind!=="pawchive"[\s\S]*openTarget\(item\.url/);
   assert.match(html,/media-src[^;]*sinrad-monitor:/);
 });
 
 test("Pawchive reader uses quick previews, flat media and contextual downloads", function () {
   const detailView=renderer.slice(renderer.indexOf("function monitoringFilePreview"),renderer.indexOf("function renderMonitoringView"));
-  assert.match(main,/file\.kind==="image"\?await _pawchiveImagePreview\(file\)/);
+  assert.match(main,/file\.kind==="image"&&!animated\?MONITOR_MEDIA_PROTOCOL/);
   assert.match(main,/function _pawchiveImagePreview\(file\)[\s\S]*pawchiveThumbnailUrl\(file\)[\s\S]*2\*1024\*1024/);
   assert.match(detailView,/data-ctx="monitor-file"/);
-  assert.match(detailView,/data-action="monitoring-post-back">← Back<\/button>/);
+  assert.doesNotMatch(detailView,/data-action="monitoring-post-back"|← Back/);
   assert.match(detailView,/class="mon-reader-creator"[\s\S]*data-action="monitoring-post-artist-open"/);
-  assert.equal((detailView.match(/<button/g)||[]).length,3);
+  assert.match(detailView,/monitoringPostPager\('top'\)/);
+  assert.match(renderer,/function monitoringPostPager\(position\)[\s\S]*data-action="monitoring-post-page"[\s\S]*aria-current="page"/);
+  assert.match(detailView,/monitoringPostPager\('top'\)[\s\S]*monitoringPostPager\('bottom'\)/);
+  assert.match(renderer,/monitoringPostSequence=monitoringFilteredEvents\(\)[\s\S]*item\.read=true/);
   assert.match(renderer,/case "monitoring-post-artist-open"[\s\S]*E\.monitoringArtistDetail/);
   assert.match(css,/\.mon-reader-creator\{[^}]*background:transparent[^}]*cursor:pointer/);
   assert.match(renderer,/type==="monitor-file"[\s\S]*Download image/);
-  assert.match(renderer,/type==="monitor-file"[\s\S]*monitoring-post-back/);
+  assert.doesNotMatch(renderer,/type==="monitor-file"[^\n]*monitoring-post-back/);
+  assert.doesNotMatch(renderer,/type==="monitor-file"[^\n]*(?:Next post|Previous post)/);
   assert.match(renderer,/if\(leaveMonitoringPost\(\)\)\{ev\.preventDefault\(\);return;\}/);
   assert.match(css,/\.mon-reader-post\{[^}]*border:0[^}]*background:transparent/);
   assert.match(css,/\.mon-file\{[^}]*border:0[^}]*background:transparent/);
   assert.match(detailView,/class="mon-file-row"/);
-  assert.match(detailView,/controls preload="auto" playsinline/);
-  assert.match(detailView,/mon-reader-audio[^>]*controls preload="auto"/);
+  assert.match(detailView,/data-action="monitoring-video-toggle"[^>]*preload="metadata" playsinline><source[^>]*type=/);
+  assert.doesNotMatch(detailView,/<video[^>]* controls/);
+  assert.match(detailView,/media\.readyState>=1\)ready\(\)/);
+  assert.match(detailView,/mon-reader-audio[^>]*controls preload="none"/);
   assert.match(detailView,/class="mon-media-file"[^>]*data-action="monitoring-download"[^>]*data-index/);
-  assert.match(detailView,/Click to download/);
+  assert.match(detailView,/mon-download-arrow/);
   assert.doesNotMatch(detailView,/mon-media-file">Right-click to download/);
   assert.match(css,/\.mon-file-row\{[^}]*width:min\(920px,100%\)[^}]*display:grid[^}]*grid-template-columns:minmax\(0,1fr\)[^}]*grid-auto-flow:row/);
   assert.match(css,/\.mon-media-frame\.image\{[^}]*aspect-ratio:auto/);
+  assert.match(html,/media-src[^;]*https:\/\/file\.pawchive\.pw/);
+  assert.match(renderer,/if\(!monitoringMode\|\|e\.defaultPrevented[\s\S]*showCardMenu\("monitor-post"[\s\S]*showCardMenu\("monitor-artist"/);
 });
 
 test("browser snapshots enter Offline Reader through the authenticated bridge", function () {
@@ -172,7 +260,7 @@ test("browser snapshots enter Offline Reader through the authenticated bridge", 
   assert.match(renderer,/class="of-storage"/);
   assert.match(renderer,/function offlineSourceLimitModal\(source\)/);
   assert.match(main,/offlineFeed\.cleanupHistory/);
-  assert.match(main,/knownKeys:source\.seenPostKeys/);
+  assert.match(main,/knownKeys:offlineFeed\.recentPostKeys/);
   assert.match(preload,/offlineItemRemove:/);
   assert.match(preload,/offlineSourceUpdate:/);
   assert.match(renderer,/function offlineRichBlocks\(blocks,className\)/);
@@ -181,7 +269,7 @@ test("browser snapshots enter Offline Reader through the authenticated bridge", 
   assert.match(main,/comment\.avatar=ref/);
   assert.match(renderer,/const inMode=offlineMode\|\|monitoringMode[\s\S]*if\(inMode&&inContent&&!interactive\)/);
   assert.match(renderer,/const item=offlineSelectedId&&offlineItem\(offlineSelectedId\)/);
-  assert.match(renderer,/mi\("offline-item-back","","Back"/);
+  assert.doesNotMatch(renderer,/mi\("offline-item-back","","Back"/);
   assert.match(css,/\.of-gallery-stage\{[^}]*height:clamp\(430px,70vh,760px\)[^}]*border:1px solid/);
   assert.match(css,/\.of-body\.rich\{[^}]*white-space:normal/);
 });
@@ -229,7 +317,7 @@ test("Ideas is a local module with chat import, approval and Codex handoff", fun
   assert.match(main,/ipcMain\.handle\("idea-images-import"/);
   assert.match(main,/ipcMain\.handle\("idea-image-copy"/);
   assert.match(preload,/ideaImagesPick:[\s\S]*ideaImagesImport:[\s\S]*ideaImageCopy:/);
-  assert.match(renderer,/Nothing is saved until you approve the preview/);
+  assert.match(renderer,/ITQ queues this batch and clears the input/);
   assert.match(renderer,/function ideaCodexText\(item\)/);
   assert.match(renderer,/const IDEA_GROUPS=\{app:"App",other:"Other",unsorted:"Unsorted"\}/);
   assert.match(renderer,/data-action="idea-group-filter"/);
@@ -272,7 +360,7 @@ test("offline videos use balanced quality and feed sources stay mixed", function
   assert.match(main,/36\*1024\*1024/);
   assert.match(main,/_upgradeLowQualityOfflineVideos/);
   assert.match(renderer,/function offlineMixSources\(items\)/);
-  assert.match(renderer,/return offlineMixSources\(filtered\)/);
+  assert.match(renderer,/return offlineMixSources\(/);
   const vm=require("node:vm"),code=renderer.slice(renderer.indexOf("function offlineMixSources(items)"),renderer.indexOf("function offlineSourceName(item)")),context={};vm.runInNewContext(code,context);
   const input=[{id:"a1",sourceId:"a"},{id:"a2",sourceId:"a"},{id:"a3",sourceId:"a"},{id:"b1",sourceId:"b"},{id:"b2",sourceId:"b"}];
   assert.deepEqual(Array.from(context.offlineMixSources(input),item=>item.id),["a1","b1","a2","b2","a3"]);
@@ -286,7 +374,7 @@ test("list navigation preserves its visual anchor and partial Reddit batches con
   assert.match(renderer,/renderViewAnchored\(anchor,true\)/);
   assert.match(main,/continueRefill=saved>0&&kept<source\.limit/);
   assert.match(main,/syncRequestedAt:continueRefill\?now\+1:0/);
-  assert.match(offlineFeed,/freshnessDays:3/);
+  assert.match(offlineFeed,/freshnessDays:1/);
   assert.match(offlineFeed,/cleanupStale\(now\)/);
 });
 
@@ -311,7 +399,10 @@ test("the retired console no longer consumes workspace width", function () {
 test("navigation remains compact and accessible as the app grows", function () {
   assert.match(renderer,/<button type="button" class="nav-item/);
   assert.match(renderer,/aria-current="page"/);
-  assert.match(html,/aria-label="Open navigation and commands"/);
+  assert.match(html,/class="command-palette"[^>]*id="commandPalette"/);
+  assert.match(renderer,/"Timeline"/);
+  assert.match(renderer,/"Monitoring"/);
+  assert.match(renderer,/"Clipping"/);
   assert.match(html,/placeholder="Find a page or command…"/);
   assert.doesNotMatch(html,/>⌘<\/button>/);
   assert.match(renderer,/group:"Navigate"/);
@@ -325,6 +416,7 @@ test("navigation remains compact and accessible as the app grows", function () {
 test("context menus share the calm icon-led desktop treatment", function () {
   assert.match(renderer,/const CTX_ICON=\{/);
   assert.match(renderer,/function contextIcon\(/);
+  assert.match(renderer,/\/deck-add\/\.test\(a\)[\s\S]*M12 5v14M5 12h14/);
   assert.match(css,/#ctxmenu\.show\{animation:ctx-menu-in/);
   assert.match(css,/#ctxmenu \.ci-ico\{[^}]*background:transparent/);
   assert.match(css,/#ctxmenu \.ci:hover\{[^}]*linear-gradient/);
@@ -343,41 +435,96 @@ test("context menus share the calm icon-led desktop treatment", function () {
 
 test("Settings stays focused and exposes editable hotkeys", function () {
   const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
-  assert.match(html,/data-action="settings-open"/);
+  assert.match(renderer,/shellNavButton\("settings-open"/);
   assert.match(html,/id="settingsPanel"/);
   ["general","parking","tools"].forEach(function(tab){assert.match(renderer,new RegExp('id:"'+tab+'"'),tab);});
   assert.doesNotMatch(renderer,/settingsTab==="search"/);
   assert.match(renderer,/if\(settingsTab==="parking"\)\{[\s\S]*settingsStacks\(\)[\s\S]*<div class="setting-stacks">/);
   assert.match(renderer,/settingContextRow\("Browser extension","extension"/);
-  assert.match(renderer,/data-action="settings-back"/);
+  assert.doesNotMatch(renderer,/data-action="settings-back"/);
   ["globalSearch","commandPalette","undo","quickSave"].forEach(function(name){assert.match(renderer,new RegExp('settingHotkeyRow\\("'+name+'"'),name);});
   ["scan","park-url","park-list","stack-open","shots-refresh","backup","restore","update"].forEach(function(action){assert.doesNotMatch(renderer,new RegExp('data-setting-action=\\"'+action+'\\"'),action);});
   assert.match(preload,/hotkeysUpdate:[\s\S]*hotkeyCapture:/);
   assert.match(main,/ipcMain\.handle\("hotkeys-update"[\s\S]*ipcMain\.on\("hotkey-capture"/);
 });
 
-test("Settings lives at the top-right and global search works from dedicated modes", function () {
+test("Settings opens as a centered organized workspace", function () {
   const html=fs.readFileSync(path.join(root,"index.html"),"utf8");
   const css=fs.readFileSync(path.join(root,"assets","index.css"),"utf8");
   const titlebar=html.slice(html.indexOf('<div class="titlebar"'),html.indexOf('<div class="body">'));
-  assert.match(titlebar,/id="settingsToggle"[^>]*data-action="settings-open"/);
-  assert.ok(html.indexOf('id="settingsToggle"')<html.indexOf('<div class="statusbar">'));
-  assert.match(html,/id="settingsToggle"[^>]*data-action="settings-open"/);
+  assert.doesNotMatch(titlebar,/data-action="settings-open"|data-action="offline-mode"|data-action="monitoring-mode"/);
+  assert.match(renderer,/shellNavButton\("settings-open"/);
+  assert.doesNotMatch(renderer,/shellNavButton\("shell-search"/);
   assert.doesNotMatch(html,/CONTROL CENTER/);
   assert.match(css,/\.settings-open\{[^}]*border:0[^}]*background:transparent/);
   assert.match(css,/\.offline-toggle\.active,\.monitoring-toggle\.active\{[^}]*box-shadow:none/);
   assert.doesNotMatch(css,/\.window\.offline-mode \.global-search/);
   assert.doesNotMatch(css,/\.window\.monitoring-mode \.global-search/);
   assert.match(renderer,/function openGlobalSearchResult\(index\)\{[\s\S]*?if\(offlineMode\)setOfflineMode\(false,true\);if\(monitoringMode\)setMonitoringMode\(false,true\);[\s\S]*?currentView=item\.view/);
-  assert.doesNotMatch(renderer,/function settingToggle\([^)]*\)\{return '[^']*<small>/);
+  assert.match(html,/class="settings-head"[\s\S]*data-settings-close/);
+  assert.match(shellCss,/\.settings-panel\.show\s*\{\s*display:grid/);
+  assert.match(shellCss,/\.settings-card\s*\{[^}]*width:min\(1180px,100%\)[^}]*height:min\(780px,100%\)/);
+  assert.match(renderer,/function settingsGroup\(/);
+  assert.match(renderer,/name:"Organization"[\s\S]*name:"Tools & storage"/);
   assert.doesNotMatch(renderer,/function settingCommandRow\([^)]*\)\{return '[^']*<small>/);
 });
 
-test("Settings uses the top gear as a toggle and has no duplicate title row", function () {
-  assert.doesNotMatch(html,/class="settings-head"|data-action="settings-close"|id="settingsTitle"/);
+test("Settings controls censoring, Offline collection, and focused single feeds", function () {
+  assert.match(shellCss,/settings-panel\.show \.settings-card[\s\S]*settings-card-in/);
+  assert.match(renderer,/settingToggle\("censor","Censor mode"/);
+  assert.match(renderer,/function applyCensorMode\(\)[\s\S]*classList\.toggle\("censor-mode"/);
+  assert.match(renderer,/function monitoringPrivateText\([^)]*\)[\s\S]*censorModeActive\(\)[\s\S]*classList\.contains\("censor-mode"\)[\s\S]*replace\(\/\[\\p\{L\}\\p\{N\}\]/u);
+  assert.match(renderer,/function monitoringEventCard\([^)]*\)[\s\S]*monitoringPrivateText\(item\.title/);
+  assert.match(renderer,/function viewMonitoringWatchlist\([^)]*\)[\s\S]*monitoringPrivateText\(item\.label/);
+  assert.match(renderer,/function viewMonitoringDetail\([^)]*\)[\s\S]*privateBody=monitoringPrivateText/);
+  assert.match(renderer,/function applyCensorMode\(\)[\s\S]*E\.setCensorMode\(active\)/);
+  assert.match(main,/ipcMain\.on\("censor-mode"[\s\S]*censorModeEnabled=!!enabled/);
+  assert.match(main,/function _showMonitoringNotification\(events\)\{[\s\S]*if\(censorModeEnabled\|\|/);
+  assert.match(renderer,/function settingMonitoringRow\(\)\{const censored=censorModeActive\(\)[\s\S]*Paused while Censor Mode is on[\s\S]*disabled/);
+  assert.match(renderer,/CENSOR_AWAY_MS=5\*60\*1000[\s\S]*function returnFromCensorAway\(\)[\s\S]*promptAwayCensor\(\)/);
+  assert.match(renderer,/window\.addEventListener\("blur",beginCensorAway\)[\s\S]*window\.addEventListener\("focus",returnFromCensorAway\)/);
+  assert.match(renderer,/persistentCensorOff[\s\S]*Turn off the censor/);
+  assert.match(renderer,/class="mon-censor-toggle[\s\S]*data-action="censor-toggle"[\s\S]*>cen<\/button>/);
+  assert.match(renderer,/function animateCensorSweep\(\)[\s\S]*censor-sweep-on[\s\S]*Math\.min\(index,18\)\*32/);
+  assert.match(renderer,/function refreshTimelineCensorColumns\(\)[\s\S]*timelineColumnBody\(config\)[\s\S]*hydrateMonitoringMedia\(\)/);
+  assert.match(renderer,/function refreshTimelineCensorColumns\(\)[\s\S]*\[document,timelineSurfaceCache\]/);
+  assert.match(renderer,/function monitoringMediaUrl\(ref\)[\s\S]*sinrad-monitor:\/\/cache\//);
+  assert.match(renderer,/function retryMonitoringMedia\(image,ref\)[\s\S]*E\.monitoringMedia\(ref\)/);
+  assert.match(renderer,/deferredMediaObserver[\s\S]*virtualMedia==="1"[\s\S]*removeAttribute\("src"\)/);
+  assert.match(renderer,/function offlineMediaUrl\(ref\)[\s\S]*jpg\|jpeg\|png\|webp\|gif\|mp4\|webm/);
+  assert.match(renderer,/function hydrateOfflineMedia\(\)[\s\S]*observedMedia\.has\(image\)[\s\S]*image\.dataset\.virtualMedia="1"[\s\S]*deferMediaLoad\(image,load\)/);
+  assert.match(main,/parsed\.hostname==="cache"[\s\S]*monitoringStore\.resolveMedia\("media\/"\+name\)/);
+  assert.match(shellCss,/html\.censor-mode:not\(\.censor-sweeping\) \.monitoring-shell img[\s\S]*censor-sweep-on img[\s\S]*filter:blur\(22px\) saturate\(\.45\)!important/);
+  assert.match(renderer,/function openSettings\(\)[\s\S]*Promise\.all\(requests[\s\S]*settingsTab===openedTab/);
+  assert.match(renderer,/data-offline-collection/);
+  assert.doesNotMatch(renderer,/class="of-collection-toggle"/);
+  assert.match(renderer,/offlineSettings\(\{collectionPaused:!collecting\}\)/);
+  assert.match(renderer,/class="deck-workspace'\+\(singleFeed\?' single-feed'/);
+  assert.match(renderer,/Math\.min\(1100,[\s\S]*viewport-56/);
+  assert.match(timelineRefinementCss,/\.deck-workspace\.single-feed\{[^}]*justify-content:center/);
+});
+
+test("module switches reuse cached surfaces and Timeline keeps right-click space", function () {
+  assert.match(renderer,/let timelineSurfaceCache=null[\s\S]*function cacheTimelineSurface\(/);
+  assert.match(renderer,/function renderTimelinePersistent\(content\)\{[\s\S]*content\.replaceChildren\(timelineSurfaceCache\)/);
+  assert.match(renderer,/offlineDataReady[\s\S]*refreshOfflineDataAfterPaint\(\)/);
+  assert.match(renderer,/monitoringDataReady[\s\S]*refreshMonitoringDataAfterPaint\(\)/);
+  assert.match(renderer,/monitoringFilter[\s\S]*opacity:\.58[\s\S]*duration:180/);
+  assert.match(renderer,/function animateTimelineColumn[\s\S]*animateTimelineColumn\(item\.key,"add"\)/);
+  assert.match(renderer,/let timelinePan=null[\s\S]*\.deck-column>header[\s\S]*glideTimeline\(workspace,velocity\)/);
+  assert.match(timelineRefinementCss,/\.deck-title:hover[\s\S]*\.deck-title:hover:after/);
+  assert.match(renderer,/case "deck-source-set"[\s\S]*animateTimelineColumn\(item\.key,"switch"\)/);
+  assert.match(timelineRefinementCss,/\.deck-workspace:not\(\.single-feed\)::after\{[^}]*flex:0 0 clamp\(150px,14vw,220px\)/);
+  assert.match(renderer,/classList\.add\("confirm-modal"\)/);
+  assert.match(shellCss,/\.modal\.confirm-modal\s*\{[^}]*border-bottom:3px solid[^}]*radial-gradient/);
+});
+
+test("Settings uses the top gear, close button and Escape", function () {
+  assert.match(html,/class="settings-head"/);
+  assert.match(renderer,/closest\("\[data-settings-close\]"\)\)\{closeSettings\(\)/);
   assert.match(renderer,/case "settings-open": toggleSettings\(\)/);
   assert.match(renderer,/function toggleSettings\(\)\{[^}]*classList\.contains\("show"\)\)closeSettings\(\);else openSettings\(\);\}/);
-  assert.match(renderer,/if\(ev\.key==="Escape"\)\{ if\(\$\("#settingsPanel"\)[^}]*closeSettings\(\)/);
+  assert.match(renderer,/if\(ev\.key==="Escape"\)\{[\s\S]*?closeTimelinePreview\(\)[\s\S]*?closeSettings\(\)/);
 });
 
 test("compact UI cleanup keeps page counts visual and horizontal chrome out", function () {
@@ -388,7 +535,7 @@ test("compact UI cleanup keeps page counts visual and horizontal chrome out", fu
   assert.match(renderer,/function pageCounterMarkup\(\)\{return '<div class="page-counter" id="pageCounter"/);
   assert.match(renderer,/function head\([^)]*\)[\s\S]*?pageCounterMarkup\(\)/);
   assert.match(renderer,/of-head-actions[^\n]*pageCounterMarkup\(\)/);
-  assert.match(renderer,/mon-head-actions[^\n]*pageCounterMarkup\(\)/);
+  assert.doesNotMatch(renderer,/mon-head-actions[^\n]*pageCounterMarkup\(\)/);
   assert.match(css,/\.nav\{[^}]*overflow-x:hidden/);
   assert.match(html,/class="norma-stage"[\s\S]*class="norma-dock-gif"/);
   assert.match(css,/#norma\.floating-placeholder\{[^}]*height:180px[^}]*min-height:180px/);
@@ -413,6 +560,9 @@ test("Settings switches animate in place and mode tabs close Settings", function
   assert.match(css,/\.setting-switch:active input:checked\+i::after/);
   assert.match(renderer,/function setOfflineMode\([^)]*\)\{\s*closeSettings\(\);/);
   assert.match(renderer,/function setMonitoringMode\([^)]*\)\{\s*closeSettings\(\);/);
+  assert.match(preload,/getAutostart:[^\n]*"get-autostart"/);
+  assert.match(main,/function _autostartSettings\(\)[\s\S]*executableWillLaunchAtLogin/);
+  assert.match(renderer,/toggle\.dataset\.settingToggle==="autostart"[\s\S]*state\.settings\.autoStart=!!\(result&&result\.enabled\)/);
 });
 
 test("Settings opens the supported intro and animation folders", function () {
@@ -426,11 +576,11 @@ test("Settings opens the supported intro and animation folders", function () {
 });
 
 test("offline storage has a visible configurable folder and organized post media", function () {
-  assert.match(main,/DEFAULT_OFFLINE_DIR = app\.isPackaged \? path\.join\(app\.getPath\("documents"\),"Sinrad Offline"\)/);
+  assert.match(main,/DEFAULT_OFFLINE_DIR = app\.isPackaged \? path\.join\(app\.getPath\("documents"\),"SINRAD Offline Storage"\)/);
   assert.match(main,/ipcMain\.handle\("offline-storage-open"/);
   assert.match(main,/ipcMain\.handle\("offline-storage-choose"/);
   assert.match(preload,/offlineStorageOpen:[\s\S]*offlineStorageChoose:/);
-  assert.match(renderer,/settingFolderRow\("Offline library",offlineData\.storagePath,"offline-storage"\)/);
+  assert.match(renderer,/settingFolderRow\("Clipping library",offlineData\.storagePath,"offline-storage"/);
   assert.match(renderer,/key==="offline-storage"[\s\S]*settings-offline-open/);
   assert.match(renderer,/settings-offline-change/);
   assert.match(main,/async function _switchOfflineRoot[\s\S]*await fs\.promises\.cp/);
@@ -438,11 +588,12 @@ test("offline storage has a visible configurable folder and organized post media
   assert.match(offlineFeed,/postFolder=crypto\.createHash[\s\S]*"media\/" \+ postFolder \+ "\/" \+ name/);
 });
 
-test("dedicated views keep visible Back navigation and contextual secondary actions", function () {
-  assert.match(renderer,/data-action="offline-exit">← Back<\/button>/);
-  assert.match(renderer,/data-action="offline-item-back">← Back<\/button>/);
-  assert.match(renderer,/data-action="monitoring-exit">← Back<\/button>/);
-  assert.match(renderer,/data-action="monitoring-post-back">← Back<\/button>/);
+test("dedicated views use persistent navigation and contextual secondary actions", function () {
+  assert.doesNotMatch(renderer,/data-action="offline-exit">← Back<\/button>/);
+  assert.doesNotMatch(renderer,/data-action="offline-item-back">← Back<\/button>/);
+  assert.doesNotMatch(renderer,/data-action="monitoring-exit">← Back<\/button>/);
+  assert.doesNotMatch(renderer,/data-action="monitoring-post-back">← Back<\/button>/);
+  assert.match(renderer,/type==="monitor-post"[^\n]*monitoring-post-back[^\n]*"Back"/);
   assert.match(renderer,/function rememberMonitoringReturn\(id\)/);
   assert.match(renderer,/function monitoringPostNeighbors\(\)/);
   assert.match(renderer,/case "monitoring-post-nav": await navigateMonitoringPost/);
@@ -458,8 +609,8 @@ test("dedicated views keep visible Back navigation and contextual secondary acti
   assert.match(main,/site-preview-v4/);
   assert.match(renderer,/offlineExtensionRequiredModal\(name\)/);
   assert.match(renderer,/function settingsMenuHtml\(key\)/);
-  assert.match(css,/\.setting-row\{min-height:35px;padding:3px 0/);
-  assert.match(css,/\.setting-hotkey-input\{width:150px;flex-basis:150px/);
+  assert.match(shellCss,/\.settings-group \.setting-row\s*\{[^}]*min-height:58px/);
+  assert.match(shellCss,/\.settings-group \.setting-hotkey-input\s*\{[^}]*width:168px/);
 });
 
 test("recently visited links are surfaced first without a boxed badge", function () {
@@ -474,7 +625,7 @@ test("monitoring cards avoid repeated open and unread buttons", function () {
   assert.match(renderer,/function monitoringEventCard\(item\)[\s\S]*<article class="mon-event[\s\S]*data-action="monitoring-event-open"/);
   assert.doesNotMatch(renderer,/data-action="monitoring-event-read"/);
   assert.doesNotMatch(renderer,/>Open ↗<\/button>/);
-  assert.match(renderer,/label\.textContent="Offline"/);
+  assert.match(renderer,/label\.textContent="Clipping"/);
   assert.match(renderer,/label\.textContent="Monitor"/);
   assert.doesNotMatch(renderer,/label\.textContent=offlineMode\?"Exit Offline"/);
   assert.doesNotMatch(renderer,/label\.textContent=monitoringMode\?"Exit Monitor"/);
@@ -487,7 +638,7 @@ test("link menus and Parking controls stay visually quiet", function () {
   assert.doesNotMatch(renderer,/class="cm-site"/);
   assert.doesNotMatch(css,/\.cm-site/);
   assert.doesNotMatch(renderer,/dh-title" style=/);
-  assert.match(css,/\.lot-row:hover\{border-color:#4b463c;background:#1b1a16;box-shadow:none\}/);
+  assert.match(css,/\.lot-row:hover\{border-color:var\(--border\);background:var\(--panel\);box-shadow:none\}/);
   assert.match(css,/\.drill-head \.dh-open\{font-weight:550\}/);
   assert.match(renderer,/mode==="icon"\?'<svg viewBox="0 0 24 24"/);
   assert.match(css,/\.lot-site-preview\{[^}]*border:0[^}]*background:transparent/);
@@ -529,4 +680,60 @@ test("Monitoring downloads are queued, visible globally and ZIP checked",functio
   assert.match(renderer,/function paintMonitoringDownload/);
   assert.match(renderer,/case "monitoring-output-open"/);
   assert.match(monitoringQueue,/class MonitoringDownloadQueue[\s\S]*this\.pending[\s\S]*_pump/);
+});
+
+test("Monitoring collections persist named post groups and expose shared send menus",function(){
+  assert.match(renderer,/function monitoringCollections\(\)[\s\S]*state\.settings\.monitoringCollections/);
+  assert.match(renderer,/function monitoringCollectionAddModal\([\s\S]*New collection[\s\S]*monitoringRecentCollectionId/);
+  assert.match(renderer,/function monitoringCollectionSendMenu\([\s\S]*monitoring-collection-send-recent/);
+  assert.match(renderer,/function monitoringCollectionSendMenu\([\s\S]*monitoring-collection-send/);
+  assert.match(renderer,/type==="monitor-event"[\s\S]*monitoringCollectionSendMenu\(type,id\)/);
+  assert.match(renderer,/type==="monitor-post"[\s\S]*monitoringCollectionSendMenu\(type,id\)/);
+  assert.match(renderer,/type==="monitor-artist-post"[\s\S]*monitoringCollectionSendMenu\(type,id\)/);
+  assert.match(renderer,/type==="monitor-collections"[\s\S]*Add collection/);
+  assert.match(renderer,/case "monitoring-collection-send-recent"[\s\S]*monitoringRecentCollectionId/);
+  assert.match(notificationsCss,/\.mon-collection-grid/);
+  assert.match(css,/\.ci-submenu:hover>\.ci-submenu-panel/);
+});
+
+test("Timeline deck keeps module pages intact and persists readable columns",function(){
+  assert.match(renderer,/const TIMELINE_DEFAULT_COLUMN_WIDTH=450/);
+  assert.match(renderer,/width:TIMELINE_DEFAULT_COLUMN_WIDTH,autoWidth:false/);
+  assert.match(renderer,/Default: 450 px/);
+  assert.match(renderer,/settings:\{timelineDeck:\[\]\}/);
+  assert.doesNotMatch(renderer,/deck\.unshift\(\{key:"deck-reddit-home"/);
+  assert.doesNotMatch(renderer,/deck\[index\]\.id==="reddit"&&deck\.length===1/);
+  assert.match(renderer,/const TIMELINE_MODULES=\{reddit:[\s\S]*notifications:[\s\S]*channels:[\s\S]*compression:[\s\S]*reminders:/);
+  assert.match(renderer,/function timelineDeck\(\)[\s\S]*state\.settings\.timelineDeck=deck/);
+  assert.match(renderer,/case "deck-add"[\s\S]*case "deck-menu"[\s\S]*case "deck-settings"[\s\S]*case "deck-auto-width"[\s\S]*case "deck-stack-left"[\s\S]*case "deck-remove"[\s\S]*case "deck-move"/);
+  assert.match(renderer,/function timelineActivityRows[\s\S]*monitoringData\.events[\s\S]*offlineData\.items[\s\S]*compressionHistory[\s\S]*state\.links/);
+  assert.match(timelineCss,/\.deck-workspace\{[^}]*overflow-x:auto[^}]*overflow-y:hidden/);
+  assert.match(timelineCss,/\.deck-column\.narrow[\s\S]*\.deck-column\.medium[\s\S]*\.deck-column\.wide/);
+  assert.match(deckCss,/\.deck-lane>\.deck-column\+\.deck-column:before[\s\S]*\.deck-context-menu[\s\S]*\.deck-switch/);
+  assert.match(renderer,/function captureTimelinePosition[\s\S]*workspace\.scrollLeft[\s\S]*data-deck-key/);
+  assert.match(renderer,/function timelineSourceMenu[\s\S]*data-deck-width/);
+  assert.match(renderer,/configured:item\.configured!==false[\s\S]*Choose a source from the column menu/);
+  assert.match(renderer,/function openTimelineAddWindow[\s\S]*deck-add-modal[\s\S]*case "deck-add-open"/);
+  assert.match(renderer,/showMenu\(e\.clientX,e\.clientY,mi\("deck-add-open"/);
+  assert.match(renderer,/const column=e\.target\.closest\("\.deck-column"\);if\(column&&!column\.querySelector\("\.deck-empty"\)\)return/);
+  assert.match(renderer,/showCardMenu\(type,id,x,y,columnKey\)/);
+  assert.match(renderer,/columnKey\?monitoringCollectionSendMenu\(type,id,false\)[\s\S]*type==="monitor-event"[\s\S]*mi\("deck-menu",columnKey,"Column settings"/);
+  assert.match(renderer,/if\(enabled&&!monitoringMode&&!offlineMode&&currentView==="home"\)rememberTimelinePosition\(\)/);
+  assert.match(renderer,/data-monitoring-original[\s\S]*sinrad-monitor:\/\/file/);
+  assert.match(main,/needsMediaBackfill[\s\S]*item\.mediaRef&&!\(item\.meta&&item\.meta\.mediaPath\)/);
+  assert.doesNotMatch(renderer,/translateY\(8px\) scale\(\.995\)/);
+  assert.match(renderer,/value:"inbox",label:"Inbox",group:"MONITORING"/);
+  assert.match(renderer,/class="mon-source pawchive"[\s\S]*assets\/pawchive\.png/);
+  assert.match(renderer,/class="mon-event-avatar" data-action="monitoring-monitor-open"/);
+  assert.match(renderer,/image\.draggable=false/);
+  assert.match(renderer,/monitoringFilter==="inbox"\?monitoringNewestRows\(filtered\):offlineMixSources\(filtered\)/);
+  assert.match(renderer,/kind==="channel"\)\{monitoringTab="watchlist";await setMonitoringMode\(true\);await openMonitoringArtist\(id,null\)/);
+  assert.match(deckCss,/Timeline correction pass[\s\S]*\.deck-add-controls\{position:fixed[\s\S]*\.deck-monitor-gallery/);
+  assert.match(renderer,/data-deck-header[\s\S]*data-deck-drag[\s\S]*clearDeckDragMarkers/);
+  assert.match(renderer,/timelineShuffleValue[\s\S]*sort\(function\(a,b\)/);
+  assert.match(main,/_offlineStorageSummaryAsync[\s\S]*fs\.promises\.stat/);
+  assert.match(renderer,/Duplicate column/);
+  assert.match(renderer,/TIMELINE_ADD_GROUPS=\[\['Clipping',[\s\S]*\['Monitoring',[\s\S]*\['Activity',[\s\S]*\['Processing',[\s\S]*Library \/ Personal/);
+  assert.match(renderer,/startDroppedCompressionBatch[\s\S]*compressionBatchStart\(\{sources:sources/);
+  assert.match(main,/Array\.isArray\(input\.sources\)[\s\S]*_safeCompressionSource/);
 });

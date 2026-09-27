@@ -33,6 +33,7 @@ test("Pawchive posts become sorted, deduplicatable monitoring events", function(
   assert.equal(items[0].summary,"New text");
   assert.equal(items[0].mediaUrl,"https://img.pawchive.pw/thumbnail/data/5d/4b/"+"a".repeat(64)+".png");
   assert.equal(items[0].mediaPath,"/5d/4b/"+"a".repeat(64)+".png");
+  assert.equal(items[0].meta.mediaPath,items[0].mediaPath);
   assert.equal(Sources.pawchiveThumbnailUrl({path:"../../secret.png"}),"");
 });
 
@@ -64,6 +65,23 @@ test("Pawchive detail keeps exposed ZIP archives and other file types", function
   assert.deepEqual(detail.files.map(function(file){return file.kind;}),["file","file"]);
   assert.equal(Sources.pawchiveFileUrl(detail.files[0]),"https://file.pawchive.pw/data"+archive);
   assert.equal(Sources.pawchivePostUrl(Sources.parseTarget("https://pawchive.pw/fanbox/user/12"),"34"),"https://pawchive.pw/fanbox/user/12/post/34");
+});
+
+test("Pawchive post pages remain usable when the JSON post endpoint is unavailable", function(){
+  const image="/aa/bb/"+"a".repeat(64)+".png",video="/cc/dd/"+"b".repeat(64)+".mp4";
+  const html='<article data-service="fanbox" data-user="12" data-id="34"><a class="post__user-name">Artist</a><h1 class="post__title"><span>New work</span> <span>(Fanbox)</span></h1><div class="post__published">Published: 2026-09-22 04:30:00</div><div class="post__content"><p>First line</p><p>Second line</p></div><h2>Files</h2><a class="fileThumb" href="https://file.pawchive.pw/data'+image+'?f=cover.png"></a><video><source src="https://file.pawchive.pw/data'+video+'?f=movie.mp4"></video><a class="post__attachment-link" href="https://file.pawchive.pw/data'+video+'?f=movie.mp4"></a></article>';
+  const detail=Sources.parsePawchiveDetailHtml(html);
+  assert.equal(detail.id,"34");assert.equal(detail.title,"New work");assert.equal(detail.author,"Artist");
+  assert.equal(detail.content,"First line\nSecond line");
+  assert.deepEqual(detail.files.map(function(file){return [file.name,file.kind];}),[["cover.png","image"],["movie.mp4","video"]]);
+});
+
+test("Pawchive creator pages replace the unavailable JSON listing endpoint", function(){
+  const image="/aa/bb/"+"a".repeat(64)+".jpeg";
+  const html='<h1 class="user-header__name"><a><span itemprop="name">Artist Name</span></a></h1><small>Showing 1 - 50 of 73</small><article class="post-card post-card--preview" data-id="34" data-service="fanbox" data-user="12"><a href="/fanbox/user/12/post/34"><header class="post-card__header">New work</header><div class="post-card__image-container"><img class="post-card__image" src="https://img.pawchive.pw/thumbnail/data'+image+'"></div><footer class="post-card__footer"><time class="timestamp" datetime="2026-09-22 04:30:00">date</time><div>3 attachments</div></footer></a></article>';
+  const target=Sources.parseTarget("https://pawchive.pw/fanbox/user/12"),posts=Sources.parsePawchivePostsHtml(html,target,Date.now());
+  assert.equal(Sources.pawchiveCreatorNameHtml(html),"Artist Name");assert.equal(Sources.pawchivePostCountHtml(html),73);assert.equal(posts.length,1);
+  assert.equal(posts[0].meta.postId,"34");assert.equal(posts[0].title,"New work");assert.equal(posts[0].author,"Artist Name");assert.equal(posts[0].meta.attachments,3);assert.equal(posts[0].mediaPath,image);assert.equal(posts[0].meta.mediaPath,image);
 });
 
 test("Pawchive works can be limited to an inclusive date range", function(){

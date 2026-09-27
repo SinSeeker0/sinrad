@@ -333,7 +333,7 @@ async function savePageOffline(tab, options) {
     }
     await postJson('/capture/finish', { captureId });
     setStatus(true);
-    if (captureOptions.notify !== false) chrome.notifications.create('sinrad-offline-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Saved for offline use', message: (tab.title || tab.url).slice(0, 180), priority: 0, silent: true });
+    if (captureOptions.notify !== false) chrome.notifications.create('sinrad-offline-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Saved to Clipping', message: (tab.title || tab.url).slice(0, 180), priority: 0, silent: true });
   } catch (error) {
     if (captureId) postJson('/capture/cancel', { captureId }).catch(() => {});
     throw error;
@@ -443,6 +443,7 @@ async function runOfflineJob(job) {
     const target = Math.min(100, Number(job.limit) || 30),candidates = new Map();
     const listings = [{path:'hot/',kind:'hot'},{path:'top/?sort=top&t=week',kind:'top'},{path:'new/',kind:'new'}];
     for (const source of listings) {
+      if((await authorizedRequest("/offline/status",{method:"GET",cache:"no-store"})).paused){await postJson("/offline/job-finish",{sourceId:job.sourceId,ok:true,saved});return;}
       const listing = await chrome.tabs.create({ url: 'https://old.reddit.com/r/' + encodeURIComponent(job.handle) + '/' + source.path, active: false });listingId = listing.id;
       await waitForTab(listing.id, 30000);
       const batch = await gatherRedditCandidates(listing.id, job.handle, known, target, source.kind);
@@ -452,6 +453,7 @@ async function runOfflineJob(job) {
     const selected = Array.from(candidates.values()).sort((a,b) => b.rank-a.rank).slice(0,target);
     if(!selected.length)throw new Error('Reddit did not expose any unseen posts for r/'+job.handle);
     for (const candidate of selected) {
+      if((await authorizedRequest("/offline/status",{method:"GET",cache:"no-store"})).paused)break;
       let postId = null;
       try {
         const post = await chrome.tabs.create({ url:candidate.url, active: false }); postId = post.id;
@@ -465,11 +467,11 @@ async function runOfflineJob(job) {
       finally { await closeBackgroundTab(postId); }
     }
     await postJson('/offline/job-finish', { sourceId: job.sourceId, ok: saved > 0 || failed === 0, saved, failed, error: saved === 0 ? 'Reddit pages could not be captured' : '' });
-    if (saved) chrome.notifications.create('sinrad-reddit-sync-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Offline Reddit updated', message: 'Saved ' + saved + ' new r/' + job.handle + ' post' + (saved === 1 ? '' : 's'), priority: 0, silent: true });
+    if (saved) chrome.notifications.create('sinrad-reddit-sync-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Clipping Reddit updated', message: 'Saved ' + saved + ' new r/' + job.handle + ' post' + (saved === 1 ? '' : 's'), priority: 0, silent: true });
   } catch (error) {
     await closeBackgroundTab(listingId);
     await postJson('/offline/job-finish', { sourceId: job.sourceId, ok: false, saved, failed, error: String(error && error.message || error).slice(0, 300) }).catch(() => {});
-    setStatus(false);chrome.notifications.create('sinrad-reddit-sync-error-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Offline Reddit needs attention', message: String(error && error.message || error).slice(0, 180), priority: 1, silent: true });
+    setStatus(false);chrome.notifications.create('sinrad-reddit-sync-error-' + Date.now(), { type: 'basic', iconUrl: 'icon.png', title: 'Clipping Reddit needs attention', message: String(error && error.message || error).slice(0, 180), priority: 1, silent: true });
   }
 }
 
@@ -503,8 +505,11 @@ chrome.runtime.onInstalled.addListener(() => {
     });
     chrome.contextMenus.create({
       id: 'sinrad-add-subreddit-offline',
-      title: 'Add subreddit to Offline',
+      title: 'Add subreddit to Clipping',
       contexts: ['page']
+    });
+    chrome.contextMenus.create({
+      id: 'sinrad-add-artist-monitoring',title:'Add artist to Monitoring',contexts:['all']
     });
     chrome.contextMenus.create({
       id: 'sinrad-park-all',
@@ -529,10 +534,13 @@ chrome.contextMenus.onClicked.addListener((info, tab) => {
     const sel = (info.selectionText || '').trim();
     const targetUrl = info.linkUrl || (/^https?:\/\//i.test(sel) ? sel : tab.url);
     saveOne(targetUrl, tab.title, false).catch(() => {});
+  } else if (info.menuItemId === 'sinrad-add-artist-monitoring') {
+    const monitoringUrl=info.linkUrl||info.pageUrl||info.frameUrl||(tab&&tab.url)||info.srcUrl||'';
+    postJson('/monitoring/source-add',{url:monitoringUrl}).then(()=>{setStatus(true);chrome.notifications.create('sinrad-monitor-'+Date.now(),{type:'basic',iconUrl:'icon.png',title:'Added to Monitoring',message:'SINRAD is watching this artist.',priority:0,silent:true});}).catch(notifyUnavailable);
   } else if (info.menuItemId === 'sinrad-add-subreddit-offline') {
     let handle='';try{const match=new URL(tab&&tab.url||'').pathname.match(/^\/r\/([A-Za-z0-9_]{2,21})(?:\/|$)/i);handle=match?match[1]:'';}catch(_){}
     if(!handle){notifyUnavailable(new Error('Open a subreddit page first'));return;}
-    postJson('/offline/source-add',{handle}).then(() => chrome.notifications.create('sinrad-reddit-source-'+Date.now(),{type:'basic',iconUrl:'icon.png',title:'Added to Offline',message:'r/'+handle+' will keep an unread pool in SINRAD.',priority:0,silent:true})).catch((error)=>notifyUnavailable(error));
+    postJson('/offline/source-add',{handle}).then(() => chrome.notifications.create('sinrad-reddit-source-'+Date.now(),{type:'basic',iconUrl:'icon.png',title:'Added to Clipping',message:'r/'+handle+' will keep an unread pool in SINRAD.',priority:0,silent:true})).catch((error)=>notifyUnavailable(error));
   } else if (info.menuItemId === 'sinrad-park-all' || info.menuItemId === 'sinrad-park-all-close') {
     const shouldClose = info.menuItemId === 'sinrad-park-all-close';
     

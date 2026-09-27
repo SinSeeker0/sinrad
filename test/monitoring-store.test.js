@@ -41,6 +41,15 @@ test("monitoring events deduplicate and preserve read state", function(){
   });
 });
 
+test("monitoring refresh backfills original Pawchive media paths", function(){
+  withStore(function(store,root){
+    const monitor=store.add({target:target(),label:"Artist"}),key="pawchive:patreon:52511814:post-1",mediaPath="/aa/bb/"+"c".repeat(64)+".jpg";
+    store.mergeEvents(monitor.id,[{key:key,title:"New post",date:Date.now(),mediaRef:"media/"+"a".repeat(64)+".jpg"}]);
+    assert.equal(store.refreshEventMediaPaths(monitor.id,[{key:key,mediaPath:mediaPath}]),true);
+    const reloaded=new MonitoringStore(root);reloaded.load();assert.equal(reloaded.snapshot().events[0].meta.mediaPath,mediaPath);
+  });
+});
+
 test("monitoring media stays inside its private cache", async function(){
   const root=fs.mkdtempSync(path.join(os.tmpdir(),"sinrad-monitor-media-test-"));
   try{
